@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- iPad: ホーム画面に置くとアドレスバー無しの全画面アプリとして開く -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="ガッシャン">
+<meta name="theme-color" content="#2f93da">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+<!-- 実機での「古いHTMLキャッシュで島が出ない」を恒久回避（毎回サーバから取り直す） -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>ガッシャンランド</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;overflow:hidden;
+    font-family:"Hiragino Maru Gothic ProN","Rounded Mplus 1c","Yu Gothic Rounded",system-ui,sans-serif;
+    background:#11151d;color:#fff;
+    touch-action:pan-x pan-y;overscroll-behavior:none;
+    -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+  #app{position:fixed;inset:0;}
+  canvas{display:block;width:100%;height:100%;touch-action:none;}
+  .hide{display:none!important;}
+
+  /* ---- menu (しまめぐり マップ せんたく がめん) ---- */
+  #menu{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;
+    background:linear-gradient(180deg,#8fd6ff 0%,#74c4f0 16%,#49aae6 34%,#2f93da 60%,#2785cf 100%);}
+  /* そら の かざり: おひさま + くも（タップは すりぬける） */
+  #sky{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0;}
+  #sky .sun{position:absolute;right:-24px;top:-24px;width:120px;height:120px;border-radius:50%;
+    background:radial-gradient(circle at 38% 36%,#fff6c0,#ffd23f 58%,#ffb23a);
+    box-shadow:0 0 46px rgba(255,206,80,.7);animation:sunPulse 4s ease-in-out infinite;}
+  #sky .cloud{position:absolute;width:64px;height:24px;background:#fff;border-radius:20px;
+    box-shadow:0 8px 16px rgba(110,165,210,.28);opacity:.95;}
+  #sky .cloud::before,#sky .cloud::after{content:"";position:absolute;background:#fff;border-radius:50%;}
+  #sky .cloud::before{width:34px;height:34px;left:8px;top:-16px;}
+  #sky .cloud::after{width:26px;height:26px;right:8px;top:-11px;}
+  #sky .c1{left:7%;top:10%;animation:drift 9s ease-in-out infinite;}
+  #sky .c2{left:60%;top:7%;width:84px;height:30px;animation:drift 12s ease-in-out infinite reverse;}
+  #sky .c3{left:33%;top:17%;width:50px;height:20px;opacity:.85;animation:drift 14s ease-in-out infinite;}
+  #sky .c4{left:82%;top:21%;width:54px;height:21px;opacity:.8;animation:drift 11s ease-in-out infinite reverse;}
+  @keyframes drift{0%,100%{transform:translateX(0)}50%{transform:translateX(16px)}}
+  @keyframes sunPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+
+  #menuInner{position:relative;z-index:1;width:100%;max-width:680px;margin:auto;padding:10px 12px 14px;}
+  #brand{text-align:center;padding:2px 0 4px;}
+  #brand h1{display:block;font-size:clamp(28px,7.4vw,46px);color:#ffd23f;letter-spacing:2px;
+    -webkit-text-stroke:2px #7a5200;text-shadow:0 4px 0 #c98a00,0 9px 0 #a06d00,0 14px 22px rgba(60,90,130,.45);
+    transform-origin:center bottom;animation:titleBob 2.6s ease-in-out infinite;}
+  @keyframes titleBob{0%,100%{transform:translateY(0) rotate(-1.5deg)}50%{transform:translateY(-6px) rotate(1.5deg)}}
+  #brand p{display:inline-block;margin-top:6px;font-size:clamp(12px,3.4vw,16px);color:#3a7bd0;font-weight:800;
+    background:#fff;padding:4px 16px;border-radius:22px;box-shadow:0 3px 0 rgba(120,170,210,.55);}
+  #grid{display:none;}              /* engineの旧メニュー（非表示） */
+  /* ---- テーマパーク島マップ（横スワイプで島チェンジ・1島10アトラクション） ---- */
+  #mapWrap{position:relative;width:min(96vw, calc(100vh - 150px), 600px);margin:6px auto 0;}
+  #map{position:relative;width:100%;aspect-ratio:1/1;display:flex;
+    overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;border-radius:16px;
+    scroll-behavior:smooth;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  #map::-webkit-scrollbar{display:none;}
+  /* 1つの島ページ（画面幅いっぱい・スナップ） */
+  .isle{position:relative;flex:0 0 100%;height:100%;scroll-snap-align:center;
+    background-size:contain;background-repeat:no-repeat;background-position:center;}
+  /* アトラクション・ピン（島の各場所に点在。タップで起動） */
+  .pin{position:absolute;transform:translate(-50%,-50%);background:none;border:none;padding:0;cursor:pointer;
+    z-index:2;display:flex;flex-direction:column;align-items:center;
+    animation:pinPop .45s cubic-bezier(.34,1.56,.64,1) backwards;}
+  .pin .plate{position:relative;width:50px;height:50px;
+    border-radius:50% 50% 50% 50%/56% 56% 44% 44%;
+    background:radial-gradient(circle at 38% 30%,#ffffff,#dfecfb);border:3px solid #fff;
+    box-shadow:0 4px 9px rgba(8,40,70,.5);display:flex;align-items:center;justify-content:center;
+    transition:transform .1s;}
+  .pin .plate::after{content:"";position:absolute;bottom:-7px;left:50%;transform:translateX(-50%);
+    border:7px solid transparent;border-top-color:#fff;filter:drop-shadow(0 2px 1px rgba(8,40,70,.3));}
+  .pin .ic{width:37px;height:37px;}
+  .pin:active .plate{transform:scale(.88);}
+  .pin .nm{margin-top:9px;font-size:11px;font-weight:800;color:#fff;white-space:nowrap;
+    background:rgba(18,74,120,.85);padding:2px 8px;border-radius:9px;max-width:100px;overflow:hidden;
+    text-overflow:ellipsis;text-shadow:0 1px 1px rgba(0,30,60,.8);box-shadow:0 2px 4px rgba(10,50,90,.4);}
+  .pin.locked{filter:grayscale(.6) brightness(.8);}
+  @keyframes pinPop{from{opacity:0;transform:translate(-50%,-50%) scale(.3)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+  /* 左右の島おくりボタン（PC/わかりやすさ用。スマホはスワイプでもOK） */
+  .narr{position:absolute;top:50%;transform:translateY(-50%);z-index:4;width:38px;height:38px;border:none;
+    border-radius:50%;background:rgba(255,255,255,.82);color:#2f7fc0;font-size:18px;font-weight:900;
+    box-shadow:0 3px 7px rgba(8,40,70,.4);cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .narr:active{transform:translateY(-50%) scale(.9);}
+  #prevIsle{left:-6px;} #nextIsle{right:-6px;}
+  .narr.off{opacity:0;pointer-events:none;}
+  /* ページ ドット */
+  #dots{display:flex;justify-content:center;gap:8px;margin-top:10px;}
+  #dots b{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.5);transition:.2s;}
+  #dots b.on{background:#fff;width:24px;border-radius:5px;}
+  #ver{text-align:center;margin-top:8px;font-size:11px;font-weight:700;color:rgba(255,255,255,.55);letter-spacing:1px;}
+
+  /* ---- スマホ横向き: タイトルを左・大きな島マップを右に並べて画面を活かす ---- */
+  @media (orientation:landscape) and (max-height:600px){
+    #menuInner{display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;
+      justify-content:center;gap:0 26px;max-width:none;padding:6px 18px;}
+    #brand{flex:0 0 auto;text-align:center;padding:0;}
+    #brand h1{font-size:clamp(22px,5.2vh,42px);}
+    #brand p{margin-top:6px;font-size:clamp(11px,2.6vh,15px);}
+    #mapWrap{flex:0 0 auto;width:min(92vh,52vw);margin:0;}
+    #dots{flex-basis:100%;order:5;margin-top:8px;}
+    #ver{flex-basis:100%;order:6;margin-top:3px;}
+  }
+
+  /* ---- in-game chrome ---- */
+  #gbar{position:absolute;top:0;left:0;right:0;z-index:6;display:flex;align-items:center;
+    gap:10px;pointer-events:none;
+    padding:calc(10px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) 10px calc(14px + env(safe-area-inset-left));}
+  #backBtn{pointer-events:auto;cursor:pointer;border:none;font-weight:800;color:#1a1a1a;
+    font-size:18px;padding:9px 18px;border-radius:14px;background:rgba(255,255,255,.92);
+    box-shadow:0 4px 0 rgba(0,0,0,.3);}
+  #backBtn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.3);}
+  #gTitle{font-weight:800;font-size:18px;text-shadow:0 2px 4px rgba(0,0,0,.6);}
+  #score{margin-left:auto;font-weight:800;font-size:22px;text-shadow:0 2px 4px rgba(0,0,0,.6);
+    background:rgba(0,0,0,.25);padding:4px 14px;border-radius:14px;
+    transform-origin:center;will-change:transform;}
+  #score.pop{animation:scorePop .26s ease-out;}
+  @keyframes scorePop{0%{transform:scale(1)}35%{transform:scale(1.45);color:#ffe066}100%{transform:scale(1);color:#fff}}
+  #muteBtn{pointer-events:auto;cursor:pointer;border:none;width:40px;height:40px;border-radius:12px;
+    font-size:18px;background:rgba(0,0,0,.3);color:#fff;}
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="c" class="hide"></canvas>
+  <div id="gbar" class="hide">
+    <button id="backBtn">◀ もどる</button>
+    <span id="gTitle"></span>
+    <span id="score">0</span>
+    <button id="muteBtn" aria-label="おと"></button>
+  </div>
+  <div id="menu">
+    <div id="sky" aria-hidden="true">
+      <div class="sun"></div>
+      <div class="cloud c1"></div>
+      <div class="cloud c2"></div>
+      <div class="cloud c3"></div>
+      <div class="cloud c4"></div>
+    </div>
+    <div id="menuInner">
+      <div id="brand"><h1>ガッシャンランド</h1><p>あそびたい アトラクションを タップ！</p></div>
+      <div id="grid"></div><!-- engineの旧メニュー（非表示） -->
+      <div id="mapWrap">
+        <button id="prevIsle" class="narr" aria-label="まえのしま">◀</button>
+        <div id="map"></div><!-- 島ページ（下のスクリプトで生成） -->
+        <button id="nextIsle" class="narr" aria-label="つぎのしま">▶</button>
+      </div>
+      <div id="dots"></div>
+      <div id="ver">v60 ipad</div><!-- 新版確認用の小さな目印 -->
+    </div>
+  </div>
+</div>
+<!-- ===== scripts ===== -->
+<!-- ?v= はキャッシュ無効化用。engine/registry を更新したら数字を上げる（実機の旧キャッシュ対策） -->
+<script src="engine.js?v=60"></script>
+<script src="registry.js?v=60"></script>
+<!-- 完成ゲーム（見本）。エージェントは新しいゲームを games/ に作り、下にscriptタグを追加する -->
+<script src="games/crane.js?v=60"></script>
+<script src="games/punch.js?v=60"></script>
+<script src="games/hammer.js?v=60"></script>
+<script src="games/truck.js?v=60"></script>
+<script src="games/rocket.js?v=60"></script>
+<script src="games/chain.js?v=60"></script>
+<script src="games/slash.js?v=60"></script>
+<script src="games/cannon.js?v=60"></script>
+<script src="games/volcano.js?v=60"></script>
+<script src="games/robot.js?v=60"></script>
+<script src="games/drill.js?v=60"></script>
+<script src="games/bowl.js?v=60"></script>
+<script src="games/maze.js?v=60"></script>
+<script src="games/domino.js?v=60"></script>
+<script src="games/race.js?v=60"></script>
+<script src="games/jet.js?v=60"></script>
+<script src="games/glass.js?v=60"></script>
+<script src="games/meteor.js?v=60"></script>
+<script src="games/balloon.js?v=60"></script>
+<script src="games/dino.js?v=60"></script>
+<script src="games/excavator.js?v=60"></script>
+<!-- 島C: 雪テーマ 10本 -->
+<script src="games/snowman.js?v=60"></script>
+<script src="games/icebreak.js?v=60"></script>
+<script src="games/snowball.js?v=60"></script>
+<script src="games/icicle.js?v=60"></script>
+<script src="games/avalanche.js?v=60"></script>
+<script src="games/snowplow.js?v=60"></script>
+<script src="games/penguin.js?v=60"></script>
+<script src="games/blizzard.js?v=60"></script>
+<script src="games/frostbeam.js?v=60"></script>
+<script src="games/igloo.js?v=60"></script>
+<!-- 島D: 火山テーマ 10本 -->
+<script src="games/magma.js?v=60"></script>
+<script src="games/eruption.js?v=60"></script>
+<script src="games/lavaball.js?v=60"></script>
+<script src="games/rockfall.js?v=60"></script>
+<script src="games/geyser.js?v=60"></script>
+<script src="games/fireball.js?v=60"></script>
+<script src="games/obsidian.js?v=60"></script>
+<script src="games/ashbomb.js?v=60"></script>
+<script src="games/crater.js?v=60"></script>
+<script src="games/magmaflow.js?v=60"></script>
+<!-- 島E: お菓子テーマ 10本 -->
+<script src="games/gummy.js?v=60"></script>
+<script src="games/cookiebreak.js?v=60"></script>
+<script src="games/candyshoot.js?v=60"></script>
+<script src="games/cakesmash.js?v=60"></script>
+<script src="games/gumball.js?v=60"></script>
+<script src="games/donutfall.js?v=60"></script>
+<script src="games/jellypop.js?v=60"></script>
+<script src="games/icecream.js?v=60"></script>
+<script src="games/chocofount.js?v=60"></script>
+<script src="games/candyswirl.js?v=60"></script>
+<!-- AGENT: ここに新しい <script src="games/xxx.js?v=60"></script> を追加（Engine.start()の前） -->
+<script>Engine.start();</script>
+<!-- しまめぐりマップ: Engine.meta の各ゲームを島として航路上に並べ、タップで Engine.launch -->
+<script>
+(function(){
+  var lockSvg='<svg class="ic" viewBox="0 0 64 64"><rect x="20" y="28" width="24" height="20" rx="4" fill="rgba(255,255,255,.85)"/><path d="M24 28 v-6 a8 8 0 0 1 16 0 v6" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="4"/></svg>';
+  // じゅんび中の「？」(ミステリー)アイコン
+  var qSvg='<svg class="ic" viewBox="0 0 64 64"><path d="M24 24 a8 8 0 0 1 16 0 c0 6 -8 6 -8 12" fill="none" stroke="#9fb4cc" stroke-width="6" stroke-linecap="round"/><circle cx="32" cy="46" r="3.4" fill="#9fb4cc"/></svg>';
+  var PER=10;                               // 1島あたりのアトラクション数(既定)
+  var ISLE_CAP=[11,10,10,10,10];            // 島ごとの定員(島A=11: ショベルカーを解体系の仲間に追加)
+  var ISLE_IMG=['island_map_a.jpg','island_map_b.jpg','island_map_c.jpg','island_map_d.jpg','island_map_e.jpg'];   // 島ごとの背景（順に巡回）
+  // 島ごとの専用アトラクション座標（％）。島の絵のランドマークとゲーム内容を合わせて配置。
+  var ISLE_POS=[
+    [ // 島A 公園: クレーン=赤い建物 / ロケット=丘のテント / 火山=岩山 / 大砲=ボート / ロボ=メリーゴーランド
+      // 11個目=ショベルカー(工事現場らしく橋のたもとの空き地)
+      [40,32],[60,38],[21,43],[75,52],[30,11],[36,54],[47,75],[29,81],[73,16],[84,61],[58,66]
+    ],
+    [ // 島B 公園: ドリル=岩場 / ボウリング=丸プール / ドミノ=大テント / 隕石=お城テント / 風船=パラソル
+      [45,84],[38,30],[26,71],[43,52],[55,62],[24,26],[68,36],[52,13],[13,26],[78,44]
+    ],
+    [ // 島C 雪: つらら=小屋 / ペンギン=氷の湖 / なだれ=雪の斜面 / ふぶき=湖面 / イグルー=雪山
+      [20,13],[28,32],[48,42],[72,9],[47,20],[20,76],[68,52],[32,57],[58,70],[80,35]
+    ],
+    [ // 島D 火山: だいふんか=火口 / がんせき=左の峰 / ようがんボール=斜面 / ゲイザー=滝 / マグマ=溶岩の池
+      [26,63],[58,9],[46,28],[33,12],[55,47],[80,48],[12,51],[77,30],[63,64],[15,33]
+    ],
+    [ // 島E お菓子: ケーキ=巨大ケーキ塔 / アイス=ソフトクリーム屋台 / クッキー=チョコの橋 / ガムボール=ロリポップ園
+      [46,78],[33,63],[64,22],[55,38],[15,20],[77,60],[16,58],[42,17],[51,59],[75,30]
+    ]
+  ];
+  var POS=ISLE_POS[0];   // フォールバック（6島目以降を足したらISLE_POSにも1行追加）
+  function build(){
+    var map=document.getElementById('map');
+    if(!map||!window.Engine||!Engine.meta||!Engine.meta.length) return;
+    var meta=Engine.meta, html='';
+    // 島ごとの定員(ISLE_CAP)で分割。未指定の島は PER。合計が meta 数に満たない分は末尾の島に追加。
+    var caps=[],rest=meta.length,s2=0;
+    while(rest>0){ var c=(ISLE_CAP[s2]||PER); if(c>rest)c=rest; caps.push(c); rest-=c; s2++; }
+    var isles=caps.length, off=0;
+    for(var s=0;s<isles;s++){
+      html+='<div class="isle" data-isle="'+s+'" style="background-image:url(assets/'+ISLE_IMG[s%ISLE_IMG.length]+')">';
+      for(var j=0;j<caps[s];j++){
+        var k=off+j; if(k>=meta.length) break;
+        var m=meta[k], playable=!!(Engine.builds&&Engine.builds[m.id]), p=(ISLE_POS[s]||POS)[j]||[50,50];
+        html+='<button class="pin'+(playable?'':' locked')+'" data-i="'+k+'" '
+          +'style="left:'+p[0]+'%;top:'+p[1]+'%;animation-delay:'+(j*0.04).toFixed(2)+'s">'
+          +'<span class="plate">'+(playable?m.icon:qSvg)+'</span>'
+          +'<span class="nm">'+m.name+'</span>'
+          +'</button>';
+      }
+      html+='</div>';
+      off+=caps[s];
+    }
+    map.innerHTML=html;
+    var btns=map.getElementsByClassName('pin');
+    for(var x2=0;x2<btns.length;x2++){(function(btn){
+      var idx=+btn.getAttribute('data-i'), m=meta[idx];
+      if(Engine.builds&&Engine.builds[m.id]) btn.addEventListener('click',function(){Engine.launch(m);});
+    })(btns[x2]);}
+    // ページドット
+    var dots=document.getElementById('dots'); if(dots){ var dh='';
+      for(var d=0;d<isles;d++) dh+='<b'+(d===0?' class="on"':'')+'></b>'; dots.innerHTML=dh; }
+    setupPager(map,isles);
+  }
+  function setupPager(map,isles){
+    var dots=document.getElementById('dots');
+    var prev=document.getElementById('prevIsle'), next=document.getElementById('nextIsle');
+    function cur(){ return Math.round(map.scrollLeft/map.clientWidth); }
+    function refresh(){ var c=cur();
+      if(dots) for(var i=0;i<dots.children.length;i++) dots.children[i].className=(i===c?'on':'');
+      if(prev) prev.className='narr'+(c<=0?' off':'');
+      if(next) next.className='narr'+(c>=isles-1?' off':'');
+    }
+    function go(i){ i=Math.max(0,Math.min(isles-1,i)); map.scrollLeft=i*map.clientWidth; setTimeout(refresh,80); }
+    map.onscroll=function(){ clearTimeout(map._st); map._st=setTimeout(refresh,60); };
+    if(prev) prev.onclick=function(){ go(cur()-1); };
+    if(next) next.onclick=function(){ go(cur()+1); };
+    refresh();
+  }
+  window.buildIslandMap=build;
+  // 実機での確実起動: Engine.meta が埋まるまで数回リトライ（cold load の取りこぼし防止）
+  var tries=0;
+  function boot(){
+    var map=document.getElementById('map');
+    if(map&&window.Engine&&Engine.meta&&Engine.meta.length){
+      build();
+      if(!map.getElementsByClassName('pin').length && tries<20){ tries++; setTimeout(boot,80); }
+      return;
+    }
+    if(tries++<40) setTimeout(boot,60);
+  }
+  boot();
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot);
+  window.addEventListener('load',boot);
+  var rt;
+  window.addEventListener('resize',function(){clearTimeout(rt);rt=setTimeout(function(){
+    var menu=document.getElementById('menu');
+    if(menu&&!menu.classList.contains('hide')) build();
+  },160);});
+})();
+</script>
+</body>
+</html>
