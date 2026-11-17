@@ -2,7 +2,7 @@ function build_donutfall(api){
   const g=api.g;
   api.preload(["bg.jpg","choc.png","golddonut.png"]);   // 画像アセット(無ければ従来の手描きにフォールバック)。cake.pngは生成2回とも皿/台が消えず不採用(手描きのみ)
   let sweets=[],shards=[],rings=[],sparks=[],floats=[],motes=[],clouds=[],balloons=[];
-  let R,groundY,spawnT=0,count=0,combo=0,comboT=0,tsec=0;
+  let R,groundY,spawnT=0,idleT=0,count=0,combo=0,comboT=0,tsec=0;
   // stage progression: clear a quota -> "ステージ クリア!" -> harder endless. ミスでゲームオーバーにしない。
   let stage=1,stageKill=0,stageGoal=8,clearT=0,clearStage=0,flash=0,flashHue="#fff";
   let goldSeenThisStage=false; // ⑤ ピティ: このステージでまだゴールドが出ていないか
@@ -22,6 +22,8 @@ function build_donutfall(api){
     {a:"#d6f5e6",b:"#bfeede",c:"#fff0c4"}, // 4 mint candy
     {a:"#ffe0d0",b:"#ffc9d6",c:"#e3d0ff"}  // 5 peach dream
   ];
+  // 第4ラウンド: 判定を半径x1.35→x1.1へ絞る(狙わない連打が約半分当たる密度を下げる)。直径130px級の的は指(44px)より十分大きいまま。下限は指の半径相当。
+  const HIT_K=1.1,HIT_MIN=30;
   function sky(){return SKY[(stage-1)%SKY.length];}
   function goalFor(s){return 13+(s-1)*4;}         // 13,17,21,25,29（7〜8歳向けに手応えを増やした）
   // fall speed scales with stage so the テンポ感 rises endlessly（7〜8歳向けに少し速く）
@@ -29,7 +31,10 @@ function build_donutfall(api){
   // tap側にも明確な改善が出なかった(quietはむしろ10.9→11.4に悪化)ためskip。据え置き。
   function fallSpeed(){return clamp(2.75+(stage-1)*0.56,2.75,9.4);}
   // 第2ラウンド改善: 補充間隔の上限を28→22に下げ、maxQuietSec(無反応の最長秒)を縮める。特に指をなぞる操作(drag)での間延び対策
-  function spawnGap(){const g0=clamp(24-(stage-1)*2,10,22);return fever>0?Math.max(8,g0*0.45):g0;}
+  // 第4ラウンド: ステージ1だけ補充間隔を伸ばして同時数を約8個に(どこを押しても当たる密度を下げる)。maxQuietSecを見ながら調整
+  const STAGE1_GAP=22;
+  const IDLE_HELP=210;
+  function spawnGap(){const g0=stage<=1?STAGE1_GAP:clamp(24-(stage-1)*2,10,22);return fever>0?Math.max(8,g0*0.45):g0;}
   // hitStop は大ヒット限定 + 30フレーム以上のクールダウン
   function tryHitStop(f){if(hsCd<=0){api.hitStop(f);hsCd=32;}}
 
@@ -48,8 +53,9 @@ function build_donutfall(api){
   // 第2ラウンド改善: 1個目は最初から画面内、かつ画面中央寄り(H*0.25)へ直接置く。低学年のタップは画面中央付近に集中するため、
   // 端(H*0.18やそれより上)より中央寄りに置いたほうが最初のタップで当たりやすい(firstScoreSecの中央値3.75秒/3.8秒→3秒以内を狙う)。
   // 2個目は画面上端近くに直接置き(H*0.08)、0秒時点で2個とも画面内に見える状態を作る。
-  spawn();sweets[sweets.length-1].y=api.H*0.25;
+  spawn();{const f=sweets[sweets.length-1];f.y=api.H*0.25;f.x=api.W*0.5;f.vx=0;f.vy=fallSpeed()*0.7;}
   spawn();sweets[sweets.length-1].y=api.H*0.08;
+  spawn();{const t=sweets[sweets.length-1];t.y=api.H*0.4;t.x=api.W*(Math.random()<0.5?0.3:0.7);t.vy=fallSpeed()*0.8;}
 
   function pickType(){
     const bag=["donut","donut","candy","choc","mini","mini"]; // ⑦ 一口サイズの小さい飴(mini)も混ぜる
@@ -74,7 +80,7 @@ function build_donutfall(api){
     else if(type==="gold"){col="#ffd23f";r=R*1.08;}
     else if(type==="rainbow"){col=pick(PAL);r=R*1.14;} // 描画側で毎フレーム虹色に色替わり
     else if(type==="mini"){col=pick(PAL);r=R*0.6;}     // ⑦ 小さい一口サイズ(大きいcake/gold/rainbowの逆側)
-    sweets.push({x:rnd(r*1.2,api.W-r*1.2),y:-r*1.4,
+    sweets.push({x:stage<=1?clamp(api.W*rnd(0.16,0.84),r*1.2,api.W-r*1.2):rnd(r*1.2,api.W-r*1.2),y:-r*1.4,
       vy:fallSpeed()*rnd(0.85,1.15)*(type==="gold"||type==="rainbow"?0.66:1),
       vx:rnd(-0.4,0.4),type,col,hp,r,rot:rnd(0,TAU),vr:rnd(-0.04,0.04),
       wob:rnd(0,TAU),flash:0,dead:false});
@@ -206,7 +212,7 @@ function build_donutfall(api){
     const isLucky=(s.type==="donut"||s.type==="candy"||s.type==="cake"||s.type==="gummy"||s.type==="mini")&&s.col===luckyColor;
     if(isLucky){gain+=1;luckyMsgT=luckySeen?Math.max(luckyMsgT,0.7):1.6;luckySeen=true;}
     if(fever>0)gain*=2; // フィーバー中は点2倍
-    count+=gain;stageKill++;api.setScore(count);
+    count+=gain;stageKill++;api.setScore(count);idleT=0;
     combo++;comboT=0.9;
     api.slide(380,150,0.12,0.3,"square");api.noise(0.1,0.18,2000);
     api.tone(520*Math.pow(2,clamp(combo,0,10)/12),0.12,"triangle",0.12);
@@ -235,7 +241,7 @@ function build_donutfall(api){
       if(type!=="down")return;
       for(let i=sweets.length-1;i>=0;i--){const s=sweets[i];
         if(s.dead)continue;
-        if(Math.hypot(x-s.x,y-s.y)<s.r*1.35){crack(s,s.x,s.y);return;}}
+        if(Math.hypot(x-s.x,y-s.y)<Math.max(s.r*HIT_K,HIT_MIN)){crack(s,s.x,s.y);return;}}
       // ④ ふうせん ひみつタップ: お菓子に当たらなかったタップが風船に届いたら、ポンッと割れてキラキラ(減点なし・ごほうび)
       for(const bl of balloons){
         if(Math.hypot(x-bl.x,y-bl.y)<bl.r*1.25){
@@ -327,6 +333,10 @@ function build_donutfall(api){
       // ---- spawn ----
       const paused=clearT>0;
       if(!paused){spawnT-=dt;if(spawnT<=0){spawn();spawnT=spawnGap();}}
+      // 第4ラウンド: 判定を絞った代わりの助け舟。5秒ほど何も割れていなければ、画面中央の上から1個だけゆっくり落とす(迷子の子が置いていかれない)
+      if(!paused){idleT+=dt;if(idleT>=IDLE_HELP){idleT=0;spawn();const h=sweets[sweets.length-1];
+        if(h.type==="cake"){h.type="donut";h.hp=1;h.r=R;}
+        h.x=api.W*rnd(0.4,0.6);h.vx=0;h.y=-h.r*0.4;h.vy=fallSpeed()*0.6;}}
 
       // ---- sweets update + draw ----
       for(const s of sweets){
@@ -484,9 +494,13 @@ function build_donutfall(api){
 
   function drawSweet(s){
     const r=s.r,wob=Math.sin(s.wob)*0.06;
-    g.save();g.translate(s.x,s.y);g.rotate(s.rot*0.4);g.scale(1+wob,1-wob);
-    // shadow
-    g.fillStyle="rgba(120,80,100,.18)";g.beginPath();g.ellipse(0,r*0.95,r*0.7,r*0.22,0,0,TAU);g.fill();
+    g.save();g.translate(s.x,s.y);g.scale(1+wob,1-wob);
+    // shadow(回転の外で描く=傾いた灰色の楕円に見えない)
+    g.fillStyle="rgba(120,80,100,.22)";g.beginPath();g.ellipse(0,r*0.95,r*0.7,r*0.22,0,0,TAU);g.fill();
+    // 第4ラウンド: 白い縁取り+薄い外周影で、雲の上の淡色ドーナツ・白い飴も背景から浮かせる
+    g.save();g.strokeStyle="rgba(255,255,255,.9)";g.lineWidth=3;g.shadowColor="rgba(90,50,90,.35)";g.shadowBlur=8;
+    g.beginPath();g.arc(0,0,Math.max(0,r*1.0),0,TAU);g.stroke();g.restore();
+    g.rotate(s.rot*0.4);
     // A: ゴールドは後光+回転する光のレイで一目でわかる
     if(s.type==="gold"){
       const pu=0.6+0.4*Math.sin(s.wob*3);

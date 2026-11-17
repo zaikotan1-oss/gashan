@@ -8,10 +8,13 @@ function buildAvalanche(api){
   // ⑥ 同フレーム内で複数のfloatが同じ場所に出て重ならないよう、frame()の先頭で0に戻し
   //   floats.pushのたびに積み上げる縦オフセット(コンボ/キラキラ/にじいろ/ラッキー/ジャストヒットが対象)
   let floatStack=0;
+  let lastJustT=-9; // ⑥ 「ジャストヒット!」を最後に文字で出した時刻(0.5秒に1回まで)
+  // ⑥ 同時に画面に出る浮かぶ文字は最大3個(古い順に消す)。重なって読めなくなるのを防ぐ。
+  function pushFloat(f){floats.push(f);while(floats.length>3)floats.shift();}
   let groundY,slopeTop,slopeBot,slopeX0,slopeX1,unit;
   let count=0,combo=0,comboT=0,tsec=0,flash=0,chargeT=0,lastStopT=-9;
   // stage progression: clear a number of obstacles -> "ステージ クリア!" -> harder, endless
-  let stage=1,stageKill=0,stageGoal=10,clearT=0,clearStage=0;
+  let stage=1,stageKill=0,stageGoal=8,clearT=0,clearStage=0;
   // FEVER TIME: destroying blocks fills a gauge -> 12s of rainbow madness
   // (everything 1-hit, double points, extra obstacles). "また あれを 出したい!"
   let fever=0,feverGauge=0,feverBanner=0;
@@ -26,7 +29,7 @@ function buildAvalanche(api){
     {top:"#bff0e6",mid:"#9fe0d0",low:"#e8fff8",accent:"#3fffb0",name:"こおりの ゆきやま"}  // 5 frost
   ];
   function curBg(){return STAGE_BG[(stage-1)%STAGE_BG.length];}
-  function stageGoalFor(s){return 10+(s-1)*4;}     // 10,14,18,22...（7〜8歳向けに手応えを増やした）
+  function stageGoalFor(s){return 8+(s-1)*3;}      // 8,11,14,17...（狙った的だけ数えるので少し軽く)
   // background props
   let trees=[],bgFlakes=[],sparkleStars=[];
   const OBS_COL=["#c45a3a","#3f7fc4","#c4a03f","#7a5fc4","#3fa86a","#c43f7a"];
@@ -59,7 +62,7 @@ function buildAvalanche(api){
     slopeX0=api.W*0.06; slopeTop=api.H*0.30;
     slopeX1=api.W*0.78; slopeBot=api.H*0.74;
     // re-seat existing obstacles on the (possibly moved) surface
-    for(const o of obstacles){o.x=clamp(o.x,0,api.W*0.94);o.by=surfYAt(o.x);}
+    for(const o of obstacles){o.x=clamp(o.x,0,api.W*0.94);o.by=surfYAt(o.x);o.lane=laneOfX(o.x);}
     // ④ 太陽/月ひみつタップの当たり判定(描画位置に一致・寛容に大きめ)
     sunPos.x=api.W*0.82;sunPos.y=api.H*0.14;sunPos.r=Math.max(42,api.W*0.10);
     buildBg();
@@ -80,14 +83,17 @@ function buildAvalanche(api){
   const LANE_N=3;
   // ⑦ 丸い岩/背の高いタワー/横広の壁/氷の家(建物)の4種で見た目と壊れ方を変える。
   //   家は柱=タワーと同じ「硬そう」な印象を出せるので、hp2(かたいブロック)側にも回せる。
-  const KINDS=["round","tower","wall","house"];
-  const HARD_KINDS=["tower","house"]; // ⑦ hp2(かたい)に使ってよい見るからに硬そうな種類
+  //   ゆきだるま(3段の丸)/そり(車体+車輪)/ペンギン(生き物)を足して、形も壊れ方も増やす。
+  const KINDS=["round","tower","wall","house","snowman","car","penguin"];
+  const HARD_KINDS=["tower","house","snowman"]; // ⑦ hp2(かたい)に使ってよい見るからに硬そうな種類
+  // 的の帯(spawnObstacleと同じ式)。タップ位置→レーンも必ずこの帯で数える(狙いが報われる)
+  function laneBand(){const minX=lerp(slopeX0,slopeX1,0.35),maxX=api.W*0.94;return{minX,maxX,laneW:(maxX-minX)/LANE_N};}
+  function laneOfX(x){const L=laneBand();return clamp(Math.floor((x-L.minX)/L.laneW),0,LANE_N-1);}
+  // 見た目の横幅(重なり避け用)
+  function extW(o){return o.w*(o.kind==="car"?1.7:o.kind==="wall"?1.6:1.15);}
   function spawnObstacle(){
     // obstacles sit ON the surface all along the ball's path (mid-slope to right edge)
-    const minX=lerp(slopeX0,slopeX1,0.35), maxX=api.W*0.94;
-    const laneW=(maxX-minX)/LANE_N;
-    const lane=rint(0,LANE_N-1);
-    const x=clamp(minX+laneW*(lane+0.5)+rnd(-laneW*0.32,laneW*0.32),minX,maxX);
+    const {minX,maxX,laneW}=laneBand();
     // ① 激レア にじいろブロック (~3.5%) — 虹色に光り、壊すと虹の大盤振る舞い＋大量得点。
     //    ふだんの金ブロック(~8%)より さらにレア。いつ出るか分からない=ドキドキ発見。
     const rainbow=Math.random()<0.035;
@@ -98,23 +104,55 @@ function buildAvalanche(api){
     if(rainbow||gold||fever>0)hp=1;             // レア/フィーバーは気持ちよく一撃
     else hp=(stage>=3&&Math.random()<0.36?2:1);   // かたいこおりブロックを少し増やす(7〜8歳向け)
     // ⑦ かたいブロック(hp2)は硬そうな「タワー/家」からランダム。他は丸/タワー/壁/家からランダム。
-    const kind=hp>=2?pick(HARD_KINDS):pick(KINDS);
-    // ⑦補助: たまに(~14%)ふつうブロックの1.5〜2倍幅の「おおきい」個体を混ぜ、大小のコントラストを出す。
-    //   激レア/金は既に専用サイズがあるので対象外。
-    const big=!rainbow&&!gold&&Math.random()<0.14;
+    // ⑦補助: 25%は ふつうの1.5〜2倍幅の「おおきい」個体、20%は半分くらいの「ちいさい」個体を混ぜ、大小の差を出す。
+    //   激レア/金は既に専用サイズがあるので対象外。ステージ3以降の「おおきい」は かたい(hp2・2かい)にして印を付ける。
+    const r=Math.random();
+    const big=!rainbow&&!gold&&r<0.25;
+    const small=!rainbow&&!gold&&!big&&r<0.45;
+    if(big&&stage>=3&&fever<=0)hp=2;
+    const kind=(hp>=2&&!big)?pick(HARD_KINDS):pick(KINDS);
     let w;
     if(rainbow)w=rnd(unit*1.2,unit*1.6);
     else if(gold)w=rnd(unit*1.1,unit*1.5);
     else if(big)w=rnd(unit*1.7,unit*2.3);
+    else if(small)w=rnd(unit*0.5,unit*0.7);
     else w=rnd(unit*0.8,unit*1.3);
+    // レーンは的の少ないところを優先(どのレーンにも的がある=狙った所に必ず的がある)
+    const cnt=new Array(LANE_N).fill(0);
+    for(const o of obstacles)if(!o.dead&&o.lane!==undefined)cnt[o.lane]++;
+    const mn=Math.min.apply(null,cnt),cand=[];
+    cnt.forEach((c,i)=>{if(c===mn)cand.push(i);});
+    const lane=pick(cand);
+    // 出現位置: 既にある的と団子に重ならないよう最大5回まで引き直す
+    //   ころがっている玉の真上には出さない(止まった玉の上に出た的が一瞬で壊れて点が増え続けるのを防ぐ)。
+    const tmp={w,kind};let x=minX,bestX=-1,bestGap=-1e9;
+    for(let t=0;t<5;t++){
+      x=clamp(minX+laneW*(lane+0.5)+rnd(-laneW*0.32,laneW*0.32),minX,maxX);
+      if(balls.some(b=>b.life>0&&Math.abs(b.x-x)<b.r+w*0.7+unit*0.8))continue;
+      let gap=1e9;
+      for(const o of obstacles){if(o.dead)continue;gap=Math.min(gap,Math.abs(o.x-x)-(extW(o)+extW(tmp))*0.5);}
+      if(gap>=0){bestX=x;bestGap=gap;break;}
+      if(gap>bestGap){bestGap=gap;bestX=x;}
+    }
+    if(bestX<0)return false;
+    x=bestX;
     obstacles.push({x,by:surfYAt(x),col:rainbow?RAINBOW[0]:(gold?"#ffd23f":pick(OBS_COL)),gold,rainbow,hp,kind,lane,big,
-      w,wob:rnd(0,TAU)});
+      w,wob:rnd(0,TAU),sq:0});
+    return true;
   }
   function ensureObstacles(){
     // fever floods the field with extra targets so every ball plows a long chain
     const want=clamp(4+Math.floor(stage/2),4,8)+(fever>0?3:0);
     let guard=0;
     while(obstacles.length<want&&guard++<20) spawnObstacle();
+  }
+  // 壊れた的の補充は少し間をあける(ふだん0.45秒・フィーバー中0.22秒に1個)。
+  // 一瞬で次が出ると、玉の通り道に的が湧き続けて「連打しなくても点が増える」状態になるため。
+  let spawnCd=0;
+  function refill(dt){
+    const want=clamp(4+Math.floor(stage/2),4,8)+(fever>0?3:0);
+    if(spawnCd>0){spawnCd-=0.016*dt;return;}
+    if(obstacles.length<want&&spawnObstacle())spawnCd=fever>0?0.22:0.45;
   }
   ensureObstacles();
 
@@ -126,7 +164,8 @@ function buildAvalanche(api){
     //    発射位置そのものも同じレーンへ寄せるので、狙いが見た目にも反映される。
     // (発射位置そのものは坂の入口付近から少しだけ振る程度に留め、密度/粘り強さの数字を崩さない。
     //  「狙い」の主効果はレーン一致ボーナス側=hitObstacle()の得点調整で受け持つ)
-    const lane=clamp(Math.floor(clamp(px,0,api.W)/api.W*LANE_N),0,LANE_N-1);
+    //    ※的の帯(laneBand)と同じ区切りで数える。的の真上を押せば必ずジャストヒットになる。
+    const lane=laneOfX(px);
     const laneNudge=(lane-(LANE_N-1)/2)*unit*0.9;
     const sx=slopeX0+laneNudge+rnd(-unit*0.3,unit*0.6);
     balls.push({x:sx,y:slopeYAt(sx)-unit*0.6,vx:rnd(2.2,3.4),vy:0,
@@ -151,22 +190,32 @@ function buildAvalanche(api){
     // ③ 狙ったレーン(タップした場所)の的ほど得点がまるごと伸びる。当たり自体は今まで通り
     //    全て命中して壊れる(爽快感・密度は崩さない)ので、狙わなくても壊せて楽しいままだが、
     //    ズレたレーンで壊すと金/にじ/フィーバー込みの合計点ごと大きく目減りする=連打だけでは稼げない。
-    if(!o.gold&&!o.rainbow&&b.lane!==undefined&&o.lane!==undefined){
-      const ld=Math.abs(b.lane-o.lane);
+    //   さらに ずれたレーンの的は「ころころ当たって壊れる」だけで ステージの「あと N こ」は進まない
+    //   (=狙って当てた的だけが数えられる)。2レーン以上ずれた的は玉が飛び越える(collision側)。
+    //   金/にじいろ/フィーバー中は どこで壊しても全部ごほうび。
+    let ld=0;
+    if(fever<=0&&!o.gold&&!o.rainbow&&b.lane!==undefined&&o.lane!==undefined){
+      ld=Math.abs(b.lane-o.lane);
       gain=Math.max(1,Math.round(gain*(ld===0?1:(ld===1?0.4:0.12))));
     }
+    const countsStage=ld===0||fever>0||o.gold||o.rainbow;
     const oy=o.by;
     // ③ ジャストヒット: 狙ったレーン(タップ位置)と的のレーンが一致した命中は、
     //   既存のsparks/toneに加えて言葉でも「当たった!」を即時に伝える(壊れる/割れる両方で出す)。
+    //   ⑥ 文字が重なって読めなくなるので、直近0.5秒に出していたら文字だけ出さない(音と得点はそのまま)。
     const isJustHit=!o.gold&&!o.rainbow&&b.lane!==undefined&&o.lane!==undefined&&b.lane===o.lane;
     if(isJustHit){
-      floats.push({x:o.x,y:oy-o.w-16-floatStack*26,txt:"ジャストヒット!",life:1,vy:-1.0,col:"#3fffb0",size:20});
-      floatStack++;
+      if(tsec-lastJustT>0.5){
+        lastJustT=tsec;
+        pushFloat({x:o.x,y:oy-o.w-16-floatStack*26,txt:"ジャストヒット!",life:1,vy:-1.0,col:"#ffe14d",size:22});
+        floatStack++;
+      }
       api.tone(1760,0.05,"triangle",0.05);
     }
     o.hp--;
     if(o.hp>0){
-      // tough block: just cracks, ball slows a touch
+      // tough block: just cracks (ぺこっと へこむ), ball slows a touch
+      o.sq=1;
       b.vx*=0.78;
       api.noise(0.08,0.16,1600,"highpass",0.8);api.tone(240,0.07,"square",0.08);
       api.shake(4);flash=Math.min(1,flash+0.12);
@@ -176,21 +225,42 @@ function buildAvalanche(api){
       return;
     }
     // destroyed!
-    count+=gain;stageKill++;combo++;comboT=1;
+    count+=gain;if(countsStage)stageKill++;combo++;comboT=1;
     api.setScore(count);
     const big=b.r>unit*1.1;
     // debris chunks (golden / rainbow blocks burst into RAINBOW pieces)
-    // ⑦ 壊れ方も見た目に合わせる: 丸→まるい欠片(砕ける)/ タワー→細長い角材(崩れる)/ 壁→平たい板(はじけ飛ぶ)
-    const shape=o.kind==="round"?"circle":"rect";
-    for(let i=rint(6,9)+((o.gold||o.rainbow)?5:0);i>0;i--){const a=rnd(-TAU/2,0),s=rnd(3,8);
+    // ⑦ 壊れ方も見た目に合わせる: 丸→まるい欠片(砕ける)/ タワー→細長い角材がぐるぐる回って倒れる /
+    //   壁→平たい板(はじけ飛ぶ)/ 家→角ばった瓦礫 /
+    //   ゆきだるま→丸3つが別々にころころ転がる / そり→車輪が横にころがる / ペンギン→高く吹っ飛ぶ
+    const kd=o.kind,special=(o.gold||o.rainbow);
+    const shape=kd==="round"?"circle":"rect";
+    if(kd==="snowman"&&!special){
+      const sz=[o.w*0.95,o.w*0.75,o.w*0.55],bodyCol=tint(o.col,0.6);
+      for(let i=0;i<3;i++)
+        shards.push({x:o.x+rnd(-4,4),y:oy-sz[i]*0.5-i*o.w*0.5,vx:b.vx*0.5+rnd(1.5,4)+i*1.4-(i===2?5:0),vy:-rnd(2,5)-i*1.2,
+          s:sz[i],sw:sz[i],sh:sz[i],shape:"circle",col:bodyCol,rot:rnd(0,TAU),vr:rnd(-0.2,0.2),
+          life:1,decay:0.006,fr:0.965});
+    }
+    if(kd==="car"&&!special){
+      const wr=o.w*0.5;
+      for(let i=0;i<2;i++)
+        shards.push({x:o.x+(i?1:-1)*o.w*0.5,y:oy-wr*0.5,vx:b.vx*0.5+(i?1:-1)*rnd(3,5.5)+2,vy:-rnd(2,4),
+          s:wr,sw:wr,sh:wr,shape:"circle",col:"#2b3a55",rot:rnd(0,TAU),vr:0,
+          life:1,decay:0.006,fr:0.98});
+    }
+    const nSh=rint(6,9)+(special?5:0)-((kd==="snowman"||kd==="car")&&!special?3:0);
+    for(let i=nSh;i>0;i--){const a=rnd(-TAU/2,0);let s=rnd(3,8);
       const base=rnd(o.w*0.2,o.w*0.4);
-      let sw=base,sh=base;
-      if(o.kind==="tower"){sw=base*0.55;sh=base*1.6;}
-      else if(o.kind==="wall"){sw=base*1.7;sh=base*0.5;}
-      else if(o.kind==="house"){sw=base*1.2;sh=base*0.9;} // ⑦ 家は角ばった瓦礫として崩れる
+      let sw=base,sh=base,vr=rnd(-0.4,0.4),col=special?pick(RAINBOW):o.col,sp=shape;
+      if(kd==="tower"){sw=base*0.55;sh=base*1.6;vr=rnd(-1.1,1.1);s*=0.7;} // 倒れて ぐるぐる回る
+      else if(kd==="wall"){sw=base*1.7;sh=base*0.5;}
+      else if(kd==="house"){sw=base*1.2;sh=base*0.9;} // ⑦ 家は角ばった瓦礫として崩れる
+      else if(kd==="snowman"){sp="circle";col=pick(["#ffffff","#e6f2ff",o.col]);sw=sh=base*0.7;}
+      else if(kd==="car"){sw=base*1.5;sh=base*0.6;}
+      else if(kd==="penguin"&&!special){col=pick(["#2b3a55","#2b3a55","#ffffff","#ff9a2a",o.col]);vr=rnd(-0.9,0.9);s*=1.25;}
       shards.push({x:o.x+rnd(-o.w*0.4,o.w*0.4),y:oy-rnd(0,o.w*1.2),
-        vx:Math.cos(a)*s+b.vx*0.4,vy:Math.sin(a)*s-rnd(1,4),
-        s:base,sw,sh,shape,col:(o.gold||o.rainbow)?pick(RAINBOW):o.col,rot:rnd(0,TAU),vr:rnd(-0.4,0.4),
+        vx:Math.cos(a)*s+b.vx*0.4,vy:Math.sin(a)*s-rnd(1,4)-(kd==="penguin"?rnd(2,5):0),
+        s:base,sw,sh,shape:sp,col,rot:rnd(0,TAU),vr,
         life:1,decay:rnd(0.008,0.016)});}
     // snow puffs + shockwave + glints
     for(let i=0;i<8;i++){const a=rnd(0,TAU),s=rnd(2,5);
@@ -212,18 +282,10 @@ function buildAvalanche(api){
     // hitStop only for a big ball's smash, and never twice in quick succession
     // (spamming it every hit would freeze the game during chain destruction)
     if(big&&tsec-lastStopT>0.6){api.hitStop(3);lastStopT=tsec;}
-    if(combo>1){
-      // ⑥ 直前のfloatがコンボ表示(末尾が数字のx始まり)ならpushせず使い回し、同時表示数を減らす
-      const lastFl=floats.length?floats[floats.length-1]:null;
-      const isComboFl=lastFl&&typeof lastFl.txt==="string"&&lastFl.txt[0]==="x"&&!isNaN(parseInt(lastFl.txt.slice(1),10));
-      const cCol=combo>=8?"#ff5b9e":combo>=4?"#ff8c42":"#ffd23f",cSize=combo>=4?38:30;
-      if(isComboFl){lastFl.txt="x"+combo;lastFl.life=1;lastFl.y=oy-o.w-16-floatStack*26;lastFl.col=cCol;lastFl.size=cSize;}
-      else floats.push({x:o.x,y:oy-o.w-16-floatStack*26,txt:"x"+combo,life:1,vy:-1.1,col:cCol,size:cSize});
-      floatStack++;
-    }
+    // ⑥ 床の「xN」文字は廃止。コンボは画面上の「コンボ xN」に一本化(玉の上で文字が重なって読めなくなるため)。
     // golden block jackpot: fanfare + big float + extra glints
     if(o.gold){
-      floats.push({x:o.x,y:oy-o.w-44-floatStack*26,txt:"キラキラ +"+gain,life:1,vy:-0.8,col:"#ffd23f",size:40});
+      pushFloat({x:o.x,y:oy-o.w-44-floatStack*26,txt:"キラキラ +"+gain,life:1,vy:-0.8,col:"#ffd23f",size:40});
       floatStack++;
       api.tone(1046,0.12,"triangle",0.14);
       setTimeout(()=>{api.tone(1318,0.12,"triangle",0.14);},90);
@@ -236,7 +298,7 @@ function buildAvalanche(api){
     // ① にじいろブロック撃破: 5色の虹の輪＋にじ色の破片＋ファンファーレ(激レアの爽快ごほうび)
     if(o.rainbow){
       queueBanner(()=>{rbMsgT=1.5;}); // ⑥ 他のバナーと重なる時は表示だけ少し遅らせる
-      floats.push({x:o.x,y:oy-o.w-46-floatStack*26,txt:"にじいろ +"+gain,life:1,vy:-0.8,col:"#ff4d8d",size:42});
+      pushFloat({x:o.x,y:oy-o.w-46-floatStack*26,txt:"にじいろ +"+gain,life:1,vy:-0.8,col:"#ff4d8d",size:42});
       floatStack++;
       for(let k=0;k<RAINBOW.length;k++)
         rings.push({x:o.x,y:oy-o.w*0.5,r:o.w*0.4,vr:o.w*(0.5+k*0.14),life:1,decay:0.05,col:RAINBOW[k]});
@@ -252,7 +314,7 @@ function buildAvalanche(api){
     // ② ラッキー色命中: 小さな祝福(白飛びしないよう控えめ)＋頭上に星のキラッ
     if(isLucky){
       if(!luckySeen){luckySeen=true;queueBanner(()=>{luckyMsgT=1.8;});} // ⑥ 表示だけ遅らせて重なりを防ぐ
-      floats.push({x:o.x,y:oy-o.w-40-floatStack*26,txt:"ラッキー!",life:1,vy:-0.8,col:luckyColor,size:32});
+      pushFloat({x:o.x,y:oy-o.w-40-floatStack*26,txt:"ラッキー!",life:1,vy:-0.8,col:luckyColor,size:32});
       floatStack++;
       api.tone(1046,0.12,"triangle",0.1);api.tone(1568,0.14,"triangle",0.08);
       // 頭上の小さな星(気づけるヒント)
@@ -262,7 +324,7 @@ function buildAvalanche(api){
     }
     // fill the fever gauge (gold charges it fast)
     if(fever<=0){
-      feverGauge=Math.min(1,feverGauge+((o.gold||o.rainbow)?0.28:0.09));
+      feverGauge=Math.min(1,feverGauge+((o.gold||o.rainbow)?0.28:(ld===0?0.11:0.03)));
       if(feverGauge>=1)startFever();
     }
     // mark obstacle dead
@@ -448,6 +510,7 @@ function buildAvalanche(api){
       // ---- obstacles (snowmen-ish blocks down in the run-out) ----
       for(const o of obstacles){
         const wob=Math.sin(tsec*2+o.wob)*0.5;
+        if(o.sq>0)o.sq=Math.max(0,o.sq-0.07*dt);
         drawObstacle(o,wob);
       }
 
@@ -478,6 +541,13 @@ function buildAvalanche(api){
         for(const o of obstacles){
           if(o.dead)continue;
           if(Math.abs(b.x-o.x)<b.r+o.w*0.7 && b.y>o.by-b.r-o.w*2.2){
+            // ③ 狙ったレーン以外の的は 玉がぴょんと飛び越える(狙ってない的は壊れない=ただ連打では稼げない)。
+            //   金/にじいろ/フィーバー中は どこでも当たる。
+            if(fever<=0&&!o.gold&&!o.rainbow&&b.lane!==undefined&&o.lane!==undefined&&Math.abs(b.lane-o.lane)>=1){
+              if(b.hopO!==o){b.hopO=o;b.vy=Math.min(b.vy,-5);
+                for(let i=0;i<3;i++)puffs.push({x:b.x,y:b.y+b.r,vx:rnd(-1,1),vy:rnd(-2,-0.5),r:rnd(unit*0.15,unit*0.3),life:1,decay:0.04});}
+              continue;
+            }
             hitObstacle(b,o);
             if(o.dead){o.x=-9999;} // pushed off; will be filtered
           }
@@ -494,7 +564,7 @@ function buildAvalanche(api){
       // right-side obstacles. The >=14 guard in input() caps spawns instead.
       // remove destroyed obstacles, refill the field
       obstacles=obstacles.filter(o=>!o.dead);
-      if(clearT<=0)ensureObstacles();
+      if(clearT<=0)refill(dt);
 
       // ---- snow puffs ----
       for(const p of puffs){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=0.06*dt;p.vx*=0.96;
@@ -507,7 +577,7 @@ function buildAvalanche(api){
       // ---- shards ----
       for(const s of shards){s.vy+=0.45*dt;s.x+=s.vx*dt;s.y+=s.vy*dt;s.rot+=s.vr*dt;
         const sfy=surfYAt(s.x)-2;
-        if(s.y>sfy){s.y=sfy;s.vy*=-0.4;s.vx*=0.7;if(Math.abs(s.vy)<1.2)s.life-=0.04*dt;}
+        if(s.y>sfy){s.y=sfy;s.vy*=-0.4;s.vx*=(s.fr||0.7);if(s.fr){s.rot+=s.vx*0.07*dt;if(Math.abs(s.vy)<1.2)s.life-=0.004*dt;}else if(Math.abs(s.vy)<1.2)s.life-=0.04*dt;}
         s.life-=s.decay*dt;
         g.save();g.globalAlpha=Math.max(0,s.life);g.translate(s.x,s.y);g.rotate(s.rot);
         g.fillStyle=s.col;
@@ -560,7 +630,7 @@ function buildAvalanche(api){
       for(const fl of floats){fl.y+=fl.vy*dt;fl.life-=0.018*dt;
         g.globalAlpha=Math.max(0,fl.life);
         g.font="800 "+fl.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-        g.lineWidth=6;g.strokeStyle="rgba(40,60,90,.5)";g.strokeText(fl.txt,fl.x,fl.y);
+        g.lineJoin="round";g.lineWidth=8;g.strokeStyle="rgba(30,40,70,.9)";g.strokeText(fl.txt,fl.x,fl.y);
         g.fillStyle=fl.col;g.fillText(fl.txt,fl.x,fl.y);}
       g.globalAlpha=1;g.textAlign="left";floats=floats.filter(fl=>fl.life>0);
 
@@ -614,7 +684,7 @@ function buildAvalanche(api){
         // ⑥ engine.js の祝福バナー(y=0.3H)とちょうど同じ高さだったのでずらす
         g.save();g.translate(api.W/2,api.H*0.68);g.textAlign="center";
         g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
-        const t2="きょうのラッキー色は "+(COLNAME[luckyColor]||"")+"!";
+        const t2="きょうのラッキーいろは "+(COLNAME[luckyColor]||"")+"!";
         g.lineWidth=5;g.strokeStyle="rgba(40,60,90,.5)";g.strokeText(t2,0,0);
         g.fillStyle=luckyColor;g.fillText(t2,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";if(luckyMsgT<0)luckyMsgT=0;}
@@ -698,9 +768,14 @@ function buildAvalanche(api){
     else if(kind==="tower"){bw=w*0.82;bh=w*2.0;}
     else if(kind==="wall"){bw=w*1.6;bh=w*0.62;}
     else if(kind==="house"){bw=w*1.3;bh=w*1.55;} // ⑦ 氷の家(建物): 箱+三角屋根で丸/タワー/壁と違うシルエット
+    else if(kind==="snowman"){bw=w*0.95;bh=w*1.9;}  // ⑦ ゆきだるま: 3段の丸
+    else if(kind==="car"){bw=w*1.7;bh=w*0.9;}       // ⑦ そり/くるま: 横長の車体+車輪2つ
+    else if(kind==="penguin"){bw=w*1.0;bh=w*1.5;}   // ⑦ ペンギン(生き物)
+    const simple=kind==="snowman"||kind==="car"||kind==="penguin"; // 専用の顔/飾りを自分で描く種類
     // にじいろブロックは体色が虹の6色を巡回して にじ色に見える(激レアの合図)
     const base=o.rainbow?RAINBOW[Math.floor(tsec*6+o.wob)%RAINBOW.length]:o.col;
     g.save();g.translate(x,y);g.rotate(wob*((o.gold||o.rainbow)?0.12:0.04)); // gold/rainbow jiggle harder
+    if(o.sq>0)g.scale(1+o.sq*0.16,1-o.sq*0.22); // かたいブロックは叩かれると ぺこっと へこむ
     // shadow
     g.fillStyle="rgba(60,90,130,.2)";
     g.beginPath();g.ellipse(0,0,Math.max(0,bw*0.7),Math.max(0,bw*0.22),0,0,TAU);g.fill();
@@ -737,30 +812,81 @@ function buildAvalanche(api){
         g.fillRect(bw*0.16,-wallH*0.86,bw*0.18,bw*0.18);
         g.fillStyle="rgba(90,60,40,.55)";
         g.fillRect(-bw*0.09,-wallH*0.46,bw*0.18,wallH*0.46);
+      } else if(kind==="snowman"){
+        // ⑦ ゆきだるま: 大中小の丸を3段に積み、帽子とマフラーに的の色を使う
+        const r1=bh*0.24,r2=bh*0.19,r3=bh*0.14,y1=-r1,y2=-(r1*1.7+r2),y3=-(r1*1.7+r2*1.7+r3);
+        const sb=tint(base,0.62);
+        g.fillStyle=sb;g.strokeStyle="rgba(40,60,100,.5)";g.lineWidth=2;
+        for(const c of [[y1,r1],[y2,r2],[y3,r3]]){g.beginPath();g.arc(0,c[0],Math.max(0,c[1]),0,TAU);g.fill();g.stroke();}
+        g.fillStyle="rgba(255,255,255,.7)";g.beginPath();g.arc(-r3*0.4,y3-r3*0.4,Math.max(0,r3*0.3),0,TAU);g.fill();
+        g.fillStyle=base;
+        roundRect(-r3*0.95,y3+r3*0.35,r3*1.9,r2*0.38,r2*0.15);g.fill();              // マフラー
+        roundRect(-r3*0.8,y3-r3*1.55,r3*1.6,r3*1.05,r3*0.2);g.fill();                   // 帽子
+        g.fillRect(-r3*1.15,y3-r3*0.62,r3*2.3,r3*0.2);
+        g.fillStyle="#2b3a55";
+        g.beginPath();g.arc(-r3*0.35,y3-r3*0.1,Math.max(0,r3*0.13),0,TAU);g.arc(r3*0.35,y3-r3*0.1,Math.max(0,r3*0.13),0,TAU);g.fill();
+        g.beginPath();g.arc(0,y2-r2*0.1,Math.max(0,r2*0.1),0,TAU);g.arc(0,y2+r2*0.35,Math.max(0,r2*0.1),0,TAU);g.fill(); // ボタン
+        g.fillStyle="#ff8a3a";g.beginPath();g.moveTo(0,y3+r3*0.05);g.lineTo(r3*0.8,y3+r3*0.22);g.lineTo(0,y3+r3*0.36);g.closePath();g.fill(); // にんじん鼻
+      } else if(kind==="car"){
+        // ⑦ そり/くるま: 横長の車体+窓の付いた小屋根+まる車輪2つ
+        const wr=bh*0.2;
+        roundRect(-bw*0.5,-bh*0.62,bw,bh*0.34,bh*0.1);g.fill();
+        g.strokeStyle="rgba(255,255,255,.4)";g.lineWidth=2;roundRect(-bw*0.5,-bh*0.62,bw,bh*0.34,bh*0.1);g.stroke();
+        g.beginPath();g.moveTo(-bw*0.28,-bh*0.62);g.lineTo(-bw*0.16,-bh);g.lineTo(bw*0.16,-bh);g.lineTo(bw*0.3,-bh*0.62);g.closePath();
+        g.fillStyle=shadeHex(base,15);g.fill();g.strokeStyle="rgba(255,255,255,.4)";g.stroke();
+        g.fillStyle="rgba(235,248,255,.85)";
+        g.beginPath();g.moveTo(-bw*0.2,-bh*0.66);g.lineTo(-bw*0.12,-bh*0.93);g.lineTo(-bw*0.01,-bh*0.93);g.lineTo(-bw*0.01,-bh*0.66);g.closePath();g.fill();
+        g.beginPath();g.moveTo(bw*0.03,-bh*0.66);g.lineTo(bw*0.03,-bh*0.93);g.lineTo(bw*0.13,-bh*0.93);g.lineTo(bw*0.22,-bh*0.66);g.closePath();g.fill();
+        g.fillStyle="#ffe680";g.beginPath();g.arc(bw*0.45,-bh*0.5,Math.max(0,bh*0.07),0,TAU);g.fill();
+        for(const wx of [-bw*0.3,bw*0.3]){
+          g.fillStyle="#2b3a55";g.beginPath();g.arc(wx,-wr,Math.max(0,wr),0,TAU);g.fill();
+          g.fillStyle="#cfd8e6";g.beginPath();g.arc(wx,-wr,Math.max(0,wr*0.45),0,TAU);g.fill();}
+      } else if(kind==="penguin"){
+        // ⑦ ペンギン(生き物): 紺のからだ+白いおなか+くちばし+足。マフラーに的の色を使う
+        g.fillStyle="#2b3a55";g.beginPath();g.ellipse(0,-bh*0.45,Math.max(0,bw*0.46),Math.max(0,bh*0.45),0,0,TAU);g.fill();
+        g.strokeStyle="rgba(255,255,255,.45)";g.lineWidth=2;g.stroke();
+        g.beginPath();g.ellipse(-bw*0.5,-bh*0.38,Math.max(0,bw*0.12),Math.max(0,bh*0.25),0.3,0,TAU);g.ellipse(bw*0.5,-bh*0.38,Math.max(0,bw*0.12),Math.max(0,bh*0.25),-0.3,0,TAU);g.fill();
+        g.fillStyle="#f4f8ff";g.beginPath();g.ellipse(0,-bh*0.36,Math.max(0,bw*0.3),Math.max(0,bh*0.3),0,0,TAU);g.fill();
+        g.fillStyle=base;roundRect(-bw*0.44,-bh*0.62,bw*0.88,bh*0.1,bh*0.04);g.fill();
+        g.fillStyle="#fff";g.beginPath();g.arc(-bw*0.16,-bh*0.76,Math.max(0,bw*0.1),0,TAU);g.arc(bw*0.16,-bh*0.76,Math.max(0,bw*0.1),0,TAU);g.fill();
+        g.fillStyle="#1a2540";g.beginPath();g.arc(-bw*0.15,-bh*0.75,Math.max(0,bw*0.05),0,TAU);g.arc(bw*0.17,-bh*0.75,Math.max(0,bw*0.05),0,TAU);g.fill();
+        g.fillStyle="#ff9a2a";g.beginPath();g.moveTo(-bw*0.1,-bh*0.68);g.lineTo(bw*0.1,-bh*0.68);g.lineTo(0,-bh*0.58);g.closePath();g.fill();
+        g.beginPath();g.ellipse(-bw*0.2,-bh*0.03,Math.max(0,bw*0.16),Math.max(0,bh*0.04),0,0,TAU);g.ellipse(bw*0.2,-bh*0.03,Math.max(0,bw*0.16),Math.max(0,bh*0.04),0,0,TAU);g.fill();
       } else {
         // 横広の壁
         roundRect(-bw*0.5,-bh,bw,bh,bw*0.18);g.fill();
         g.strokeStyle="rgba(255,255,255,.4)";g.lineWidth=2;roundRect(-bw*0.5,-bh,bw,bh,bw*0.18);g.stroke();
       }
       // crack overlay for tough (2-hp, already chipped) blocks
-      if(o.hp<2){
+      if(o.hp<2&&!simple){
         g.strokeStyle="rgba(20,30,50,.6)";g.lineWidth=Math.max(2,bw*0.07);g.lineCap="round";
         g.beginPath();g.moveTo(-bw*0.1,-bh*0.85);g.lineTo(bw*0.08,-bh*0.5);g.lineTo(-bw*0.1,-bh*0.25);g.stroke();
       }
       // snow cap on top
-      g.fillStyle="#ffffff";
-      g.beginPath();g.ellipse(0,-bh,Math.max(0,bw*0.5),Math.max(0,bw*0.18),0,0,TAU);g.fill();
-      if(kind!=="round"&&kind!=="house"){
+      if(!simple){g.fillStyle="#ffffff";
+      g.beginPath();g.ellipse(0,-bh,Math.max(0,bw*0.5),Math.max(0,bw*0.18),0,0,TAU);g.fill();}
+      if(kind!=="round"&&kind!=="house"&&!simple){
         g.fillStyle="rgba(255,255,255,.55)";
         g.fillRect(-bw*0.4,-bh*0.9,bw*0.16,bh*0.7);
       }
       // tiny worried eyes (cute target) ※家は窓/ドアがあるので顔は付けない
-      if(kind!=="house"){
+      if(kind!=="house"&&!simple){
         g.fillStyle="#fff";
         g.beginPath();g.arc(-bw*0.18,-bh*0.55,Math.max(0,bw*0.12),0,TAU);g.arc(bw*0.18,-bh*0.55,Math.max(0,bw*0.12),0,TAU);g.fill();
         g.fillStyle="#2b3a55";
         g.beginPath();g.arc(-bw*0.18,-bh*0.53,Math.max(0,bw*0.06),0,TAU);g.arc(bw*0.18,-bh*0.53,Math.max(0,bw*0.06),0,TAU);g.fill();
       }
+    }
+    // かたい的(hp2=2かい)の目印: 氷色のふち+「2」のバッジ
+    if(o.hp>=2){
+      g.strokeStyle="rgba(190,235,255,.95)";g.lineWidth=4;
+      if(kind==="round"){g.beginPath();g.arc(0,-bh*0.5,Math.max(0,bh*0.5+2),0,TAU);g.stroke();}
+      else roundRect(-bw*0.5-2,-bh-2,bw+4,bh+2,bw*0.18);g.stroke();
+      const br=Math.max(10,bw*0.17);
+      g.fillStyle="#bfeaff";g.strokeStyle="#4a7fb0";g.lineWidth=2;
+      g.beginPath();g.arc(bw*0.42,-bh*0.95,br,0,TAU);g.fill();g.stroke();
+      g.fillStyle="#1f3a5f";g.font="900 "+Math.round(br*1.3)+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
+      g.fillText("2",bw*0.42,-bh*0.95+br*0.45);g.textAlign="left";
     }
     // GOLDEN block: pulsing glow, orbiting sparkle, bouncing "!" — impossible to miss
     if(o.gold){
@@ -817,7 +943,7 @@ function buildAvalanche(api){
     }
     g.strokeStyle="rgba(255,255,255,.55)";g.lineWidth=2;
     roundRect(bx-4,by-3,bw+8,bh+6,(bh+6)/2);g.stroke();
-    g.font="800 15px 'Hiragino Maru Gothic ProN',system-ui";
+    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
     g.fillStyle=fever>0?RAINBOW[Math.floor(tsec*8)%RAINBOW.length]:"#fff";
     g.shadowColor="rgba(30,50,80,.7)";g.shadowBlur=5;
     g.fillText(fever>0?"フィーバー!! てんすう 2ばい!":"フィーバーゲージ",api.W/2,by-7);
@@ -827,7 +953,7 @@ function buildAvalanche(api){
     const left=clamp(stageGoal-stageKill,0,stageGoal);
     const bw=Math.min(api.W*0.6,360),bh=14,bx=(api.W-bw)/2,by=api.H*0.05;
     g.save();g.textAlign="center";
-    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
+    g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
     g.fillStyle="#fff";g.shadowColor="rgba(30,50,80,.6)";g.shadowBlur=6;
     g.fillText("ステージ "+stage+"      あと "+left+" こ",api.W/2,by-8);
     g.shadowBlur=0;
@@ -842,6 +968,10 @@ function buildAvalanche(api){
   function roundRect(x,y,w,h,r){r=Math.min(r,w/2,h/2);
     g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);
     g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
+  // 色を白に近づける(t=0で元の色,1で白)。ゆきだるまの体の色づけ用
+  function tint(hex,t){const c=parseInt(hex.slice(1),16);
+    const r=Math.round((c>>16)+(255-(c>>16))*t),gg=Math.round(((c>>8)&255)+(255-((c>>8)&255))*t),b=Math.round((c&255)+(255-(c&255))*t);
+    return "rgb("+r+","+gg+","+b+")";}
   function shadeHex(hex,amt){const c=parseInt(hex.slice(1),16);
     const r=clamp((c>>16)+amt,0,255),gg=clamp(((c>>8)&255)+amt,0,255),b=clamp((c&255)+amt,0,255);
     return "rgb("+r+","+gg+","+b+")";}

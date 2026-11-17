@@ -14,7 +14,7 @@ function buildHammer(api){
   let boss=null,bossSeenWeak=false;
   // ---- 毎プレイの変化: BGの並びシャッフル + ステージごとのモディファイア ----
   let bgOrder=[0,1,2,3,4];
-  let modifier="",modName="";
+  let modifier="",modName="",modShowT=0;   // modShowT: 「きょうは ◯◯」を出す残り秒(ステージ開始から約3秒だけ)
   // stage / progression
   const STAGES=5;                 // 5 stages then "ぜんぶクリア!" -> loop
   let stage=1,stageKill=0,stageGoal=8;
@@ -42,7 +42,7 @@ function buildHammer(api){
     {id:"slow", name:"ゆっくり モード"},
     {id:"tough",name:"でかロボ たくさん"}
   ];
-  function rollModifier(){const m=pick(MODS);modifier=m.id;modName=m.name;}
+  function rollModifier(){const m=pick(MODS);modifier=m.id;modName=m.name;modShowT=3;}
   // live cursor for follow-hammer + magic glow trail
   let cur={x:0,y:0,has:false,tx:0,ty:0};
   let trail=[];           // sparkle trail behind the hammer head
@@ -111,7 +111,8 @@ function buildHammer(api){
   function spawn(){
     const free=holes.map((h,i)=>i).filter(i=>!holes[i].occ);
     if(!free.length)return;
-    const hi=pick(free);holes[hi].occ=true;
+    // 最初の1匹だけは中央の穴(holes[4])に確実に出す(低学年は まず真ん中を叩く癖があるので、最初の成功を逃さない)
+    const hi=(count===0&&targets.length===0&&!holes[4].occ)?4:pick(free);holes[hi].occ=true;
     // life shrinks per STAGE (not elapsed): constant within a stage, harder across
     let dur=clamp(1500-(stage-1)*180,720,1500);
     if(modifier==="slow")dur*=1.5;  // ゆっくりモード: 長く出ていて さらにやさしい
@@ -125,6 +126,7 @@ function buildHammer(api){
     else if(type==="rock"){color="#8a8378";}       // いわ: ロボより小さい丸い的(1回で割れる)
     else if(type==="crate"){color="#b5793a";}      // きばこ: 四角い木箱(1回で割れる)
     else if(type==="tower"){color="#c98a4a";hp=3;life=dur*1.6;} // やぐら: 積み箱3段、1段ずつ崩す(でかい・長めに出る)
+    if(count===0&&targets.length===0)life=Math.max(life,3600);   // 最初の1匹は長めに居る(最初の成功を逃さない)
     targets.push({hi,x:holes[hi].x,baseY:holes[hi].y,up:0,state:"rise",
       type,color,hp,life,squash:1,blink:0,bob:rnd(0,TAU),flash:0});
   }
@@ -352,6 +354,7 @@ function buildHammer(api){
     frame(dt,now){
       elapsed+=dt/60;tGlobal+=dt;
       if(hsCD>0)hsCD-=dt;
+      if(modShowT>0&&clearT<=0&&endingT<=0)modShowT-=dt/60;
       // sky-to-meadow gradient (per-stage palette) with extra sky band on top
       const bg=curBg();
       let imgBg=false;
@@ -575,7 +578,8 @@ function buildHammer(api){
       // combo text with pop + glow
       if(combo>1){
         const pop=1+Math.max(0,comboT-0.7)*1.2;
-        g.save();g.translate(api.W/2,api.H*0.16);g.scale(pop,pop);
+        const bossUp=boss&&!boss.dead;   // ボス戦はボスの頭(体力バー)に被らないよう左側へ逃がす
+        g.save();g.translate(bossUp?api.W*0.17:api.W/2,api.H*0.16);g.scale(pop,pop);
         g.font="800 32px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.globalAlpha=clamp(comboT,0,1);
         g.shadowColor="rgba(255,140,40,.8)";g.shadowBlur=14;
@@ -584,47 +588,54 @@ function buildHammer(api){
         g.strokeText("コンボ x"+combo,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";
       }
+      // 軸6: 3種のバナー(でんき/ボス教示/にじいろ/ラッキー)は同時に出ても重ならないよう縦に40pxずつずらして積む。
+      // クリア帯・エンディング中は描かない(タイマーだけ進める)。ボス戦はボス絵の下から始める。
+      const bannerHide=clearT>0||endingT>0;
+      let slotY=(boss&&!boss.dead)?Math.max(api.H*0.4,boss.y+boss.r*1.35+18):api.H*0.4;
       // でんき チェイン! banner (teaches the row/col chain across plays; center = HUD安全帯)
       if(zapMsgT>0){zapMsgT-=0.016*dt;
         const pop=1+Math.max(0,zapMsgT-0.8)*1.4;
-        g.save();g.translate(api.W/2,safeY(api.H*0.25));g.scale(pop,pop);
+        if(!bannerHide){g.save();g.translate(api.W/2,slotY);slotY+=40;g.scale(pop,pop);
         g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.globalAlpha=clamp(zapMsgT*1.4,0,1);
         g.shadowColor="rgba(77,224,255,.9)";g.shadowBlur=16;
         g.fillStyle="#c8f6ff";g.fillText("でんき チェイン!",0,0);
         g.shadowBlur=0;g.lineWidth=1.5;g.strokeStyle="rgba(40,120,160,.7)";
         g.strokeText("でんき チェイン!",0,0);
-        g.restore();g.globalAlpha=1;g.textAlign="left";
+        g.restore();g.globalAlpha=1;g.textAlign="left";}
         if(zapMsgT<0)zapMsgT=0;}
       // ボス弱点の教示: 「ピカッたら いまだ!」(center = HUD安全帯)
       if(bossMsgT>0){bossMsgT-=0.016*dt;
         const pop=1+Math.max(0,bossMsgT-1)*1.4;
-        g.save();g.translate(api.W/2,safeY(api.H*0.2));g.scale(pop,pop);
+        if(!bannerHide){g.save();g.translate(api.W/2,slotY);slotY+=40;g.scale(pop,pop);
         g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.globalAlpha=clamp(bossMsgT*1.4,0,1);
         g.shadowColor="rgba(255,220,60,.9)";g.shadowBlur=16;
         g.fillStyle="#ffe23f";g.fillText("ピカッたら いまだ!",0,0);
         g.shadowBlur=0;g.lineWidth=1.5;g.strokeStyle="rgba(160,110,20,.7)";
         g.strokeText("ピカッたら いまだ!",0,0);
-        g.restore();g.globalAlpha=1;g.textAlign="left";
+        g.restore();g.globalAlpha=1;g.textAlign="left";}
         if(bossMsgT<0)bossMsgT=0;}
       // ① にじいろロボ! 発見バナー(虹色に色替わり)
       if(rbMsgT>0){rbMsgT-=0.016*dt;
         const pop=1+Math.max(0,rbMsgT-1)*1.4,col=TC[Math.floor(tGlobal*0.1)%TC.length];
-        g.save();g.translate(api.W/2,safeY(api.H*0.22));g.scale(pop,pop);
+        if(!bannerHide){g.save();g.translate(api.W/2,slotY);slotY+=40;g.scale(pop,pop);
         g.font="900 34px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.globalAlpha=clamp(rbMsgT*1.4,0,1);g.shadowColor=col;g.shadowBlur=18;
         g.fillStyle="#ffffff";g.fillText("にじいろロボ!",0,0);
         g.shadowBlur=0;g.lineWidth=2;g.strokeStyle=col;g.strokeText("にじいろロボ!",0,0);
-        g.restore();g.globalAlpha=1;g.textAlign="left";if(rbMsgT<0)rbMsgT=0;}
+        g.restore();g.globalAlpha=1;g.textAlign="left";}
+        if(rbMsgT<0)rbMsgT=0;}
       // ② ラッキー! バナー(今日のラッキー色で)
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
         const pop=1+Math.max(0,luckyMsgT-0.8)*1.3;
-        g.save();g.translate(api.W/2,safeY(api.H*0.31));g.scale(pop,pop);
+        if(!bannerHide){g.save();g.translate(api.W/2,slotY);slotY+=40;g.scale(pop,pop);
         g.font="900 26px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.globalAlpha=clamp(luckyMsgT*1.5,0,1);g.shadowColor=luckyColor;g.shadowBlur=14;
+        g.shadowBlur=14;g.lineWidth=3;g.strokeStyle="rgba(120,80,0,.75)";g.strokeText("ラッキー! "+TCNAME[TC.indexOf(luckyColor)]+"は あたり",0,0);
         g.fillStyle="#fff7c2";g.fillText("ラッキー! "+TCNAME[TC.indexOf(luckyColor)]+"は あたり",0,0);
-        g.restore();g.globalAlpha=1;g.textAlign="left";if(luckyMsgT<0)luckyMsgT=0;}
+        g.restore();g.globalAlpha=1;g.textAlign="left";}
+        if(luckyMsgT<0)luckyMsgT=0;}
       // ③ ノーミス ボーナス! バナー(ステージ突破の下側=クリア文字と重ねない)
       if(noMissT>0){noMissT-=0.014*dt;
         const pop=1+Math.max(0,noMissT-1.3)*1.4;
@@ -642,7 +653,7 @@ function buildHammer(api){
       // ---- STAGE CLEAR banner ----
       if(clearT>0){clearT-=0.016*dt;
         const a=clamp(clearT*1.4,0,1);
-        g.save();g.globalAlpha=a*0.5;g.fillStyle="#000";g.fillRect(0,api.H*0.34,api.W,api.H*0.22);g.restore();
+        g.save();g.globalAlpha=a*0.72;g.fillStyle="#000";g.fillRect(0,api.H*0.32,api.W,api.H*0.26);g.restore();
         const pop=1+Math.max(0,clearT-1.3)*1.8;
         g.save();g.translate(api.W/2,api.H*0.45);g.scale(pop,pop);g.globalAlpha=a;
         g.textAlign="center";g.font="900 46px 'Hiragino Maru Gothic ProN',system-ui";
@@ -657,9 +668,9 @@ function buildHammer(api){
         else if(nx===3){pvType="gold";pvTxt="きんピカロボ とうじょう!";}
         else if(nx===4){pvType="bomb";pvTxt="ばくだんに ちゅうい!";}
         else if(nx>=5){pvType="boss";pvTxt="つぎは ボス!";}
-        if(pvType){g.font="800 20px 'Hiragino Maru Gothic ProN',system-ui";
-          drawMiniEnemy(-124,82,15,pvType);
-          g.textAlign="left";g.fillStyle="#ffe6a0";g.fillText(pvTxt,-100,88);g.textAlign="center";}
+        if(pvType){g.font="800 24px 'Hiragino Maru Gothic ProN',system-ui";
+          drawMiniEnemy(-150,86,18,pvType);
+          g.textAlign="left";g.fillStyle="#ffffff";g.fillText(pvTxt,-122,94);g.textAlign="center";}
         g.restore();g.globalAlpha=1;g.textAlign="left";
         if(clearT<=0){clearT=0;spawnT=20;}
       }
@@ -707,9 +718,11 @@ function buildHammer(api){
       g.strokeStyle="rgba(255,255,255,.5)";g.lineWidth=2;roundRect(bx,by,bw,bh,bh/2);g.stroke();
     }
     // 今回のモディファイア名を小さく表示（毎プレイの変化を見せる / top-center安全帯）
-    if(modName){g.font="800 13px 'Hiragino Maru Gothic ProN',system-ui";
-      g.fillStyle="rgba(255,255,255,.85)";g.shadowColor="rgba(0,0,0,.4)";g.shadowBlur=4;
-      g.fillText("きょうは "+modName,api.W/2,by+bh+16);g.shadowBlur=0;}
+    // 常時HUDは2段(ステージ文字+ゲージ)だけ。モディファイア名はステージ開始から約3秒だけ16px・白+黒縁で出す。
+    if(modName&&modShowT>0&&!bossFight){g.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";
+      g.globalAlpha=clamp(modShowT*1.5,0,1);
+      g.lineWidth=4;g.lineJoin="round";g.strokeStyle="rgba(0,0,0,.7)";g.strokeText("きょうは "+modName,api.W/2,by+bh+22);
+      g.fillStyle="#fff";g.fillText("きょうは "+modName,api.W/2,by+bh+22);g.globalAlpha=1;}
     g.restore();g.textAlign="left";
   }
   function drawBot(t,x,y,sq){const big=t.type==="big",gold=t.type==="gold",zap=t.type==="zap",rainbow=t.type==="rainbow";

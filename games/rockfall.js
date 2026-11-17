@@ -49,6 +49,9 @@ function buildRockfall(api){
   layout();
   spawn();spawn();spawn();spawn();spawn();   // 軸3: 開始した瞬間から複数のいわが画面にある状態にする(6個目はframe内でspawnT=0により即時)
   function spawn(){
+    // 軸3: 画面内の生きている岩が多すぎる時は出さない(重なって連打で当たる・見づらい状態を防ぐ)。初期の連続spawnは対象外。
+    if(initBurst<=0){let alive=0;for(const r of rocks)if(!r._dead)alive++;
+      if(alive>=24)return false;}
     // ① にじいろいわ: ステージ1以降、ときどき(約3%)だけ落ちてくる激レア。ゆっくり落ちて虹色に光る。
     const rainbow=!boss&&stage>=1&&Math.random()<0.03;
     // rare golden king rock: slower, sparkling, worth +5 with a fanfare
@@ -299,7 +302,7 @@ function buildRockfall(api){
       // hit-test topmost rock first
       // 軸3: まだ一度も得点していない間だけ的を大きく取り、最初の成功を早める。得点後は通常判定に戻すので
       // 以降の連打耐性(scorePerTap)には影響しない。
-      const hitMul=count===0?1.6:(stage===1?1.25:1.15);
+      const hitMul=count===0?1.6:(stage===1?1.15:1.05);
       for(let i=rocks.length-1;i>=0;i--){const rk=rocks[i];
         if(rk._dead)continue;
         if(Math.hypot(x-rk.x,y-rk.y)<rk.size*hitMul){
@@ -391,8 +394,8 @@ function buildRockfall(api){
       g.restore();
       // ---- spawning ----
       const paused=clearT>0;
-      if(!paused){spawnT-=dt;if(spawnT<=0){spawn();
-        spawnT=(earlyBoost>0?(earlyBoost--,9):clamp(16-(stage-1)*1.5,9,16))*(boss||bossWarn>0?1.6:1);}}   // 軸3: 開始直後だけ間隔を短く、以降も無反応が続きすぎない上限に縮める
+      if(!paused){spawnT-=dt;if(spawnT<=0){
+        if(spawn()===false)spawnT=8;else spawnT=(earlyBoost>0?(earlyBoost--,9):clamp(16-(stage-1)*1.5,9,16))*(boss||bossWarn>0?1.6:1);}}   // 軸3: 開始直後だけ間隔を短く、以降も無反応が続きすぎない上限に縮める
       // ---- boss warning: rumbling screen + looming shadow + red pulse ----
       if(bossWarn>0&&!paused){
         bossWarn-=0.016*dt;api.shake(0.9);
@@ -497,7 +500,7 @@ function buildRockfall(api){
       // ---- combo text (top-center) ----
       if(combo>1){
         const pop=1+Math.max(0,comboT-0.7)*1.2;
-        g.save();g.translate(api.W/2,api.H*0.16);g.scale(pop,pop);
+        g.save();g.translate(api.W/2,api.H*0.14);g.scale(pop,pop);
         g.font="800 32px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.globalAlpha=clamp(comboT,0,1);
         g.shadowColor="rgba(255,140,40,.9)";g.shadowBlur=14;
@@ -517,8 +520,8 @@ function buildRockfall(api){
         g.restore();g.globalAlpha=1;g.textAlign="left";if(rbHintT<0)rbHintT=0;}
       // ① にじいろいわ！ 撃破バナー(虹色に色替わり)
       if(rbMsgT>0){rbMsgT-=0.016*dt;
-        const pop=1+Math.max(0,rbMsgT-1)*1.4,col=RAINBOW[Math.floor(tsec*5)%RAINBOW.length];
-        g.save();g.translate(api.W/2,api.H*0.2);g.scale(pop,pop);g.textAlign="center";
+        const pop=1+Math.max(0,rbMsgT-1)*0.9,col=RAINBOW[Math.floor(tsec*5)%RAINBOW.length];
+        g.save();g.translate(api.W/2,api.H*0.22);g.scale(pop,pop);g.textAlign="center";
         g.globalAlpha=clamp(rbMsgT*1.4,0,1);g.font="900 36px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor=col;g.shadowBlur=18;g.fillStyle="#fff";
         g.fillText("にじいろいわ！",0,0);

@@ -10,7 +10,7 @@ function build_eruption(api){
   // ⑤ タイミングボーナス: 空てきが中央付近に集まった瞬間に「いまだ!」を出し、そのタイミングでタップすると加点(失敗しても無罰)
   let bonusReadyT=0,bonusHintCd=6;
   // stage progression: clear a quota of targets per stage, then "ステージ クリア!"; endless harder loop
-  let stage=1,stageKill=0,stageGoal=12,clearT=0,clearStage=0,endingT=0,megaT=0;
+  let stage=1,stageKill=0,stageGoal=14,clearT=0,clearStage=0,endingT=0,megaT=0;
   const STAGES=5;
   const TC=["#ff5b2e","#ffb73f","#ff3b6b","#ffd23f","#ff7a2e","#ff4d4d"];
   // per-stage sky palette so each stage looks different (dusk -> deep night -> dawn)
@@ -22,7 +22,7 @@ function build_eruption(api){
     {top:"#401040",mid:"#8a2a3a",low:"#d2602a",glow:"#ffd23f"}
   ];
   function curBg(){return STAGE_BG[(stage-1)%STAGE_BG.length];}
-  function stageGoalFor(s){return 12+(s-1)*4;}   // 12,16,20,24,28（7〜8歳向けに手応えを2〜3割増やした）
+  function stageGoalFor(s){return 14+(s-1)*5;}   // 14,19,24,29,34（連打でステージ1が10秒で終わらないよう12〜15秒に）
   // 火口の位置: 画像火山はコーンが高いので火口も上へ(岩・火の粉の出どころを揃える)
   function craterY(){return volImg?groundY-volR*1.15:volY-volR*0.7;}
   // stage unlocks: each new stage introduces a brand-new sky target ("next is what?" hook)
@@ -60,7 +60,8 @@ function build_eruption(api){
   }
   layout();
 
-  function rockGain(){ return combo>=8?3:combo>=4?2:1; }
+  // 連打で得点が雪だるま式に増えないよう、コンボ得点は最大2まで(狙って続けた子の+2は残す)
+  function rockGain(){ return combo>=6?2:1; }
 
   // spawn a flying rock from the volcano mouth
   // aimX: タップx座標(火山との左右位置)。あれば飛ぶ向きをそちらへ寄せる(狙う操作)。無ければ従来の広い乱数(megaEruptのご褒美演出用)
@@ -183,7 +184,7 @@ function build_eruption(api){
       flash=Math.min(1,flash+0.4);flashHue=s.col;
     }
     if(isLucky)luckySparkle(s.x,s.y);
-    if(combo>1)floats.push({x:clamp(s.x,70,api.W-70),y:s.y-70,txt:"x"+combo,life:1,vy:-1.1,
+    if(combo>1)floats.push({x:clamp(s.x,70,api.W-150),y:Math.max(s.y-70,100),txt:"x"+combo,life:1,vy:-1.1,
       col:combo>=8?"#ff2bff":combo>=4?"#ff8c42":"#ffd23f",size:combo>=4?40:30});
     checkStage();
   }
@@ -267,7 +268,7 @@ function build_eruption(api){
       const gain=Math.max(1,Math.ceil(rockGain()*0.6));count+=gain;stageKill++;combo++;comboT=1;api.setScore(count);
       api.boom(0.5);api.shake(10);tryHitStop(3);flash=Math.min(1,flash+0.45);flashHue="#ffb73f";
       api.slide(300,90,0.3,0.3,"sawtooth");
-      if(combo>1)floats.push({x:b.x,y:groundY-b.h,txt:"x"+combo,life:1,vy:-1.1,
+      if(combo>1)floats.push({x:clamp(b.x,70,api.W-150),y:Math.max(groundY-b.h,100),txt:"x"+combo,life:1,vy:-1.1,
         col:combo>=4?"#ff8c42":"#ffd23f",size:combo>=4?40:30});
       // 軸7: 大きい建物(画面高さの12%以上)は数フレームかけて倒れてから消える。小さい建物は現状どおり即シャッター
       if(b.h>=api.H*0.12){
@@ -305,9 +306,9 @@ function build_eruption(api){
 
   // big eruption: many rocks at once
   // aimX: タップx(火山との左右位置)。狙った側へ岩が飛ぶ(軸3: 連打一辺倒からの脱却)
-  function erupt(power,aimX){
+  function erupt(power,aimX,rapid){
     fume=1;shakeMouth=1;
-    const n=Math.round(3+power*10);
+    const n=rapid?2:Math.round(3+power*10);   // 連打(rapid)は2個だけ
     for(let i=0;i<n;i++)spawnRock(power,aimX);
     api.slide(160,40,0.4+0.3*power,0.5,"sine");
     api.noise(0.4+0.4*power,0.35,500,"lowpass",0.7);
@@ -330,7 +331,7 @@ function build_eruption(api){
       vr:rnd(1,2.4),vy:-rnd(1.4,3),life:1,decay:0.008});
   }
 
-  let spawnSkyT=40,tapPulse=0;
+  let spawnSkyT=40,tapPulse=0,lastTapT=-9;
   return{
     resize:layout,
     input(x,y,type){
@@ -347,7 +348,9 @@ function build_eruption(api){
       // each tap charges the volcano and triggers a small eruption
       charge=clamp(charge+0.16,0,1);
       const pwr=0.25+charge*0.6;
-      erupt(pwr,x);   // 軸3: タップx(火山との左右位置)に岩の飛ぶ向きを寄せる → 狙う操作が生まれる
+      // 連打ペナルティ: 前のタップから0.4秒未満の連打は岩を半分に(ゆっくり狙って押す子と1回目のタップは今まで通り)
+      const rapid=count>0&&(tsec-lastTapT)<0.4;lastTapT=tsec;   // 最初の得点が入るまでは必ず全力(最初の成功を守る)
+      erupt(rapid?0.1:pwr,x,rapid);   // 軸3: タップx(火山との左右位置)に岩の飛ぶ向きを寄せる → 狙う操作が生まれる
       if(charge>=1){ armed=true; }
       // ④ ひみつ: お月さまタップ = ふんかはそのまま + ウインクして きんの こな(減点なしのごほうび)
       if(moon.r>0&&Math.hypot(x-moon.x,y-moon.y)<moon.r*1.3)moonTap();
@@ -451,7 +454,7 @@ function build_eruption(api){
       debris=debris.filter(b=>!b._dead);
 
       // sky targets
-      if(!paused){spawnSkyT-=dt;if(spawnSkyT<=0){spawnSky();spawnSkyT=clamp(62-(stage-1)*7,30,62);}}   // 7〜8歳向け: 少し速く出る
+      if(!paused){spawnSkyT-=dt;if(spawnSkyT<=0){spawnSky();spawnSkyT=clamp(74-(stage-1)*7,40,74);}}   // 7〜8歳向け: 少し速く出る
       for(const s of sky){
         if(s.hit>0)s.hit=Math.max(0,s.hit-0.08*dt);
         if(!paused){

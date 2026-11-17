@@ -5,7 +5,8 @@ function buildIcebreak(api){
   let axe={x:0,y:0,t:1,side:1};   // タップ位置に振り下ろすアイスピック(見た目だけ・操作は変えない)
   let lastStopT=-9; // hitStopは「大ヒット単発」専用(連打で画面凍結しないよう間隔を空ける)
   // grid[col] = array of cells bottom->top; each cell {col,row,x,y,ty,vy,settled,hp,col0,wob}
-  let grid=[],shards=[],sparks=[],rings=[],snow=[],glints=[],floats=[];
+  let grid=[],shards=[],sparks=[],rings=[],snow=[],glints=[],floats=[],critters=[],balls=[];
+  let lastScoreT=0,brokeN=0;   // 最後に得点が増えた時刻(取り残し救済) / 1タップで割れた数
   // stage progression (endless): clear all ice -> "ステージ クリア!" -> harder
   let stage=1,clearBanner=0,clearTxt="",celebrate=0,refilling=false;
   // 上乗せ要素: オーロラフィーバー(ゲージMAXで一定時間ぜんぶ2倍!)
@@ -37,7 +38,7 @@ function buildIcebreak(api){
   // ① にじいろ氷 撃破: 虹の輪＋虹きらめき＋大量点(激レアの大盤振る舞い)
   function rainbowBreak(c){
     const cx=c.x+S/2,cy=c.y+S/2;
-    count+=7; api.setScore(count); rbMsgT=1.5;
+    count+=7; api.setScore(count); lastScoreT=tsec; rbMsgT=1.5;
     flash=Math.min(1,flash+0.4); flashHue="#ffe6ff";
     api.boom(0.6); api.shake(14);
     if(tsec-lastStopT>0.5){ api.hitStop(4); lastStopT=tsec; }
@@ -50,7 +51,7 @@ function buildIcebreak(api){
   // ② ラッキー色 撃破: 小さめボーナス＋頭上に星のキラッ(気づけるヒント)
   function luckyBreak(c){
     const cx=c.x+S/2,cy=c.y+S/2;
-    count+=1; api.setScore(count);
+    count+=1; api.setScore(count); lastScoreT=tsec;
     if(!luckySeen){luckySeen=true;luckyBig=true;luckyMsgT=1.8;} else {luckyBig=false;luckyMsgT=Math.max(luckyMsgT,0.8);}
     api.tone(1046,0.14,"triangle",0.11); api.tone(1568,0.16,"triangle",0.08);
     for(let i=0;i<8;i++){const a=rnd(-TAU*0.5,0),v=rnd(2,5);
@@ -59,7 +60,7 @@ function buildIcebreak(api){
   }
   function layout(){
     groundY=api.H*0.9;
-    S=clamp(Math.floor(api.W/9),38,62);
+    S=clamp(Math.min(Math.floor(api.W/9),Math.floor((groundY-api.H*0.2)/7)),38,80);   // iPad横は80まで大きく。背の低い画面では7段ぶん入る大きさに抑える
     cols=clamp(Math.floor((api.W*0.7)/S),4,8);
     bx=Math.round((api.W-cols*S)/2);
     for(let col=0;col<cols;col++){const arr=grid[col]; if(!arr)continue;
@@ -71,7 +72,7 @@ function buildIcebreak(api){
   }
   const cellY=i=>groundY-(i+1)*S;
   function buildField(){
-    grid=[]; noStop=true; let rbPlaced=false,bigPlaced=false;   // ③ 新ステージ = ノンストップ判定リセット
+    grid=[]; noStop=true; lastScoreT=tsec; let rbPlaced=false,bigPlaced=false;   // ③ 新ステージ = ノンストップ判定リセット
     // 7〜8歳向け: 氷を1段多く積み、かたい氷の割合も少し増やした(操作は同じ)
     const baseH=clamp(6+(stage-1),6,Math.floor((groundY-api.H*0.2)/S));
     for(let col=0;col<cols;col++){
@@ -94,11 +95,22 @@ function buildIcebreak(api){
         if(!bigPlaced && col===cols-1 && row===h-1) shape=2;
         if(shape===2) bigPlaced=true;
         arr.push({col,row,x:bx+col*S,y:cellY(row),ty:cellY(row),vy:0,settled:true,
-          hp:hard?2:1,hard:hard,gem:gem,rainbow:rainbow,col0:c0,wob:0,
+          hp:hard?2:1,hp0:hard?2:1,hard:hard,gem:gem,rainbow:rainbow,col0:c0,wob:0,
           shape:shape,sil:shape===3?pick(["fish","penguin","crab","starfish"]):null});
       }
       grid.push(arr);
     }
+    // 大氷(shape2)は2回たたく。ひび→ドカン(隣8方向へ吹き飛ぶ)
+    for(const arr of grid) for(const c of arr) if(c.shape===2){ c.hp=2; c.hp0=2; }
+    // 1ステージに1本だけ「ながい氷柱」(縦2マスぶん・こわすと2個いっしょに割れる)
+    const cand=[];
+    for(let col=0;col<cols;col++){const arr=grid[col];
+      for(let r=0;r<arr.length-1;r++){const a=arr[r],b=arr[r+1];
+        const ok=o=>!o.gem&&!o.rainbow&&o.shape!==2&&!o.hard;
+        if(ok(a)&&ok(b)) cand.push([a,b]);}}
+    if(cand.length){ const pr=cand[rint(0,cand.length-1)];
+      for(const o of pr){ o.shape=0; o.sil=null; o.col0="#d6f0ff"; o.hp=1; o.hp0=1; }
+      pr[0].mate=pr[1]; pr[1].mate=pr[0]; }
   }
   function totalCells(){let n=0;for(const a of grid)n+=a.length;return n;}
   // gravity: after removals, re-index each column bottom-up
@@ -112,7 +124,9 @@ function buildIcebreak(api){
     if(!c||c.dead)return false;
     c.hp--; c.wob=1;
     if(c.hp>0){
-      c.col0="#dcefff"; // visually whiter when cracked
+      if(!c.gem&&!c.rainbow) c.col0="#dcefff"; // visually whiter when cracked(宝石/にじいろは色を残す)
+      // ひびだけでも救済タイマーはリセット
+      lastScoreT=tsec;   // 得点は割れた時だけ(ひびだけで点は増やさない)。ただし救済タイマーは進める
       spark(c.x+S/2,c.y+S/2,"#eafaff",4);
       ring(c.x+S/2,c.y+S/2,"#dff4ff");
       api.noise(0.08,0.18,2600,"highpass",1.2); api.tone(900,0.06,"square",0.06);
@@ -120,12 +134,16 @@ function buildIcebreak(api){
       return false;
     }
     // shatter
-    c.dead=true;
+    c.dead=true; brokeN++;
     // かたい氷(2発目)が割れた瞬間だけ、低い音＋大きめの揺れで「割れ方の違い」を出す
     if(c.hard){ api.tone(220,0.14,"square",0.09); api.shake(viaChain?4:7); }
     if(c.rainbow) rainbowBreak(c);
     else if(c.gem && c.col0===luckyColor) luckyBreak(c);
     shatterShards(c);
+    if(c.shape===3) spawnCritter(c);                       // 中のいきものが飛び出す
+    if(c.shape===1){ c.rollDir=(c.col<cols/2?1:-1)*(Math.random()<0.8?1:-1); if(!viaChain) spawnBall(c); }
+    if(c.shape===2){ api.shake(viaChain?6:11); api.tone(160,0.16,"square",0.09); for(let k=0;k<2;k++) ring(c.x+S/2,c.y+S/2,"#ffd23f"); }
+    if(c.mate&&!c.mate.dead){ const m=c.mate; c.mate=null; m.mate=null; m.hp=1; crack(m,true); }
     spark(c.x+S/2,c.y+S/2,c.rainbow?pick(RAINBOW):c.col0,viaChain?5:7);
     ring(c.x+S/2,c.y+S/2,c.rainbow?"#ffffff":c.col0);
     // オーロラフィーバー: シャッターのたびにゲージが貯まり、満タンで一定時間ぜんぶ2倍
@@ -148,14 +166,16 @@ function buildIcebreak(api){
     // ただし終盤(残りわずか)まで同じ厳しさだと「最後の1個が遠くて延々終わらない」になるので、
     // 残数が減るほど吸着を広げて確実に決着がつくようにする(ノンストップ/クリアの気持ちよさを守る)。
     const remaining=totalCells();
-    const capR=remaining<=3?Infinity:remaining<=8?S*2.0:S*0.85;
+    // 取り残し救済: 4秒間 得点が増えていなければ、どこをタップしても最寄りの氷に作用する(投げ出し防止)
+    const quiet=tsec-lastScoreT, rescue=quiet>=4;
+    const capR=(rescue||remaining<=5)?Infinity:remaining<=14?S*2.2:S*0.9;
     // 歯ごたえ(a): 氷の塊のバウンディングボックスから明らかに離れたタップ(空・地面・画面端など)は、
     // capRの吸着に関わらず必ず外れにする(空や地面を叩いても割れてしまう問題の対策)。
     // ただし塊のすぐ外側の「惜しい」タップまで殺すと無反応が伸びすぎるので、余白は広めに取る。
     let minCy=Infinity;
     for(let col=0;col<cols;col++){const arr=grid[col];
       for(const c of arr){ if(!c.dead && c.y<minCy) minCy=c.y; } }
-    if(minCy!==Infinity){
+    if(minCy!==Infinity&&!rescue){
       const pad=S*1.6;
       if(px<bx-pad || px>bx+cols*S+pad || py<minCy-pad || py>groundY+pad){
         api.tone(220,0.05,"triangle",0.05); return;
@@ -166,26 +186,29 @@ function buildIcebreak(api){
       for(const c of arr){ if(c.dead)continue;
         if(px>=c.x&&px<=c.x+S&&py>=c.y&&py<=c.y+S){target=c;bestD=-1;break;}
         const dx=px-(c.x+S/2),dy=py-(c.y+S/2),d=dx*dx+dy*dy;
-        if(d<bestD && d<capR*capR){bestD=d;target=c;}}
+        // 救済中は、2回たたく氷より1回で割れる氷をえらぶ(確実に点が入るように)
+        const dd=(rescue&&c.hp>1)?d+S*S*16:d;
+        if(dd<bestD && d<capR*capR){bestD=dd;target=c;}}
       if(bestD<0)break;}
     if(!target){ api.tone(220,0.05,"triangle",0.05); return; }
     axe.x=px; axe.y=py; axe.t=0; axe.side=px<api.W/2?-1:1;   // アイスピックをタップ位置へ振り下ろす
     flashHue="#cfefff";
+    brokeN=0;
     const shattered=crack(target,false);
     if(!shattered){ // just a crack, small feedback, no combo growth
       return;
     }
     // it broke -> count, combo, chain to neighbours
-    let broke=1;
     // neighbour chain: left/right same row index, up/down within column
     const neigh=neighbours(target);
-    for(const n of neigh){ if(n&&!n.dead){ if(crack(n,true)) broke++; } }
+    for(const n of neigh){ if(n&&!n.dead){ crack(n,true); } }
+    const broke=Math.max(1,brokeN);
     // remove dead cells from grid, then settle
     let removed=0;
     for(let col=0;col<cols;col++){const arr=grid[col];
       for(let i=arr.length-1;i>=0;i--){ if(arr[i].dead){arr.splice(i,1);removed++;} }}
     if(removed>0) applyGravity();
-    count+=(fever>0?broke*2:broke); api.setScore(count);
+    count+=(fever>0?broke*2:broke); api.setScore(count); lastScoreT=tsec;
     combo++; comboT=0.9;   // 7〜8歳向け: コンボ猶予をわずかに短く(ノンストップの手応え)
     flash=Math.min(1,flash+0.32+broke*0.06);
     api.shake(5+broke*1.5);
@@ -200,6 +223,15 @@ function buildIcebreak(api){
   }
   function neighbours(c){
     const res=[];
+    // 丸氷: 転がって、通り道の氷を最大3個 1個ずつ割る(上下には広がらない)
+    if(c.shape===1&&c.rollDir){
+      for(let k=1;k<=3;k++){ const nc=c.col+c.rollDir*k; if(nc<0||nc>=cols)break;
+        const arr=grid[nc]; if(!arr)break; let f=null;
+        for(const o of arr){ if(!o.dead&&Math.abs(o.y-c.y)<S*0.6){ f=o; break; } }
+        if(!f)break; res.push(f); }
+      return res;
+    }
+    const wide=c.shape===2;   // 大氷: 斜めも含む8方向
     const colArr=grid[c.col];
     // up/down within column (by current index)
     const idx=colArr.indexOf(c);
@@ -207,18 +239,20 @@ function buildIcebreak(api){
     // left/right: cell at same y in adjacent columns
     for(const dc of [-1,1]){ const nc=c.col+dc; if(nc<0||nc>=cols)continue;
       const arr=grid[nc]; if(!arr)continue;
-      for(const o of arr){ if(!o.dead && Math.abs(o.y-c.y)<S*0.6){ res.push(o); break; } } }
+      for(const o of arr){ if(o.dead)continue; const dy=Math.abs(o.y-c.y);
+        if(dy<S*0.6){ res.push(o); if(!wide)break; } else if(wide&&dy<S*1.6) res.push(o); } }
     return res;
   }
   function stageClear(){
     if(refilling)return; refilling=true;
     // ③ ノンストップ ボーナス: コンボを一度も切らさず 壊し切ったら +5 & みどりの祝福
-    if(noStop){ count+=5; api.setScore(count);
+    if(noStop){ count+=5; api.setScore(count); lastScoreT=tsec;
       floats.push({x:api.W/2,y:api.H*0.55,txt:"ノンストップ！＋5",life:1,vy:-0.6,col:"#7be08a",size:34});
       api.tone(1318,0.16,"triangle",0.1); api.tone(1976,0.18,"triangle",0.08); }
     clearBanner=1.8; clearTxt="ステージ クリア！"; celebrate=1.8; flash=1; flashHue="#bfeaff";
     api.boom(0.6); api.shake(20);
     api.slide(523,1046,0.5,0.3,"triangle");
+    lastScoreT=tsec;
     setTimeout(()=>{ api.tone(784,0.18,"triangle",0.22); },120);
     setTimeout(()=>{ api.tone(1046,0.3,"triangle",0.22); },280);
     setTimeout(()=>{ stage++; combo=0; buildField(); refilling=false; },320);
@@ -303,6 +337,7 @@ function buildIcebreak(api){
       g.restore(); g.globalAlpha=1; g.shadowBlur=0;
       rings=rings.filter(rg=>rg.life>0);
       // ---- ice blocks ----
+      const bigs=[];
       for(let col=0;col<cols;col++){const arr=grid[col];
         for(const c of arr){
           if(!c.settled){ c.vy+=0.85*dt; c.y+=c.vy*dt;
@@ -311,9 +346,43 @@ function buildIcebreak(api){
                 spark(c.x+S/2,c.ty+S,"#ffffff",2); }
               else { c.vy=0; c.settled=true; } } }
           if(c.wob>0)c.wob=Math.max(0,c.wob-0.06*dt);
-          drawIce(c);
+          if(c.shape===2) bigs.push(c); else drawIce(c);   // 大氷は最後に描いて隣の氷を隠さない
         }
       }
+      for(const c of bigs) drawIce(c);
+      // 丸氷のころがり(こわれた丸氷が横へごろごろ)
+      for(const b of balls){ b.x+=b.vx*dt; b.vy+=0.6*dt; b.y+=b.vy*dt;
+        const gy=groundY-b.r; if(b.y>gy){ b.y=gy; b.vy*=-0.3; }
+        b.rot+=b.vx*dt/Math.max(1,b.r); b.life-=0.018*dt; b.dist+=Math.abs(b.vx)*dt;
+        if(b.dist>S*3.4) b.life-=0.06*dt;
+        const a=Math.max(0,Math.min(1,b.life*1.5));
+        g.save(); g.globalAlpha=a; g.translate(b.x,b.y); g.rotate(b.rot);
+        let bgr=g.createRadialGradient(-b.r*0.3,-b.r*0.3,0,0,0,Math.max(0.1,b.r));
+        bgr.addColorStop(0,"#ffffff"); bgr.addColorStop(0.5,b.col); bgr.addColorStop(1,"#5fa6d6");
+        g.fillStyle=bgr; g.beginPath(); g.arc(0,0,Math.max(0,b.r),0,TAU); g.fill();
+        g.strokeStyle="rgba(255,255,255,.85)"; g.lineWidth=Math.max(2,b.r*0.1); g.stroke();
+        g.strokeStyle="rgba(255,255,255,.7)"; g.beginPath(); g.moveTo(-b.r*0.5,0); g.lineTo(b.r*0.4,-b.r*0.3); g.stroke();
+        g.restore();
+        if(Math.random()<0.5) spark(b.x,b.y+b.r*0.6,"#ffffff",1); }
+      balls=balls.filter(b=>b.life>0&&b.x>-S&&b.x<api.W+S);
+      // いきものが飛び出す(さかな=ぴょん/ペンギン=すべる/かに=横歩き/ひとで=くるくる)
+      for(const k of critters){ const cs=S*0.95;
+        k.t+=dt;
+        if(k.kind==="fish"){ k.vy+=0.55*dt; k.x+=k.vx*dt; k.y+=k.vy*dt; k.rot=Math.atan2(k.vy,k.vx*(k.vx<0?-1:1))*0.7*(k.vx<0?-1:1);
+          if(k.y>groundY-cs*0.2){ k.y=groundY-cs*0.2; k.vy=-6; k.life-=0.3; } }
+        else if(k.kind==="penguin"){ if(k.y<groundY-cs*0.5){ k.vy+=0.7*dt; k.y+=k.vy*dt; if(k.y>=groundY-cs*0.5){k.y=groundY-cs*0.5;k.vy=0;} }
+          else { k.x+=k.vx*dt; k.rot=Math.sin(k.t*0.5)*0.12; } }
+        else if(k.kind==="crab"){ if(k.y<groundY-cs*0.4){ k.vy+=0.7*dt; k.y+=k.vy*dt; if(k.y>=groundY-cs*0.4){k.y=groundY-cs*0.4;k.vy=0;} }
+          else { k.x+=k.vx*dt; k.y=groundY-cs*0.4-Math.abs(Math.sin(k.t*0.4))*5; } }
+        else { k.vy+=0.45*dt; k.x+=k.vx*dt; k.y+=k.vy*dt; k.rot+=k.vr*dt;
+          if(k.y>groundY-cs*0.3){ k.y=groundY-cs*0.3; k.vy*=-0.4; k.vx*=0.7; k.vr*=0.7; k.life-=0.04*dt; } }
+        k.life-=0.004*dt; if(k.x<-S||k.x>api.W+S) k.life=0;
+        g.save(); g.globalAlpha=Math.max(0,Math.min(1,k.life*2)); g.translate(k.x,k.y); g.rotate(k.rot||0);
+        if(k.vx<0&&k.kind!=="starfish") g.scale(-1,1);
+        g.lineWidth=Math.max(2,cs*0.07); g.lineJoin="round"; g.strokeStyle="rgba(255,255,255,.9)";
+        drawSil(k.kind,0,0,cs*1.5,k.col,k.col,true,true);
+        g.restore(); }
+      critters=critters.filter(k=>k.life>0);
       // shards
       for(const p of shards){ p.vy+=0.5*dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.rot+=p.vr*dt;
         if(p.y>groundY-2){ p.y=groundY-2; p.vy*=-0.36; p.vx*=0.72; if(Math.abs(p.vy)<1.2)p.life-=0.05*dt; }
@@ -427,7 +496,7 @@ function buildIcebreak(api){
   function drawIce(c){
     // ⑦ 形のバラエティ: 当たり判定・グリッド座標(c.x,c.y,S)は変えず、見た目の描画サイズ/形だけ shape で変える
     let x=c.x,y=c.y,s=S;
-    if(c.shape===2){ const bs=s*1.75; x=c.x-(bs-s)/2; y=c.y-(bs-s)/2; s=bs; }
+    if(c.shape===2){ const bs=s*1.45; x=c.x-(bs-s)/2; y=c.y-(bs-s)/2; s=bs; }
     // ① にじいろ氷は虹色に色が回る/② 宝石こおりは col0 の鮮やかな色
     let base=c.col0;
     if(c.rainbow) base=RAINBOW[Math.floor(tsec*3+c.col+c.row)%RAINBOW.length];
@@ -461,37 +530,8 @@ function buildIcebreak(api){
     g.beginPath(); g.ellipse(x+s*0.3,y+s*0.26,Math.max(0,s*0.18),Math.max(0,s*0.09),-0.5,0,TAU); g.fill(); g.globalAlpha=1;
     // ③ 生き物シルエット氷: 氷にとじこめられたペンギン/さかな/かに/ひとでのかげ(壊す対象のバラエティ)
     if(c.shape===3){
-      g.save(); g.globalAlpha=0.55; g.fillStyle="rgba(15,35,65,.55)";
-      const cx=x+s*0.5, cy=y+s*0.58;
-      if(c.sil==="fish"){
-        g.beginPath(); g.ellipse(cx,cy,Math.max(0,s*0.28),Math.max(0,s*0.16),0,0,TAU); g.fill();
-        g.beginPath(); g.moveTo(cx-s*0.26,cy); g.lineTo(cx-s*0.42,cy-s*0.13); g.lineTo(cx-s*0.42,cy+s*0.13); g.closePath(); g.fill();
-      } else if(c.sil==="penguin"){
-        g.beginPath(); g.ellipse(cx,cy+s*0.06,Math.max(0,s*0.2),Math.max(0,s*0.27),0,0,TAU); g.fill();
-        g.beginPath(); g.arc(cx,cy-s*0.28,Math.max(0,s*0.13),0,TAU); g.fill();
-        g.fillStyle="rgba(255,200,90,.6)";
-        g.beginPath(); g.moveTo(cx,cy-s*0.26); g.lineTo(cx+s*0.14,cy-s*0.2); g.lineTo(cx,cy-s*0.16); g.closePath(); g.fill();
-      } else if(c.sil==="crab"){
-        // body + claws + legs (かにのシルエット)
-        g.beginPath(); g.ellipse(cx,cy,Math.max(0,s*0.24),Math.max(0,s*0.15),0,0,TAU); g.fill();
-        g.beginPath(); g.arc(cx-s*0.32,cy-s*0.1,Math.max(0,s*0.1),0,TAU); g.fill();
-        g.beginPath(); g.arc(cx+s*0.32,cy-s*0.1,Math.max(0,s*0.1),0,TAU); g.fill();
-        g.strokeStyle="rgba(15,35,65,.55)"; g.lineWidth=Math.max(1,s*0.035); g.lineCap="round";
-        for(const dx of[-1,1]){
-          g.beginPath(); g.moveTo(cx+dx*s*0.18,cy+s*0.08); g.lineTo(cx+dx*s*0.34,cy+s*0.2); g.stroke();
-          g.beginPath(); g.moveTo(cx+dx*s*0.14,cy+s*0.14); g.lineTo(cx+dx*s*0.28,cy+s*0.27); g.stroke();
-        }
-      } else {
-        // starfish (ひとで)
-        const spikes=5,outerR=Math.max(0,s*0.28),innerR=Math.max(0,s*0.12);
-        g.beginPath();
-        for(let i=0;i<spikes*2;i++){
-          const rr=i%2===0?outerR:innerR, ang=-Math.PI/2+i*Math.PI/spikes;
-          const px=cx+Math.cos(ang)*rr, py=cy+Math.sin(ang)*rr;
-          if(i===0)g.moveTo(px,py); else g.lineTo(px,py);
-        }
-        g.closePath(); g.fill();
-      }
+      g.save(); g.globalAlpha=0.55;
+      drawSil(c.sil,x+s*0.5,y+s*0.58,s,"rgba(15,35,65,.55)","rgba(15,35,65,.55)",false,false);
       g.restore(); g.globalAlpha=1;
     }
     // neon edge
@@ -516,12 +556,70 @@ function buildIcebreak(api){
       [[x+s*0.2,y+s*0.2],[x+s*0.8,y+s*0.2],[x+s*0.2,y+s*0.8],[x+s*0.8,y+s*0.8]].forEach(p=>{g.beginPath();g.arc(p[0],p[1],rr,0,TAU);g.fill();});
     }
     // crack lines once hp dropped below original
-    if(c.hp<(c.hard?2:1)){
+    if(c.hp<(c.hp0||1)){
       g.strokeStyle="rgba(255,255,255,.85)"; g.lineWidth=Math.max(1.5,s*0.06); g.lineCap="round";
       g.beginPath(); g.moveTo(x+s*0.5,y+s*0.12); g.lineTo(x+s*0.4,y+s*0.42); g.lineTo(x+s*0.6,y+s*0.6); g.lineTo(x+s*0.45,y+s*0.9); g.stroke();
       g.beginPath(); g.moveTo(x+s*0.5,y+s*0.45); g.lineTo(x+s*0.8,y+s*0.55); g.stroke();
     }
+    // ながい氷柱: 上の氷が2マスぶんの金の縁取り＋縦のきらめきで1本のはしらに見せる
+    if(c.mate&&!c.mate.dead&&c.mate.y>c.y){
+      const th=c.mate.y+S-c.y;
+      g.fillStyle="rgba(214,240,255,.38)"; g.fillRect(x+2,c.y+S-5,S-4,10);
+      g.save(); g.globalCompositeOperation="lighter"; g.globalAlpha=0.55+0.25*Math.sin(tsec*2.4);
+      g.lineWidth=Math.max(3,S*0.06); g.strokeStyle="#ffd23f"; g.shadowBlur=12; g.shadowColor="#ffd23f";
+      g.strokeRect(x+3,c.y+3,S-6,th-6);
+      g.globalAlpha=0.5; g.strokeStyle="#ffffff"; g.shadowBlur=0; g.lineWidth=Math.max(3,S*0.08);
+      g.beginPath(); g.moveTo(x+S*0.28,c.y+th*0.1); g.lineTo(x+S*0.28,c.y+th*0.9); g.stroke();
+      g.restore(); g.globalAlpha=1; g.shadowBlur=0;
+    }
     g.restore();
+  }
+  // 生き物シルエット(氷の中のかげ / とびだしたいきもの で共用)
+  function drawSil(sil,cx,cy,s,fill,line,color,beak){
+    g.fillStyle=fill;
+    if(sil==="fish"){
+      g.beginPath(); g.ellipse(cx,cy,Math.max(0,s*0.28),Math.max(0,s*0.16),0,0,TAU); g.fill();
+      g.beginPath(); g.moveTo(cx-s*0.26,cy); g.lineTo(cx-s*0.42,cy-s*0.13); g.lineTo(cx-s*0.42,cy+s*0.13); g.closePath(); g.fill();
+      if(color){ g.fillStyle="#ffffff"; g.beginPath(); g.arc(cx+s*0.14,cy-s*0.03,Math.max(0,s*0.04),0,TAU); g.fill(); }
+    } else if(sil==="penguin"){
+      g.beginPath(); g.ellipse(cx,cy+s*0.06,Math.max(0,s*0.2),Math.max(0,s*0.27),0,0,TAU); g.fill();
+      g.beginPath(); g.arc(cx,cy-s*0.28,Math.max(0,s*0.13),0,TAU); g.fill();
+      if(color){ g.fillStyle="#ffffff"; g.beginPath(); g.ellipse(cx,cy+s*0.1,Math.max(0,s*0.12),Math.max(0,s*0.19),0,0,TAU); g.fill(); }
+      g.fillStyle=beak?"#ffb02a":"rgba(255,200,90,.6)";
+      g.beginPath(); g.moveTo(cx,cy-s*0.26); g.lineTo(cx+s*0.14,cy-s*0.2); g.lineTo(cx,cy-s*0.16); g.closePath(); g.fill();
+    } else if(sil==="crab"){
+      g.beginPath(); g.ellipse(cx,cy,Math.max(0,s*0.24),Math.max(0,s*0.15),0,0,TAU); g.fill();
+      g.beginPath(); g.arc(cx-s*0.32,cy-s*0.1,Math.max(0,s*0.1),0,TAU); g.fill();
+      g.beginPath(); g.arc(cx+s*0.32,cy-s*0.1,Math.max(0,s*0.1),0,TAU); g.fill();
+      g.strokeStyle=line; g.lineWidth=Math.max(1,s*0.035); g.lineCap="round";
+      for(const dx of[-1,1]){
+        g.beginPath(); g.moveTo(cx+dx*s*0.18,cy+s*0.08); g.lineTo(cx+dx*s*0.34,cy+s*0.2); g.stroke();
+        g.beginPath(); g.moveTo(cx+dx*s*0.14,cy+s*0.14); g.lineTo(cx+dx*s*0.28,cy+s*0.27); g.stroke();
+      }
+    } else {
+      const spikes=5,outerR=Math.max(0,s*0.28),innerR=Math.max(0,s*0.12);
+      g.beginPath();
+      for(let i=0;i<spikes*2;i++){
+        const rr=i%2===0?outerR:innerR, ang=-Math.PI/2+i*Math.PI/spikes;
+        const px=cx+Math.cos(ang)*rr, py=cy+Math.sin(ang)*rr;
+        if(i===0)g.moveTo(px,py); else g.lineTo(px,py);
+      }
+      g.closePath(); g.fill();
+    }
+  }
+  function spawnCritter(c){
+    const kind=c.sil||"fish", cx=c.x+S/2, cy=c.y+S/2, dir=Math.random()<0.5?-1:1;
+    const col={fish:"#ff9f43",penguin:"#2b3a67",crab:"#ff5b4a",starfish:"#ffb347"}[kind]||"#ff9f43";
+    const k={kind:kind,x:cx,y:cy,vx:0,vy:0,rot:0,vr:0,t:0,life:1,col:col};
+    if(kind==="fish"){ k.vx=dir*rnd(2.5,4); k.vy=-rnd(11,13); }
+    else if(kind==="penguin"){ k.vx=dir*7; k.vy=-3; }
+    else if(kind==="crab"){ k.vx=dir*3.2; k.vy=-4; }
+    else { k.vx=dir*rnd(1,2.5); k.vy=-rnd(9,11); k.vr=dir*0.35; }
+    critters.push(k);
+    floats.push({x:cx,y:cy-S*0.6,txt:{fish:"ぴょん！",penguin:"すーっ",crab:"ちょきちょき",starfish:"くるくる"}[kind]||"ぴょん！",life:1,vy:-0.9,col:"#ffffff",size:22});
+  }
+  function spawnBall(c){
+    balls.push({x:c.x+S/2,y:c.y+S/2,vx:(c.rollDir||1)*8,vy:-2,r:S*0.42,rot:0,life:1,dist:0,col:c.col0||"#bfeaff"});
   }
   // アイスピック: 先端(x,y)を軸に振り下ろす。画像があればそれを、無ければ簡単な手描き
   function drawPick(x,y,ang,al){

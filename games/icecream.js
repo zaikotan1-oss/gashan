@@ -6,8 +6,8 @@ function build_icecream(api){
   let scoops=[],balls=[],shards=[],rings=[],sparks=[],floats=[],puffs=[],bgItems=[],motes=[];
   let towerX,towerBaseY,R,tsec=0,count=0,combo=0,comboT=0,launchT=0;
   // ③ 軸3対策: タップ座標が塔から大きく外れたら空振りにする当たり半径の倍率と、連射間隔の下限
-  const HIT_MULT=4.5,SHOT_CD=0.14;
-  let lastShotAt=-999;
+  const HIT_MULT=3.6,SHOT_CD=0.14;
+  let lastShotAt=-999,lastHintAt=-999,missStreak=0;  // missStreak: 続けて外した回数(たすけ用)
   // stage progression
   let stage=1,stageGoal=0,stageBroken=0,clearT=0,clearTxt="",strikeT=0,celebrate=0,flash=0,flashHue="#fff";
   // (軸3) ステージが進むほど goalFor(stage) が伸び続けるが、塔を毎回そこまで積むと画面外に出て
@@ -259,13 +259,19 @@ function build_icecream(api){
       if(bi<0)return;
       const tgt=scoops[bi];
       // (軸3) タワーから大きく外れたタップは空振り(得点にしない)。低学年の指でも当てやすい余裕は残す。
-      if(Math.hypot(px-tgt.x,py-tgt.baseY)>tgt.r*HIT_MULT){
+      // 続けて外すほど当たり範囲を少しずつ広げる(5回続けて外してから・最大 +1.0 倍)。低学年が何回も外して投げ出さない保険。
+      if(Math.hypot(px-tgt.x,py-tgt.baseY)>tgt.r*(HIT_MULT+0.5*clamp(missStreak-4,0,2))){
+        missStreak++;
         api.tone(220,0.06,"sine",0.05);
+        // 外しても『どこを押せばいいか』が見えるように、押した所の小さな波紋と「ここを タップ！」を出す
+        rings.push({x:px,y:py,r:6,vr:3,life:1,decay:0.06,col:'#ffffff'});
+        if(tsec-lastHintAt>0.8){lastHintAt=tsec;
+          floats.push({x:tgt.x,y:tgt.baseY-tgt.r*1.8,txt:'ここを タップ！',vy:0,life:0.9,col:'#ff5b8a',size:22});}
         return;
       }
       // (軸3) 連射間隔の下限。連打の速さだけでは伸びず、狙いの精度がスコアに効くようにする。
       if(tsec-lastShotAt<SHOT_CD)return;
-      lastShotAt=tsec;
+      lastShotAt=tsec;missStreak=0;
       spawnBall(tgt.x,tgt.baseY);
     },
     frame(dt,now){
@@ -363,6 +369,21 @@ function build_icecream(api){
           g.save();g.translate(sx,sy);g.rotate(i*1.3);
           g.fillStyle=SCOOP[i%SCOOP.length];g.fillRect(-5,-1.6,10,3.2);g.restore();}
       }
+
+      // (軸6) 祝福の白い光は 塔・コンボ数字・HUD より先に(背景のすぐ上に)描く。上から漂白しない。
+      // ----- celebrate color sweep -----
+      if(celebrate>0){const ca=Math.min(1,celebrate);
+        g.save();g.globalCompositeOperation="lighter";
+        const cw=g.createRadialGradient(towerX,api.H*0.5,0,towerX,api.H*0.5,api.W*0.7);
+        cw.addColorStop(0,"rgba(255,240,200,"+(0.3*ca)+")");
+        cw.addColorStop(0.5,"rgba(255,180,220,"+(0.16*ca)+")");
+        cw.addColorStop(1,"rgba(255,180,220,0)");
+        g.fillStyle=cw;g.fillRect(0,0,api.W,api.H);g.restore();}
+
+      // ----- impact flash -----
+      if(flash>0){flash-=0.06*dt;const fa=Math.max(0,flash);
+        g.save();g.globalCompositeOperation="lighter";g.globalAlpha=fa*0.28;
+        g.fillStyle=flashHue;g.fillRect(0,0,api.W,api.H);g.restore();g.globalAlpha=1;}
 
       // ----- the cone + tower base -----
       drawCone();
@@ -463,23 +484,9 @@ function build_icecream(api){
         if(stageBroken>0&&scoops.some(s=>!s.broken))nonstopBroken=true;}}
       for(const f of floats){f.y+=f.vy*dt;f.life-=0.018*dt;
         g.globalAlpha=Math.max(0,f.life);g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";
-        g.textAlign="center";g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.4)";
+        g.textAlign="center";g.lineWidth=8;g.lineJoin="round";g.strokeStyle="rgba(60,20,50,.7)";
         g.strokeText(f.txt,f.x,f.y);g.fillStyle=f.col;g.fillText(f.txt,f.x,f.y);}
-      g.globalAlpha=1;g.textAlign="left";floats=floats.filter(f=>f.life>0);
-
-      // ----- celebrate color sweep -----
-      if(celebrate>0){const ca=Math.min(1,celebrate);
-        g.save();g.globalCompositeOperation="lighter";
-        const cw=g.createRadialGradient(towerX,api.H*0.5,0,towerX,api.H*0.5,api.W*0.7);
-        cw.addColorStop(0,"rgba(255,240,200,"+(0.3*ca)+")");
-        cw.addColorStop(0.5,"rgba(255,180,220,"+(0.16*ca)+")");
-        cw.addColorStop(1,"rgba(255,180,220,0)");
-        g.fillStyle=cw;g.fillRect(0,0,api.W,api.H);g.restore();}
-
-      // ----- impact flash -----
-      if(flash>0){flash-=0.06*dt;const fa=Math.max(0,flash);
-        g.save();g.globalCompositeOperation="lighter";g.globalAlpha=fa*0.28;
-        g.fillStyle=flashHue;g.fillRect(0,0,api.W,api.H);g.restore();g.globalAlpha=1;}
+      g.globalAlpha=1;g.lineJoin="miter";g.textAlign="left";floats=floats.filter(f=>f.life>0);
 
       // spawn fresh tower once everything is gone & no banner running
       if(scoops.filter(s=>!s.broken).length===0&&clearT<=0&&strikeT<=0&&balls.length===0){
@@ -549,16 +556,16 @@ function build_icecream(api){
     const left=clamp(stageGoal-stageBroken,0,stageGoal);
     const bw=Math.min(api.W*0.6,360),bh=16,bx=(api.W-bw)/2,by=api.H*0.05;
     g.save();g.textAlign="center";
-    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
+    g.font="800 24px 'Hiragino Maru Gothic ProN',system-ui";
     g.fillStyle="#7a3a5e";g.shadowColor="rgba(255,255,255,.6)";g.shadowBlur=6;
-    g.fillText("ステージ "+stage+"      あと "+left+" こ",api.W/2,by-8);
+    g.fillText("ステージ "+stage+"      あと "+left+" こ",api.W/2,by-10);
     g.shadowBlur=0;
-    g.fillStyle="rgba(255,255,255,.5)";rr(bx,by,bw,bh,bh/2);g.fill();
+    g.fillStyle="rgba(255,255,255,.7)";rr(bx,by,bw,bh,bh/2);g.fill();
     const fr=clamp(stageBroken/Math.max(1,stageGoal),0,1);
     if(fr>0){const gg=g.createLinearGradient(bx,0,bx+bw,0);
       gg.addColorStop(0,"#ff8ac4");gg.addColorStop(1,"#ffd23f");
       g.fillStyle=gg;rr(bx,by,Math.max(bh,bw*fr),bh,bh/2);g.fill();}
-    g.strokeStyle="rgba(255,255,255,.8)";g.lineWidth=2;rr(bx,by,bw,bh,bh/2);g.stroke();
+    g.strokeStyle="rgba(122,58,94,.55)";g.lineWidth=2;rr(bx,by,bw,bh,bh/2);g.stroke();
     g.restore();g.textAlign="left";
   }
   function drawCone(){

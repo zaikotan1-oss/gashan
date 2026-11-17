@@ -109,7 +109,7 @@ function build_geyser(api){
       sparks.push({x:hx,y:hy,vx:Math.cos(a)*s,vy:Math.sin(a)*s,len:rnd(10,20),life:1,decay:rnd(0.04,0.07)});}
     rings.push({x:hx,y:hy,r:rk.r*0.4,vr:rk.r*0.8,life:1,decay:0.04,col:"#ffd23f"});
     rings.push({x:hx,y:hy,r:rk.r*0.2,vr:rk.r*0.5,life:1,decay:0.05,col:"#ffffff"});
-    floats.push({x:hx,y:hy-rk.r,txt:"ゴールド！+"+gain,life:1,vy:-1,col:"#ffd23f",size:34});
+    floats.push({x:hx,y:Math.max(hy-rk.r,api.H*0.36),txt:"ゴールド！+"+gain,life:1,vy:-1,col:"#ffd23f",size:34});
   }
 
   function jetAt(x){
@@ -143,7 +143,7 @@ function build_geyser(api){
     const isLucky=(rk.type==="rock"||rk.type==="big")&&rk.col===luckyColor;
     let gain=(base+(isLucky?2:0))*(fever?2:1); // フィーバー中は てんすう2ばい
     count+=gain;stageKill++;api.setScore(count);
-    combo++;comboT=1.0;
+    combo++;comboT=0.75;
     api.slide(360,150,0.14,0.34,"square");
     api.noise(0.14,0.22,1400,"bandpass",0.8);
     api.tone(480*Math.pow(2,clamp(combo,0,12)/12),0.13,"triangle",0.13);
@@ -166,7 +166,7 @@ function build_geyser(api){
     // ② ラッキー色 命中: 頭上に小さな星のキラッ(気づけるヒント)＋初回だけ中央で教える
     if(isLucky)luckySparkle(hx,hy-rk.r*0.6);
     // 軸6: 天面常設の「コンボ xN」と情報が重複しないよう、個別浮遊テキストは早めに消す
-    if(combo>1)floats.push({x:hx,y:hy-rk.r,txt:"x"+combo,life:0.65,vy:-0.6,
+    if(combo>=5)floats.push({x:hx,y:Math.max(hy-rk.r,api.H*0.36),txt:"x"+combo,life:0.65,vy:-0.6,
       col:combo>=8?"#ff3bd0":combo>=5?"#ff5b5b":"#ffd23f",size:combo>=5?40:30});
     if(combo>=3){climax=Math.min(1,0.5+combo*0.06);hstop(combo>=6?4:3);}
     // ③ まとめ噴火(考えどころ): ひとつの噴火で 3こ以上まとめて打ち上げたら ボーナス＋祝福。
@@ -195,7 +195,7 @@ function build_geyser(api){
         rot:rnd(0,TAU),vr:rnd(-0.4,0.4),life:1,decay:rnd(0.01,0.018),col:RAINBOW[i%RAINBOW.length]});}
     for(let i=0;i<10;i++){if(sparks.length>=80)break;const a=rnd(0,TAU),s=rnd(5,12);
       sparks.push({x:hx,y:hy,vx:Math.cos(a)*s,vy:Math.sin(a)*s,len:rnd(10,20),life:1,decay:rnd(0.04,0.07)});}
-    floats.push({x:hx,y:hy-rk.r,txt:"にじいろ！+"+gain,life:1,vy:-1,col:"#ff7bd0",size:36});
+    floats.push({x:hx,y:Math.max(hy-rk.r,api.H*0.36),txt:"にじいろ！+"+gain,life:1,vy:-1,col:"#ff7bd0",size:36});
   }
 
   function luckySparkle(hx,hy){
@@ -215,7 +215,7 @@ function build_geyser(api){
     count+=3;api.setScore(count);
     api.tone(1318,0.14,"triangle",0.11);api.tone(1976,0.16,"triangle",0.08);
     rings.push({x:jet.x,y:groundY-Math.min(jet.h,api.H*0.5),r:R*0.5,vr:R*1.1,life:1,decay:0.04,col:"#7be08a"});
-    floats.push({x:jet.x,y:groundY-Math.min(jet.h,api.H*0.5)-R,txt:"まとめて "+jet.kills+"こ！ +3",life:1,vy:-0.9,col:"#7be08a",size:30});
+    floats.push({x:jet.x,y:Math.max(groundY-Math.min(jet.h,api.H*0.5)-R,api.H*0.36),txt:"まとめて "+jet.kills+"こ！ +3",life:1,vy:-0.9,col:"#7be08a",size:30});
   }
 
   function startFever(){
@@ -225,16 +225,19 @@ function build_geyser(api){
     [0,4,7,12,16].forEach((s,i)=>setTimeout(()=>api.tone(523*Math.pow(2,s/12),0.18,"triangle",0.14),i*80));
     floats.push({x:api.W/2,y:api.H*0.42,txt:"フィーバータイム！",life:1,vy:-0.5,col:"#ffd23f",size:44});
     floats.push({x:api.W/2,y:api.H*0.42+46,txt:"てんすう 2ばい！ ぜんぶ 1ぱつ！",life:1,vy:-0.5,col:"#fff",size:22});
-    for(let i=0;i<5;i++)spawnRock(); // 的が大量発生
+    for(let i=0;i<3;i++)spawnRock(); // 的が増える(どこを押しても当たる過密は避ける)
   }
 
   function nova(){
     novaT=1;climax=1;api.boom(0.7);api.shake(18);hstop(6);
     api.slide(700,120,0.4,0.3,"sawtooth");api.tone(110,0.4,"sawtooth",0.12);
     const mul=feverT>0?2:1;
+    // 全部は倒さない: 画面の上のほうにいる岩だけ・最大4こ(連打だけでステージが埋まらないように)
+    let killed=0;
     for(const rk of rocks){
-      if(rk._dead)continue;
-      rk._dead=true;count+=(rk.type==="rainbow"?7:rk.type==="gold"?5:1)*mul;stageKill++;
+      if(killed>=4)break;
+      if(rk._dead||rk.y>=api.H*0.5)continue;
+      rk._dead=true;killed++;count+=(rk.type==="rainbow"?7:rk.type==="gold"?5:1)*mul;stageKill++;
       burst(rk.x,rk.y,rk.type==="rainbow"?pick(RAINBOW):rk.col,14,true);
     }
     api.setScore(count);
@@ -429,16 +432,16 @@ function build_geyser(api){
       // ---- spawn rocks (per stage cadence) ----
       const paused=clearT>0||endingT>0;
       if(!paused){spawnT-=dt;if(spawnT<=0){spawnRock();
-        spawnT=feverT>0?22:clamp(76-(stage-1)*9,36,76);}}   // 出現テンポ 約15%速め(7〜8歳向け)
+        spawnT=feverT>0?34:clamp(76-(stage-1)*9,36,76);}}   // 出現テンポ 約15%速め(7〜8歳向け)
       // ---- フィーバータイム進行 + 黄金の空気演出 ----
       if(feverT>0){
         feverT-=0.016*dt;
         g.save();g.globalCompositeOperation="lighter";
         const fp=0.5+0.5*Math.sin(tsec*6);
         let fg=g.createLinearGradient(0,0,0,api.H);
-        fg.addColorStop(0,"rgba(255,210,80,"+(0.10+0.10*fp)+")");
+        fg.addColorStop(0,"rgba(255,210,80,"+(0.06+0.06*fp)+")");
         fg.addColorStop(0.5,"rgba(255,160,40,0.04)");
-        fg.addColorStop(1,"rgba(255,220,100,"+(0.12+0.10*fp)+")");
+        fg.addColorStop(1,"rgba(255,220,100,"+(0.08+0.06*fp)+")");
         g.fillStyle=fg;g.fillRect(0,0,api.W,api.H);g.restore();
         // 金の火の粉が舞い上がる
         if(embers.length<120&&Math.random()<0.6*dt)
@@ -465,7 +468,7 @@ function build_geyser(api){
         if(j.life>0){
           for(const rk of rocks){
             if(rk._dead)continue;
-            if(Math.abs(rk.x-j.x)<j.w*0.28+rk.r*0.32 && rk.y+rk.r>topY-R && rk.y<groundY){
+            if(Math.abs(rk.x-j.x)<j.w*0.26+rk.r*0.29 && rk.y+rk.r>topY-R && rk.y<groundY){
               // push upward strongly; register a hit when near the jet head
               rk.vy=Math.min(rk.vy,-rnd(7,11));
               rk.vx+=(rk.x-j.x)*0.04;
@@ -616,7 +619,7 @@ function build_geyser(api){
       // ---- ② きょうのラッキー色 はっけん！(初回だけ大きく・上部中央) ----
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
         const pop=1+Math.max(0,luckyMsgT-1)*1.2;
-        g.save();g.translate(api.W/2,api.H*0.3);g.scale(pop,pop);
+        g.save();g.translate(api.W/2,api.H*0.40);g.scale(pop,pop);
         g.font="800 24px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.globalAlpha=clamp(luckyMsgT*1.4,0,1);g.shadowColor="rgba(255,240,160,.9)";g.shadowBlur=12;
         const t2=luckyIntro?"きょうのラッキー色は "+(LUCKYNAME[luckyColor]||"")+"！":"ラッキー！";

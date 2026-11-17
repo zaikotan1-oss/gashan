@@ -56,8 +56,8 @@ function buildTruck(api){
   const ALLCOLS=[];OB.forEach(t=>t.cols.forEach(c=>{if(ALLCOLS.indexOf(c)<0)ALLCOLS.push(c);}));
   const COLNAME={"#e0563a":"あか","#3a8ee6":"あお","#f5c518":"きいろ","#43b97f":"みどり","#ff8c42":"オレンジ","#9b6bff":"むらさき","#d24b3a":"あか","#e6a93a":"きいろ","#5566cc":"あお","#3a9e6b":"みどり","#e85d75":"ピンク","#4aa6c0":"みずいろ","#7be08a":"みどり","#ffb347":"オレンジ","#b58bff":"むらさき","#caa15a":"きいろ","#b9874a":"ちゃいろ","#d9b56b":"きいろ","#ff5da2":"ピンク","#5ad1ff":"みずいろ","#ffd23f":"きいろ","#ff7a2f":"オレンジ","#ff9a3f":"オレンジ","#ff3b3b":"あか","#2ecc71":"みどり"};
   function layout(){
-    groundY=api.H*0.82;
-    truckW=clamp(api.W*0.26,150,300);
+    groundY=api.H*0.76;   // 軸6: 主役を画面の下1/3から少し持ち上げる(0.82→0.76)
+    truckW=clamp(api.W*0.27,150,320);   // 軸6: 主役を少し大きく(0.26/300→0.27/320。0.29/340だと無反応の最長が12秒超の本が出たので止めた)
     truckH=truckW*0.62;
     wheelR=truckW*0.17;
     truckX=api.W*0.06;
@@ -185,6 +185,7 @@ function buildTruck(api){
     rings.push({x:cx,y:cy,r:o.w*0.3,vr:rnd(3.2,4.4)+speed*0.2,life:1,decay:0.05});
     boost=Math.min(boost+0.16,1);
     bounce=-7;
+    // 軸6(見やすさ): コンボ数字(cy-30)と特別文字(ラッキー/ボーナス/にじいろ=cy-110〜116)は寿命の間ずっと50px以上離す(重なって潰れない)
     if(combo>1)floats.push({x:cx,y:cy-30,txt:"x"+combo,life:1,vy:-1.2,
       col:combo>=8?"#ff3b3b":combo>=4?"#ff8c42":"#ffd23f",size:combo>=5?44:32});
     // 金の宝箱を割るとボーナス紙吹雪＋ファンファーレ
@@ -193,7 +194,7 @@ function buildTruck(api){
         s:rnd(4,8),col:pick(["#ffd23f","#ff6bd0","#5ad1ff","#7be08a","#ff8c42"]),
         rot:rnd(0,TAU),vr:rnd(-0.4,0.4),life:1,decay:rnd(0.008,0.014)});
       api.tone(880,0.1,"square",0.1);api.tone(1320,0.12,"square",0.08);
-      floats.push({x:cx,y:cy-50,txt:"ボーナス！",life:1,vy:-1,col:"#ffd23f",size:36});
+      floats.push({x:cx,y:cy-112,txt:"ボーナス！",life:1,vy:-1,col:"#ffd23f",size:36});
     }
     // ① にじいろブロック撃破: 虹の紙吹雪＋ファンファーレ＋大量得点
     if(isRainbow){
@@ -203,12 +204,12 @@ function buildTruck(api){
         rot:rnd(0,TAU),vr:rnd(-0.5,0.5),life:1,decay:rnd(0.006,0.012)});
       api.tone(880,0.1,"triangle",0.1);api.tone(1320,0.12,"triangle",0.09);api.tone(1760,0.14,"triangle",0.07);
       api.shake(14);flash=Math.min(flash+0.28,0.7);
-      floats.push({x:cx,y:cy-54,txt:"にじいろ！",life:1,vy:-1,col:"#ff5da2",size:44});
+      floats.push({x:cx,y:cy-116,txt:"にじいろ！",life:1,vy:-1,col:"#ff5da2",size:44});
     }
     // ② ラッキー色命中: 小さな祝福(控えめ)
     if(isLucky){
       api.tone(1046,0.1,"triangle",0.1);api.tone(1568,0.12,"triangle",0.08);
-      floats.push({x:cx,y:cy-46,txt:"ラッキー！",life:1,vy:-1,col:luckyColor,size:34});
+      floats.push({x:cx,y:cy-110,txt:"ラッキー！",life:1,vy:-1,col:luckyColor,size:34});
       for(let i=0;i<8;i++){const a=rnd(0,TAU),sp=rnd(3,7);
         sparks.push({x:cx,y:cy,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-2,life:1,decay:rnd(0.03,0.05),col:luckyColor});}
     }
@@ -848,10 +849,12 @@ function buildTruck(api){
       drawFace(x,y+canH*0.55,o.w*0.09,false);
     }else if(o.k==="sign"){
       // ⑦ 看板: 細いポール+ひし形の頭。四角いブロック群とは輪郭が全く違う(細長い)
-      const poleW=Math.max(3,o.w*0.14),poleH=o.h*0.62,headR=o.w*0.5,py=yb-poleH,headY=py-headR*0.85;
+      const poleW=Math.max(6,o.w*0.2),poleH=o.h*0.62,headR=o.w*0.5,py=yb-poleH,headY=py-headR*0.85;
       g.fillStyle="rgba(0,0,0,.2)";g.beginPath();g.ellipse(x,yb+2,o.w*0.28,o.w*0.08,0,0,TAU);g.fill();
-      g.fillStyle="#8a8f98";g.fillRect(x-poleW/2,py,poleW,poleH);
+      // 軸6: 灰青の背景ビルに埋もれないよう、濃い柱＋白い縁取りで浮かせる
+      g.fillStyle="#4b4f59";g.fillRect(x-poleW/2,py,poleW,poleH);
       g.fillStyle="rgba(255,255,255,.25)";g.fillRect(x-poleW/2,py,poleW*0.4,poleH);
+      g.strokeStyle="rgba(255,255,255,.6)";g.lineWidth=Math.max(1.5,poleW*0.18);g.strokeRect(x-poleW/2,py,poleW,poleH);
       g.save();g.translate(x,headY);g.rotate(Math.PI/4);
       const hg=g.createLinearGradient(-headR*0.62,-headR*0.62,headR*0.62,headR*0.62);
       hg.addColorStop(0,shadeC(o.col,26));hg.addColorStop(1,shadeC(o.col,-16));

@@ -189,7 +189,7 @@ function buildCandyshoot(api){
           rot:rnd(0,TAU),vr:rnd(-0.3,0.3),life:1,decay:rnd(0.02,0.03),col:luckyColor,shape:0});}
       floats.push({x:t.x,y:t.y-t.r-6,txt:"ラッキー！",life:1,vy:-0.9,col:luckyColor,size:26});
     }
-    if(combo>1)floats.push({x:t.x,y:t.y-t.r,txt:"x"+combo,life:1,vy:-1.1,
+    if(combo>=4)floats.push({x:t.x,y:t.y-t.r-(combo%2)*30,txt:"x"+combo,life:1,vy:-1.1,
       col:combo>=8?"#ff2bff":combo>=4?"#ff7bb8":"#ffd23f",size:combo>=4?38:28});
     if(combo>=3){celebrate=Math.min(1.4,0.6+combo*0.06);}
     // fever gauge fills with every pop; gold gives a big chunk
@@ -423,7 +423,7 @@ function buildCandyshoot(api){
       for(const f of floats){f.y+=f.vy*dt;f.life-=0.018*dt;
         g.save();g.globalAlpha=Math.max(0,f.life);
         g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-        g.lineWidth=6;g.strokeStyle="rgba(120,40,90,.5)";g.strokeText(f.txt,f.x,f.y);
+        g.lineJoin="round";g.lineWidth=6;g.strokeStyle="rgba(120,40,90,.7)";g.strokeText(f.txt,f.x,f.y);
         g.fillStyle=f.col;g.fillText(f.txt,f.x,f.y);g.restore();}
       g.globalAlpha=1;g.textAlign="left";floats=floats.filter(f=>f.life>0);
       // ---- celebration color-wash ----
@@ -444,10 +444,11 @@ function buildCandyshoot(api){
         g.save();g.translate(api.W/2,api.H*0.16);g.scale(popS,popS);
         g.font="800 32px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.globalAlpha=clamp(comboT,0,1);
-        g.shadowColor="rgba(255,120,180,.8)";g.shadowBlur=14;
+        g.lineJoin="round";g.lineWidth=6;g.strokeStyle="rgba(120,40,90,.75)";
+        g.strokeText("コンボ x"+combo,0,0);
+        g.shadowColor="rgba(255,120,180,.8)";g.shadowBlur=10;
         g.fillStyle="#ffd23f";g.fillText("コンボ x"+combo,0,0);
-        g.shadowBlur=0;g.lineWidth=1.5;g.strokeStyle="rgba(255,255,255,.7)";
-        g.strokeText("コンボ x"+combo,0,0);g.restore();g.globalAlpha=1;g.textAlign="left";
+        g.shadowBlur=0;g.restore();g.globalAlpha=1;g.textAlign="left";
       }
       // ① にじいろ 接近予告: はしっこに脈打つ虹の矢印(内向き)
       if(rbTele>0){const yy=rbTeleY,side=rbTeleSide,pulse=0.5+0.5*Math.sin(tsec*12);
@@ -763,9 +764,13 @@ function buildCandyshoot(api){
     const left=clamp(stageGoal-stageKill,0,stageGoal);
     const bw=Math.min(api.W*0.6,360),bh=16,bx=(api.W-bw)/2,by=api.H*0.045;
     g.save();g.textAlign="center";
+    // 【軸6】HUD背板: 白い雲の上でも文字とバーが読めるよう濃い板を敷く
+    g.fillStyle="rgba(120,40,90,.45)";rrect(bx-12,by-30,bw+24,bh+68,14);g.fill();
     g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
+    const hudTxt="ステージ "+stage+" / "+STAGES+"      あと "+left+" こ";
+    g.lineJoin="round";g.lineWidth=5;g.strokeStyle="rgba(120,40,90,.7)";g.strokeText(hudTxt,api.W/2,by-8);
     g.fillStyle="#fff";g.shadowColor="rgba(120,40,90,.6)";g.shadowBlur=6;
-    g.fillText("ステージ "+stage+" / "+STAGES+"      あと "+left+" こ",api.W/2,by-8);
+    g.fillText(hudTxt,api.W/2,by-8);
     g.shadowBlur=0;
     g.fillStyle="rgba(120,40,90,.35)";rrect(bx,by,bw,bh,bh/2);g.fill();
     const fr=clamp(stageKill/stageGoal,0,1);
@@ -782,6 +787,8 @@ function buildCandyshoot(api){
         for(let i=0;i<=4;i++)fg2.addColorStop(i/4,"hsl("+((feverHue*3+i*70)%360)+",90%,62%)");
         g.fillStyle=fg2;rrect(fx2,fy,fw2,fh,fh/2);g.fill();}
       g.font="800 15px 'Hiragino Maru Gothic ProN',system-ui";
+      g.lineJoin="round";g.lineWidth=5;g.strokeStyle="rgba(120,40,90,.7)";
+      g.strokeText("フィーバー！ とくてん 2ばい！",api.W/2,fy+fh+18);
       g.fillStyle="#fff";g.shadowColor="#ff2bff";g.shadowBlur=8;
       g.fillText("フィーバー！ とくてん 2ばい！",api.W/2,fy+fh+18);g.shadowBlur=0;
     }else if(fever>0.02){
@@ -790,6 +797,8 @@ function buildCandyshoot(api){
         fg2.addColorStop(0,"#ffd23f");fg2.addColorStop(1,"#ff2bff");
         g.fillStyle=fg2;rrect(fx2,fy,fw2,fh,fh/2);g.fill();}
       if(fever>0.85){g.font="800 14px 'Hiragino Maru Gothic ProN',system-ui";
+        g.lineJoin="round";g.lineWidth=5;g.strokeStyle="rgba(120,40,90,.7)";
+        g.strokeText("もうすぐ フィーバー！",api.W/2,fy+fh+16);
         g.fillStyle="#fff";g.shadowColor="rgba(255,43,255,.7)";g.shadowBlur=6;
         g.fillText("もうすぐ フィーバー！",api.W/2,fy+fh+16);g.shadowBlur=0;}
     }

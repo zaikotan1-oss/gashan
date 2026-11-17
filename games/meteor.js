@@ -34,7 +34,7 @@ function buildMeteor(api){
   function mkObj(i){
     // 壊す的の種類を増やす: 四角(building)・丸(tree)だけでなく丸い岩(rock)・横長の乗り物(car)も混ぜる(軸7対策)
     const roll=Math.random();
-    const kind=roll<0.28?"tree":roll<0.4?"rock":roll<0.48?"car":"building";
+    const kind=roll<0.28?"tree":roll<0.38?"rock":roll<0.52?"car":"building";
     // ① にじいろビル: 低確率(約5%)の激レア。虹色にきらめくので気づける=ドキドキ発見。壊すと大量得点＋虹の爆発。
     const rainbow=kind==="building"&&Math.random()<0.05;
     // from stage 2 some buildings are reinforced (need 2 meteors) -> mannerism breaker (7〜8歳向けに1面早く・少し多め)
@@ -42,8 +42,8 @@ function buildMeteor(api){
     // ⑤ たまに(約15%)ふつうよりずっと大きい「ランドマークビル」を混ぜて大小の差をはっきりさせる(軸7対策)
     const landmark=kind==="building"&&!rainbow&&!reinforced&&Math.random()<0.15;
     let w,h,color;
-    if(kind==="tree"){w=slotW*0.5;h=rnd(api.H*0.08,api.H*0.13);color="#3a8e4a";}
-    else if(kind==="rock"){w=rnd(slotW*0.4,slotW*0.6);h=w;color="#8a7d6e";}
+    if(kind==="tree"){w=slotW*0.65;h=rnd(api.H*0.08,api.H*0.13);color="#3a8e4a";}
+    else if(kind==="rock"){w=rnd(slotW*0.5,slotW*0.75);h=w;color="#8a7d6e";}
     else if(kind==="car"){w=slotW*0.62;h=rnd(api.H*0.045,api.H*0.06);color=pick(BCOL);}
     else{w=slotW*0.66;h=landmark?rnd(api.H*0.3,api.H*0.42):rnd(api.H*0.1,api.H*0.2);
       color=rainbow?"#ff5da2":(reinforced?"#8a93a8":pick(BCOL));}
@@ -74,7 +74,7 @@ function buildMeteor(api){
   function drop(tx){
     // 終盤(残り2体以下)は着弾点を最寄りの残存オブジェクトへ寄せる。ランダムタップでも当たりやすくし、
     // 無反応時間(maxQuietSec)が終盤の低命中率で跳ね上がるのを防ぐ(軸3対策)。狙って外すのは通常どおり自由。
-    if(standCount()<=2){
+    if(standCount()<=3){
       let best=null,bd=Infinity;
       for(const o of objs){if(o.state!=="stand")continue;
         const d=Math.abs(o.x-tx);if(d<bd){bd=d;best=o;}}
@@ -97,7 +97,7 @@ function buildMeteor(api){
       fire.push({x,y:groundY,vx:Math.cos(a)*s,vy:Math.sin(a)*s,r:rnd(4,11),life:1,decay:rnd(0.015,0.03),col:pick(["#ffd23f","#ff8c2c","#ff5b2c","#fff2a0"])});}
     for(let i=0;i<18;i++){const a=rnd(-Math.PI,0),s=rnd(7,17);
       sparks.push({x,y:groundY,vx:Math.cos(a)*s,vy:Math.sin(a)*s,len:rnd(8,18),life:1,decay:rnd(0.03,0.06),col:pick(["#fff2a0","#ffd23f","#fff"])});}
-    for(let i=0;i<8;i++)dust.push({x:x+rnd(-slotW,slotW),y:groundY,r:rnd(slotW*0.3,slotW*0.6),vr:rnd(1,2.5),vx:rnd(-4,4),life:1,decay:rnd(0.01,0.02)});
+    for(let i=0;i<5;i++)dust.push({x:x+rnd(-slotW,slotW),y:groundY,r:rnd(slotW*0.2,slotW*0.4),vr:rnd(1,2.5),vx:rnd(-4,4),life:1,decay:rnd(0.01,0.02)});
     const R=slotW*1.8;let hitCount=0;
     for(const o of objs){if(o.state!=="stand")continue;
       const d=Math.abs(o.x-x);
@@ -151,7 +151,7 @@ function buildMeteor(api){
     if(combo>stageBest)stageBest=combo;
     if(hitCount>=4){colorWash=1;washHue=hitCount>=6?28:48;api.shake(38);}
     if(hitCount>=3)floats.push({x,y:groundY-100,txt:hitCount+"はかい！",life:1,vy:-1.1,col:hitCount>=6?"#ff3b3b":"#ff8c42",size:hitCount>=6?46:34});
-    else if(combo>1)floats.push({x,y:groundY-100,txt:"x"+combo,life:1,vy:-1.1,col:combo>=5?"#ff8c42":"#ffd23f",size:32});
+    else if(combo>1){floats=floats.filter(f=>!/^x\d/.test(f.txt));floats.push({x,y:groundY-100,txt:"x"+combo,life:1,vy:-1.1,col:combo>=5?"#ff8c42":"#ffd23f",size:32});}
     // stage clear: every building/tree toppled
     if(clearT<=0&&standCount()===0)clearStage();
   }
@@ -291,16 +291,16 @@ function buildMeteor(api){
       // objects physics
       for(const o of objs){if(o.state==="fly"){o.vy+=0.5*dt;o.x+=o.vx*dt;o.y=(o.y||0)+o.vy*dt;o.rot+=o.vr*dt;
         if(groundY-o.h+o.y>api.H+40){o.state="gone";o.respawnT=rnd(30,70);o.y=0;}}}
+      // dust(軸6対策: 標的より先=奥に描いて、砂煙が木や岩を霞ませない。薄く・半径に上限)
+      for(const d of dust){d.r=Math.min(d.r+d.vr*dt,slotW*0.8);d.x+=d.vx*dt;d.y-=0.4*dt;d.life-=d.decay*dt;g.globalAlpha=Math.max(0,d.life)*0.22;
+        g.fillStyle="#caa";g.beginPath();g.arc(d.x,d.y,Math.max(0,d.r),0,TAU);g.fill();}
+      g.globalAlpha=1;dust=dust.filter(d=>d.life>0);
       // draw objects (standing/rising)
       for(const o of objs)drawObj(o);
       // UFOs cross the sky (variety target)
       for(const u of ufos){if(u.hp>0){u.x+=u.vx*dt;u.bob+=0.06*dt;}else{u.boom=(u.boom||0)-0.06*dt;}
         drawUfo(u);}
       ufos=ufos.filter(u=>(u.hp>0&&u.x>-80&&u.x<api.W+80)||(u.boom||0)>0);
-      // dust
-      for(const d of dust){d.r+=d.vr*dt;d.x+=d.vx*dt;d.y-=0.4*dt;d.life-=d.decay*dt;g.globalAlpha=Math.max(0,d.life)*0.5;
-        g.fillStyle="#caa";g.beginPath();g.arc(d.x,d.y,d.r,0,TAU);g.fill();}
-      g.globalAlpha=1;dust=dust.filter(d=>d.life>0);
       // meteors
       for(const m of meteors){const dx=m.tx-m.x,dy=m.ty-m.y,d=Math.hypot(dx,dy);
         const sp=meteorSp;m.x+=dx/d*sp*dt;m.y+=dy/d*sp*dt;m.trail+=dt;
@@ -359,7 +359,7 @@ function buildMeteor(api){
       if(combo>0){comboT-=0.012*dt;if(comboT<=0)combo=0;}
       for(const f of floats){f.y+=f.vy*dt;f.life-=0.014*dt;g.globalAlpha=Math.max(0,f.life);
         g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-        g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText(f.txt,f.x,f.y);g.fillStyle=f.col;g.fillText(f.txt,f.x,f.y);}
+        g.lineWidth=7;g.strokeStyle="rgba(0,0,0,.75)";g.strokeText(f.txt,f.x,f.y);g.fillStyle=f.col;g.fillText(f.txt,f.x,f.y);}
       g.globalAlpha=1;g.textAlign="left";floats=floats.filter(f=>f.life>0);
       // cute HUD
       if(scorePop>0)scorePop=Math.max(0,scorePop-0.06*dt);
@@ -416,7 +416,7 @@ function buildMeteor(api){
     // best combo (centered, just below the stage badge) only once it matters
     if(bestCombo>=2){const cfs=clamp(api.W*0.035,14,20);
       g.font="800 "+cfs+"px 'Hiragino Maru Gothic ProN',system-ui";
-      const ct="さいこう x"+bestCombo,cy=pad+sh+cfs+2;
+      const ct="さいこう x"+bestCombo,cy=pad+sh+cfs+6;
       g.textAlign="center";g.fillStyle="#ffd27a";g.lineWidth=4;g.strokeStyle="rgba(0,0,0,.4)";
       g.strokeText(ct,api.W/2,cy);g.fillText(ct,api.W/2,cy);g.textAlign="left";}
     // --- stage-start / final banner ---
@@ -432,7 +432,7 @@ function buildMeteor(api){
     if(clearT>0){const a=Math.min(1,clearT*1.4);g.globalAlpha=a;
       const cfs=clamp(api.W*0.07,30,54);g.font="900 "+cfs+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
       // 同じ理由でクリア見出しも 0.3H帯を避けて上寄りに置く(星の並びは見出しの下、engine帯の外に収まる)
-      const cy=groundY*0.22;
+      const cy=groundY*0.27;
       g.lineWidth=9;g.strokeStyle="rgba(0,0,0,.55)";g.strokeText(clearName,api.W/2,cy);
       g.fillStyle="#fff2a0";g.fillText(clearName,api.W/2,cy);
       // three stars, lit by rating
@@ -451,7 +451,7 @@ function buildMeteor(api){
     // ② きょうのラッキー色 ヒント(初回だけ大きく・以降は小さく)
     if(luckyMsgT>0){g.save();g.translate(api.W/2,api.H*0.28);g.textAlign="center";g.textBaseline="middle";
       g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 "+clamp(api.W*0.038,18,26)+"px 'Hiragino Maru Gothic ProN',system-ui";
-      const t2="きょうのラッキー色は "+(COLNAME[luckyColor]||"")+"！";
+      const t2="きょうのラッキーいろは "+(COLNAME[luckyColor]||"")+"！";
       g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.45)";g.strokeText(t2,0,0);
       g.fillStyle=luckyColor;g.fillText(t2,0,0);
       g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";}

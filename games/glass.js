@@ -40,19 +40,19 @@ function buildGlass(api){
       {f:"rgba(255,180,220,",e:"#ffd8ee",glow:"#ff9cd2"}]}
   ];
   function curStage(){return STAGES[stage%STAGES.length];}
-  function paneSize(shape,finale,kind){
+  function paneSize(shape,finale,kind,first){
     let w=clamp(api.W*0.74,240,560),h=clamp(api.H*0.6,300,640);
     if(shape==="tall"){w=clamp(api.W*0.5,200,420);h=clamp(api.H*0.7,320,700);}
     else if(shape==="wide"){w=clamp(api.W*0.82,260,620);h=clamp(api.H*0.46,220,520);}
     else if(shape==="round"){const d=clamp(Math.min(api.W*0.72,api.H*0.62),260,560);w=d;h=d;}
     // kindごとに明確な大小差(小物=素早く壊せる/大物=finaleでそのまま残す)
-    if(kind==="bottle"){w=clamp(api.W*0.26,110,220);h=clamp(api.H*0.5,260,460);}
+    if(kind==="bottle"){w=first?clamp(api.W*0.34,150,300):clamp(api.W*0.26,110,220);h=clamp(api.H*0.5,260,460);}
     else if(kind==="jarstack"){w=clamp(api.W*0.34,150,300);h=clamp(api.H*0.62,320,620);}
     else if(kind==="vase"){w=clamp(api.W*0.4,170,340);h=clamp(api.H*0.52,260,480);}
     if(finale){w=clamp(api.W*0.86,280,640);h=clamp(api.H*0.66,320,680);}
     return{w,h};
   }
-  function layout(){if(pane){const s=paneSize(pane.shape,pane.finale,pane.kind);pane.w=s.w;pane.h=s.h;pane.x=(api.W-pane.w)/2;pane.ty=(api.H-pane.h)/2;}}
+  function layout(){if(pane){const s=paneSize(pane.shape,pane.finale,pane.kind,pane.first);pane.w=s.w;pane.h=s.h;pane.x=(api.W-pane.w)/2;pane.ty=(api.H-pane.h)/2;}}
   function newPane(){
     const st=curStage();
     const finale=(count>=FINALE_SCORE&&!finaleDone);
@@ -60,16 +60,17 @@ function buildGlass(api){
     // ⑦ finale(特大パネル)は従来どおり板ガラスの大物として残し、それ以外はステージのkinds群からランダム選択
     // 軸3/軸1対策: ゲーム開始直後の1枚目は必ず瓶(2〜3打の小物)にして、最初の成功を確実に早める
     const kind=finale?"pane":(round===0?"bottle":pick(st.kinds||["pane"]));
-    const{w,h}=paneSize(shape,finale,kind);
-    const baseNeed=clamp(4+Math.floor(round/2),4,7)+stage;          // ステージごとに少しずつ手応え増(7〜8歳向け: 開始4・上限9)。無得点区間が伸びすぎないよう上限を8→7に
+    const first=(round===0&&!finale);
+    const{w,h}=paneSize(shape,finale,kind,first);
+    const baseNeed=clamp(3+Math.floor(round/2),3,6)+stage;          // ステージごとに少しずつ手応え増(7〜8歳向け: 開始4・上限9)。無得点区間が伸びすぎないよう上限を8→7に
     // ⑦ 小物(bottle)はneedを2〜3固定にして、サッと壊せる的として大物と混在させる
-    const need=kind==="bottle"?rint(2,3):(finale?18:clamp(baseNeed,4,9));
+    const need=kind==="bottle"?(first?2:rint(2,3)):(finale?18:clamp(baseNeed,3,9));
     pane={x:(api.W-w)/2,y:-h-20,ty:(api.H-h)/2,w,h,
       tint:st.tints[paneInStage%st.tints.length],shape,kind,round:false,grid:shape==="grid",
-      need,hits:0,cracks:[],sx:1,sy:1,gold:false,finale,jarsFallen:0,squashed:false};
+      need,hits:0,cracks:[],sx:1,sy:1,gold:false,finale,first,jarsFallen:0,squashed:false};
     if(shape==="round")pane.round=true;
     // ① にじいろガラス: ステージ2以降、ときどき(約5%)だけ出る激レア。いつ出るか分からない=ドキドキ発見。
-    if(!finale&&stage>=1&&rnd(0,1)<0.05){pane.rainbow=true;pane.tint=RAINBOW;if(kind!=="bottle")pane.need=clamp(baseNeed,4,6);}
+    if(!finale&&stage>=1&&rnd(0,1)<0.05){pane.rainbow=true;pane.tint=RAINBOW;if(kind!=="bottle")pane.need=clamp(baseNeed,3,6);}
     // コンボが乗っているとたまに金の特別窓が出る(ボーナス)。虹より優先させない。
     if(!finale&&!pane.rainbow&&combo>=3&&rnd(0,1)<0.5){pane.gold=true;pane.tint=GOLD;}
     // ⑦ jarstack: 1段ずつ崩れ落ちる演出のための、段あたりの必要タップ数
@@ -77,7 +78,7 @@ function buildGlass(api){
     settled=false;
   }
   function reset(){round=0;count=0;stage=0;paneInStage=0;combo=0;comboTimer=0;finaleDone=false;banner=0;shards=[];glints=[];floats=[];sparks=[];rings=[];balls=[];flash=0;wash=0;
-    luckyColor=pick(LUCKYKEYS);luckyName=TINTNAME[luckyColor];luckySeen=false;luckyMsgT=0;rbMsgT=0;stageWaste=0;shoot=null;shootCD=rint(180,360);
+    luckyColor=pick(LUCKYKEYS);luckyName=TINTNAME[luckyColor];luckySeen=false;luckyMsgT=0;rbMsgT=0;stageWaste=0;shoot=null;shootCD=rint(90,170);
     newPane();}
   function addCrack(x,y){
     const lines=[];const n=rint(5,8);
@@ -139,7 +140,7 @@ function buildGlass(api){
     burstSparks(cx0,cy0,46+cAmp*8,11,t);
     rings.push({x:cx0,y:cy0,r:pane.w*0.18,vr:9,life:1,col:t.glow,lw:6});
     rings.push({x:cx0,y:cy0,r:8,vr:6,life:1,col:"#ffffff",lw:4});
-    floats.push({x:api.W/2,y:api.H*0.4,txt:rainbow?"にじいろ！":gold?"きんピカ！":"パリーン！",col:t.e,life:1,vy:-0.7,size:48,pop:0});
+    floats.push({x:api.W/2,y:api.H*((isFinale||paneInStage+1>=PER_STAGE)?0.5:0.4),txt:rainbow?"にじいろ！":gold?"きんピカ！":"パリーン！",col:t.e,life:1,vy:-0.7,size:48,pop:0});
     if(combo>=2)floats.push({x:api.W/2,y:api.H*0.4+40,txt:combo+"れんさ！",col:"#ffe27a",life:1,vy:-0.5,size:30,pop:0});
     // ① にじいろガラス撃破: 虹の輪が5色ぶわっと広がる大盤振る舞い(激レアの爽快ごほうび)
     if(rainbow){
@@ -203,7 +204,8 @@ function buildGlass(api){
       if(!settled)return;
       // 投げた玉がその場でコツンと当たる小演出(操作は変えない・見た目だけ)
       balls.push({x:px,y:py,t:0,rot:rnd(0,TAU)});if(balls.length>8)balls.splice(0,balls.length-8);
-      if(px>=pane.x&&px<=pane.x+pane.w&&py>=pane.ty&&py<=pane.ty+pane.h){
+      const pad=22;   // 指の太さ分の余白(瓶・壺のような細い物でも当てやすく)
+      if(px>=pane.x-pad&&px<=pane.x+pane.w+pad&&py>=pane.ty-pad&&py<=pane.ty+pane.h+pad){
         // 弱点タップ: 既存のヒビの近くを狙うと一撃で大きく割れる
         let weak=false;
         for(const cr of pane.cracks){if(Math.hypot(px-cr.x,py-cr.y)<pane.w*0.16){weak=true;break;}}
@@ -262,7 +264,7 @@ function buildGlass(api){
       else if(!shoot&&banner<=0){
         const fromLeft=rnd(0,1)<0.5;
         shoot={x:fromLeft?-30:api.W+30,y:api.H*rnd(0.1,0.3),vx:(fromLeft?1:-1)*rnd(7,10),vy:rnd(1.5,3),trail:[],spin:rnd(0,TAU)};
-        shootCD=rint(200,380);          // 軸3対策: 出現間隔を詰めて無得点区間の保険にする
+        shootCD=rint(150,260);          // 軸3対策: 出現間隔を詰めて無得点区間の保険にする
       }
       if(shoot){
         shoot.x+=shoot.vx*dt;shoot.y+=shoot.vy*dt;shoot.spin+=0.08*dt;
@@ -389,7 +391,7 @@ function buildGlass(api){
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
         g.save();g.textAlign="center";g.translate(api.W/2,api.H*0.37);
         g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 23px 'Hiragino Maru Gothic ProN',system-ui";
-        const t3="きょうのラッキー色は "+luckyName+"！";
+        const t3="きょうの ラッキーいろは "+luckyName+"！";
         g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.4)";g.strokeText(t3,0,0);
         g.fillStyle=luckyColor;g.fillText(t3,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";if(luckyMsgT<0)luckyMsgT=0;}

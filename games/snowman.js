@@ -20,6 +20,7 @@ function build_snowman(api){
   let bunny=null,bunnyT=240;                                           // ④ ひみつの ゆきうさぎ(みっけ でごほうび)
   // ---- 無反応アシスト(理不尽な"詰み時間"を防ぐ保険。ふだんの当たり判定は変えない) ----
   let idleF=0,assistMR=1,firstScored=false,started2=false;
+  let spawnN=0,kamaPity=0,penPity=0;                                   // 出現の数え(最初の2体の大小・かまくら/ペンギンの保険)
   function stageGoalFor(s){return 10+(s-1)*3;}     // 10,13,16...（7〜8歳向けに手応えを増やした）
   function spawnInt(){return clamp(54-(stage-1)*5,30,54);}
   function lifeFor(){return clamp(132-(stage-1)*12,110,132);}
@@ -67,12 +68,39 @@ function build_snowman(api){
     // (積みだるま=丸を3段重ねたシルエット。他の丸1〜2個の形とはっきり違う「積み重なった物」)
     let shape="snow";
     if(!iron){const sr=Math.random();shape=sr<0.35?"snow":(sr<0.6?"ball":(sr<0.85?"icy":"tower"));}
-    // ⑦ とびきり大きな雪だるま: 得点後・ステージ2以降だけ ごくまれ(6%)。2回叩かないと倒れない特大サイズ。
-    // 大小差(0.6〜2.1倍=最大3.5倍差)をさらに強調し、低学年にも「特別に大きい」と一目で分かる驚きを作る
-    const big=!iron&&firstScored&&stage>=2&&Math.random()<0.06;
-    // 最初の得点が来るまでは 大小バリエーションを出さず 大きめ固定にして最初の成功を早める
-    // 得点後は大小差をはっきりさせる(0.6〜1.5倍、まれに1.9〜2.1倍の特大)。形の違いと合わせて壊す物の見分けを強くする
-    const mr=big?R*rnd(1.9,2.1):(firstScored?R*rnd(0.6,1.5):R*1.25);
+    // ⑧ かまくら(とても大きな建物・2回叩き)/ペンギン(ゆっくり歩く生き物): 雪だるま系以外の「ちがう物」
+    // 保険(pity)つき: ステージ2以降 かまくらは約14回に1回、ステージ3以降 ペンギンは約12回に1回は必ず出る
+    let kind=null;
+    if(!iron&&firstScored){
+      if(stage>=2)kamaPity++;
+      if(stage>=3)penPity++;
+      if(stage>=2&&!mans.some(q=>q.type==="kamakura")&&(kamaPity>=14||Math.random()<0.08))kind="kamakura";
+      else if(stage>=3&&!mans.some(q=>q.type==="penguin")&&(penPity>=12||Math.random()<0.10))kind="penguin";
+    }
+    if(kind==="kamakura"){
+      kamaPity=0;
+      const kmr=R*rnd(1.8,2.2),kx=rnd(kmr*1.3,Math.max(kmr*1.3,api.W-kmr*1.3)),ky=rnd(api.H*0.42,api.H*0.68);
+      // 大きいので 奥(配列の先頭)に置く: 手前の小さい標的のタップを奪わない
+      mans.unshift({x:kx,y:ky,type:"kamakura",hp:2,mR:kmr,big:false,
+        born:0,state:"rise",pop:0,squash:1,flash:0,bob:rnd(0,TAU),life:lifeFor()*1.15,wobble:0,scarf:null,fallDir:1});
+      api.tone(330,0.1,"triangle",0.08);
+      return;
+    }
+    if(kind==="penguin"){
+      penPity=0;
+      const pmr=R*rnd(0.95,1.3);
+      mans.push({x,y,type:"penguin",hp:1,mR:pmr,big:false,dir:Math.random()<0.5?-1:1,
+        born:0,state:"rise",pop:0,squash:1,flash:0,bob:rnd(0,TAU),life:lifeFor(),wobble:0,
+        scarf:pick(SCARF),fallDir:Math.random()<0.5?-1:1});
+      return;
+    }
+    // ⑦ とびきり大きな雪だるま: 得点後・ステージ2以降・6こ得点してから(12%)。2回叩かないと倒れない特大サイズ。
+    // 大小差(0.6〜2.1倍)をはっきり見せ、90秒のうちに1〜2回は「特別に大きい」物が見えるようにする
+    const big=!iron&&firstScored&&stage>=2&&count>=6&&Math.random()<0.12;
+    // 最初の2体だけは 大きめ(1.25)と ちょい小さめ(0.8)の固定。最初の成功を保ちつつ 大小があるのを見せる。
+    // 3体目以降は 大小をばらつかせる(最初の得点前は 指より小さくならないよう 下限0.75)
+    const sN=spawnN++;
+    const mr=big?R*rnd(1.9,2.1):(firstScored?R*rnd(0.6,1.5):(sN===0?R*1.25:(sN===1?R*0.8:R*rnd(0.75,1.5))));
     mans.push({x,y,type:iron?"iron":(big?"snow":shape),hp:iron?2:(big?2:1),mR:mr,big,
       born:0,state:"rise",pop:0,squash:1,flash:0,bob:rnd(0,TAU),
       life:lifeFor(),wobble:0,scarf:pick(SCARF),fallDir:Math.random()<0.5?-1:1});
@@ -130,7 +158,7 @@ function build_snowman(api){
   }
   function smash(m){
     // during fever everything dies in one hit
-    if((m.type==="iron"||m.big)&&m.hp>1&&fever<=0){
+    if((m.type==="iron"||m.big||m.type==="kamakura")&&m.hp>1&&fever<=0){
       m.hp--;m.flash=1;m.squash=0.8;m.wobble=1;
       api.slide(420,260,0.08,0.2,"square");api.noise(0.06,0.14,2200,"highpass",1);
       api.tone(520,0.07,"square",0.1);api.shake(5);
@@ -142,7 +170,7 @@ function build_snowman(api){
     const rbw=m.type==="rainbow";
     // ② ラッキー色: きょうの秘密のマフラー色を倒すと隠しボーナス。気づくと得する。
     const isLucky=!gold&&!rbw&&m.scarf===luckyColor;
-    let gain=rbw?8:(gold?5:(m.type==="iron"?3:(m.big?4:1)));
+    let gain=rbw?8:(gold?5:(m.type==="iron"?3:((m.big||m.type==="kamakura")?4:(m.type==="penguin"?2:1))));
     if(isLucky)gain+=1;
     if(fever>0)gain*=2;
     count+=gain;stageKill++;api.setScore(count);combo++;comboT=1;
@@ -188,9 +216,10 @@ function build_snowman(api){
       for(let i=0;i<3;i++)glints.push({x:m.x+rnd(-R,R),y:m.y-R*0.5+rnd(-R*0.5,R*0.5),r:rnd(4,8),life:1,decay:rnd(0.03,0.05)});
       floats.push({x:m.x,y:m.y-R*1.1,txt:"ラッキー！",life:1,vy:-1,col:luckyColor,size:30});
     }
-    burst(m.x,m.y,rbw?"#ff7bd0":(gold?"#ffd23f":(m.type==="iron"?"#ffe7a0":"#cfeeff")),gold||rbw||combo>=5);
+    burst(m.x,m.y,rbw?"#ff7bd0":(gold?"#ffd23f":(m.type==="iron"?"#ffe7a0":"#cfeeff")),gold||rbw||combo>=5||m.type==="kamakura"||m.big);
+    if(m.type==="kamakura")api.shake(12);
     // fever gauge (fills only outside fever)
-    if(fever<=0){feverG=Math.min(1,feverG+(rbw?0.3:(gold?0.25:(m.type==="iron"?0.18:0.1))));
+    if(fever<=0){feverG=Math.min(1,feverG+(rbw?0.3:(gold?0.25:((m.type==="iron"||m.type==="kamakura")?0.18:0.1))));
       if(feverG>=1)startFever();}
     checkStage();
   }
@@ -202,7 +231,9 @@ function build_snowman(api){
         if(m.state==="smashed")continue;
         const mr=m.mR||R;
         const ry=m.y-(1-ease(m.born))*mr*0.6;
-        if(Math.hypot(x-m.x,y-ry)<mr*1.25*assistMR){ smash(m); return; }
+        // 特大・かまくらは 見た目がもともと大きいので 判定は見た目ぴったり(1.05)。小さい物は 指先より大きい 1.25 のまま
+        const hk=(m.big||m.type==="kamakura")?1.05:1.25;
+        if(Math.hypot(x-m.x,y-ry)<mr*hk*assistMR){ smash(m); return; }
       }
       // ④ ひみつの ゆきうさぎ: ゆきだるまに当たらなかったタップが うさぎに届いたら みっけ!(減点なし)
       if(bunny&&!bunny.caught){
@@ -295,19 +326,28 @@ function build_snowman(api){
         if(m.state==="rise"){m.born=Math.min(1,m.born+0.08*dt);if(m.born>=1)m.state="up";}
         else if(m.state==="up"){m.life-=dt;if(m.life<=0){m.state="melt";if(clearT<=0)stageMelt++;}}
         else if(m.state==="melt"){m.born-=0.06*dt;if(m.born<=0)m._dead=true;}
-        else if(m.state==="smashed"){m.squash-=0.1*dt;if(m.squash<=0)m._dead=true;}
+        else if(m.state==="smashed"){m.squash-=(m.type==="kamakura"?0.06:(m.type==="penguin"?0.07:0.1))*dt;if(m.squash<=0)m._dead=true;}
+        if(m.type==="penguin"&&(m.state==="up"||m.state==="rise")){
+          // ペンギンは ゆっくり左右に歩く(端で折り返す)
+          m.x+=m.dir*1.2*dt;const lo=(m.mR||R)*1.4,hi=api.W-(m.mR||R)*1.4;
+          if(m.x<lo){m.x=lo;m.dir=1;}else if(m.x>hi){m.x=hi;m.dir=-1;}
+        }
         m.bob+=0.06*dt;
         if(m.state==="smashed"){
           if(m.type==="ball")drawBallSmash(m);
           else if(m.type==="icy")drawIcySmash(m);
           else if(m.type==="tower")drawTowerTopple(m);
           else if(m.type==="iron")drawIronSmash(m);
+          else if(m.type==="kamakura")drawKamakuraCrumble(m);
+          else if(m.type==="penguin")drawPenguinSlide(m);
           else if(m.type==="gold"||m.type==="rainbow")drawGoldSmash(m);
           else drawSmash(m);
         }else{
           if(m.type==="ball")drawSnowball(m);
           else if(m.type==="icy")drawIcicle(m);
           else if(m.type==="tower")drawTower(m);
+          else if(m.type==="kamakura")drawKamakura(m);
+          else if(m.type==="penguin")drawPenguin(m);
           else drawSnowman(m);
         }
       }
@@ -382,7 +422,8 @@ function build_snowman(api){
         g.font="800 32px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.globalAlpha=clamp(comboT,0,1);
         g.shadowColor="rgba(120,200,255,.9)";g.shadowBlur=14;
-        g.fillStyle="#eaf6ff";g.fillText("コンボ x"+combo,0,0);
+        g.shadowBlur=0;g.lineWidth=5;g.strokeStyle="rgba(10,40,70,.5)";g.strokeText("コンボ x"+combo,0,0);
+        g.shadowBlur=14;g.fillStyle="#eaf6ff";g.fillText("コンボ x"+combo,0,0);
         g.shadowBlur=0;g.lineWidth=1.5;g.strokeStyle="rgba(255,255,255,.7)";
         g.strokeText("コンボ x"+combo,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";
@@ -397,12 +438,23 @@ function build_snowman(api){
         g.restore();g.globalAlpha=1;g.textAlign="left";if(rbMsgT<0)rbMsgT=0;}
       // ② きょうの ラッキー色 はっけん(初回だけ 大きく色名を教える)
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
-        g.save();g.translate(api.W/2,api.H*0.30);g.textAlign="center";
+        g.save();g.translate(api.W/2,api.H*0.37);g.textAlign="center";
         g.globalAlpha=clamp(luckyMsgT*1.4,0,1);g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
         const t2="きょうの ラッキー色は "+(SCARFNAME[SCARF.indexOf(luckyColor)]||"")+"！";
         g.lineWidth=5;g.strokeStyle="rgba(10,40,70,.45)";g.strokeText(t2,0,0);
         g.fillStyle=luckyColor;g.fillText(t2,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";if(luckyMsgT<0)luckyMsgT=0;}
+      // ⑤ フィーバー！ バナー(はじまりの 1.6びょうだけ 大きく。2ばい と 1げきで こわせる を教える)
+      if(feverBann>0){feverBann-=0.016*dt;
+        const pop=1+Math.max(0,feverBann-1.2)*1.2,col=RAINBOW[Math.floor(tGlobal*0.15)%RAINBOW.length];
+        g.save();g.translate(api.W/2,api.H*0.30);g.scale(pop,pop);g.textAlign="center";
+        g.globalAlpha=clamp(feverBann*1.4,0,1);g.font="900 38px 'Hiragino Maru Gothic ProN',system-ui";
+        g.lineWidth=7;g.strokeStyle="rgba(10,40,70,.6)";g.strokeText("フィーバー！",0,0);
+        g.shadowColor=col;g.shadowBlur=16;g.fillStyle="#fff0a6";g.fillText("フィーバー！",0,0);
+        g.shadowBlur=0;g.font="800 20px 'Hiragino Maru Gothic ProN',system-ui";
+        g.lineWidth=5;g.strokeStyle="rgba(10,40,70,.55)";g.strokeText("ぜんぶ 1かいで こわれて 2ばいの てん！",0,32);
+        g.fillStyle="#ffffff";g.fillText("ぜんぶ 1かいで こわれて 2ばいの てん！",0,32);
+        g.restore();g.globalAlpha=1;g.textAlign="left";if(feverBann<0)feverBann=0;}
       // ③ パーフェクト！ バナー(クリア文字の下=重ねない)
       if(perfectT>0){perfectT-=0.014*dt;
         const pop=1+Math.max(0,perfectT-1.3)*1.4;
@@ -446,6 +498,16 @@ function build_snowman(api){
       gg.addColorStop(0,"#7be0ff");gg.addColorStop(1,"#eaf6ff");
       g.fillStyle=gg;roundRect(bx,by,Math.max(bh,bw*fr),bh,bh/2);g.fill();}
     g.strokeStyle="rgba(255,255,255,.7)";g.lineWidth=2;roundRect(bx,by,bw,bh,bh/2);g.stroke();
+    // フィーバーゲージ(下の細い帯): たまると きいろ。フィーバー中は へっていく。ひだりに「フィーバー」
+    const fh=8,fy=by+bh+6,fw=bw*0.7,fx=(api.W-fw)/2;
+    const ff=fever>0?clamp(fever/FEVER_LEN,0,1):clamp(feverG,0,1);
+    g.fillStyle="rgba(10,40,70,.3)";roundRect(fx,fy,fw,fh,fh/2);g.fill();
+    if(ff>0){g.fillStyle=fever>0?"#ffd23f":"#ffb347";roundRect(fx,fy,Math.max(fh,fw*ff),fh,fh/2);g.fill();}
+    g.strokeStyle="rgba(255,255,255,.7)";g.lineWidth=1.5;roundRect(fx,fy,fw,fh,fh/2);g.stroke();
+    g.font="800 14px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="right";
+    g.lineWidth=4;g.strokeStyle="rgba(255,255,255,.75)";
+    g.strokeText(fever>0?"フィーバー！":"フィーバー",fx-8,fy+fh);
+    g.fillStyle=fever>0?"#b86a00":"#0a3a5a";g.fillText(fever>0?"フィーバー！":"フィーバー",fx-8,fy+fh);
     g.restore();g.textAlign="left";
   }
   function drawSnowman(m){
@@ -774,6 +836,115 @@ function build_snowman(api){
     g.beginPath();g.moveTo(-w,-h*0.4-split);g.lineTo(w,-h*0.4-split);g.lineTo(w*0.5,-h*0.05-split);g.lineTo(-w*0.5,-h*0.05-split);
     g.closePath();g.fill();
     g.beginPath();g.moveTo(-w*0.4,h*0.0+drop);g.lineTo(w*0.4,h*0.0+drop);g.lineTo(0,h*0.6+drop);g.closePath();g.fill();
+    g.restore();g.globalAlpha=1;
+  }
+  // ⑧ かまくら(半円ドーム+入口の穴): 雪だるま系ではない「建物」。2回叩くと上から崩れて雪山になる
+  function kamakuraBody(rad,cracked,flash){
+    // 原点=地面(ドームの底)。ドーム半径 rr
+    const rr=rad*1.1;
+    g.save();g.shadowBlur=0;g.fillStyle="rgba(60,110,150,.25)";g.beginPath();
+    g.ellipse(0,rr*0.1,Math.max(0,rr*1.08),Math.max(0,rr*0.2),0,0,TAU);g.fill();g.restore();
+    let dg=g.createRadialGradient(-rr*0.35,-rr*0.55,Math.max(0,rr*0.1),0,-rr*0.2,Math.max(0,rr*1.3));
+    dg.addColorStop(0,"#ffffff");dg.addColorStop(0.6,"#e6f2fc");dg.addColorStop(1,"#b9d4ea");
+    g.fillStyle=dg;g.beginPath();g.moveTo(-rr,0);g.arc(0,0,Math.max(0,rr),Math.PI,TAU);g.closePath();g.fill();
+    // 雪ブロックの目地(ドームの中だけ)
+    g.save();g.beginPath();g.moveTo(-rr,0);g.arc(0,0,Math.max(0,rr),Math.PI,TAU);g.closePath();g.clip();
+    g.strokeStyle="rgba(120,165,200,.55)";g.lineWidth=Math.max(1.5,rad*0.035);g.lineCap="round";
+    for(let j=1;j<=3;j++){const yy=-rr*j*0.27,hw=Math.sqrt(Math.max(0,rr*rr-yy*yy));
+      g.beginPath();g.moveTo(-hw,yy);g.lineTo(hw,yy);g.stroke();
+      const n=3+(3-j);
+      for(let k=0;k<=n;k++){const xx=-hw+(k+(j%2?0.5:0))*(2*hw/(n+0.5));
+        if(Math.abs(xx)<hw){g.beginPath();g.moveTo(xx,yy);g.lineTo(xx,yy+rr*0.27);g.stroke();}}}
+    g.restore();
+    g.strokeStyle="rgba(110,160,195,.7)";g.lineWidth=Math.max(1.5,rad*0.04);
+    g.beginPath();g.arc(0,0,Math.max(0,rr),Math.PI,TAU);g.stroke();
+    // 入口(黒いアーチの穴)
+    const ew=rr*0.3,eh=rr*0.32;
+    g.fillStyle="#e6f2fc";g.beginPath();g.moveTo(-ew*1.25,0);g.lineTo(-ew*1.25,-eh*0.9);g.arc(0,-eh*0.9,ew*1.25,Math.PI,TAU);g.lineTo(ew*1.25,0);g.closePath();g.fill();
+    let eg=g.createLinearGradient(0,-eh*1.5,0,0);eg.addColorStop(0,"#1b2a40");eg.addColorStop(1,"#3a5272");
+    g.fillStyle=eg;g.beginPath();g.moveTo(-ew,0);g.lineTo(-ew,-eh);g.arc(0,-eh,ew,Math.PI,TAU);g.lineTo(ew,0);g.closePath();g.fill();
+    if(cracked){g.strokeStyle="rgba(70,110,145,.8)";g.lineWidth=Math.max(1.5,rad*0.05);g.lineCap="round";
+      g.beginPath();g.moveTo(-rr*0.45,-rr*0.95);g.lineTo(-rr*0.3,-rr*0.7);g.lineTo(-rr*0.5,-rr*0.5);g.lineTo(-rr*0.35,-rr*0.3);g.stroke();
+      g.beginPath();g.moveTo(rr*0.5,-rr*0.7);g.lineTo(rr*0.35,-rr*0.5);g.lineTo(rr*0.55,-rr*0.3);g.stroke();}
+    if(flash>0){g.save();g.globalAlpha=Math.min(1,flash*0.6);g.fillStyle="#fff";
+      g.beginPath();g.moveTo(-rr,0);g.arc(0,0,Math.max(0,rr),Math.PI,TAU);g.closePath();g.fill();g.restore();}
+  }
+  function drawKamakura(m){
+    const rad=m.mR||R;
+    const rise=ease(m.state==="rise"?m.born:(m.state==="melt"?m.born:1));
+    const y=m.y-(1-rise)*rad*0.6;
+    const sq=clamp(m.squash,0.4,1.2);
+    const wob=Math.sin(tGlobal*0.4)*m.wobble*0.06;
+    const fade=m.state==="melt"?clamp(m.born,0,1):1;
+    g.save();g.globalAlpha=fade;
+    g.translate(m.x,y+rad*0.55);g.rotate(wob);g.scale(rise,rise*sq);
+    kamakuraBody(rad,m.hp<=1,m.flash);
+    g.restore();g.globalAlpha=1;
+  }
+  // かまくら 崩壊: ドームが上から潰れ、雪ブロックが飛んで落ち、雪山が残る
+  function drawKamakuraCrumble(m){
+    const rad=m.mR||R,rr=rad*1.1;
+    const sq=clamp(m.squash,0,1),fall=1-sq;
+    g.save();g.globalAlpha=sq;g.translate(m.x,m.y+rad*0.55);
+    g.fillStyle="#e6f2fc";g.beginPath();
+    g.ellipse(0,-rr*0.06,Math.max(0,rr*(0.8+fall*0.35)),Math.max(0,rr*0.2*(0.5+fall)),0,0,TAU);g.fill();
+    g.save();g.scale(1+fall*0.12,Math.max(0.03,sq*sq));kamakuraBody(rad,false,0);g.restore();
+    g.fillStyle="#f4faff";g.strokeStyle="rgba(120,165,200,.7)";g.lineWidth=Math.max(1,rad*0.03);
+    for(let i=0;i<7;i++){
+      const a=Math.PI+(i+0.5)/7*Math.PI;
+      const bx=Math.cos(a)*rr*(0.7+fall*0.8),by=Math.sin(a)*rr*0.8*(1-fall)+fall*fall*rr*0.6-rr*0.1;
+      const bs=rad*0.22;
+      g.save();g.translate(bx,by);g.rotate(fall*3*(i%2?1:-1));
+      g.fillRect(-bs,-bs*0.6,bs*2,bs*1.2);g.strokeRect(-bs,-bs*0.6,bs*2,bs*1.2);g.restore();
+    }
+    g.restore();g.globalAlpha=1;
+  }
+  // ⑨ ペンギン(黒い縦長のたまご形+白いお腹+くちばし): ゆっくり歩く「生き物」
+  function penguinBody(rad,flap,flash,scarf){
+    g.save();g.fillStyle="#ff9a2e";
+    g.beginPath();g.ellipse(-rad*0.3,rad*1.1,Math.max(0,rad*0.28),Math.max(0,rad*0.12),0,0,TAU);
+    g.ellipse(rad*0.3,rad*1.1,Math.max(0,rad*0.28),Math.max(0,rad*0.12),0,0,TAU);g.fill();
+    g.fillStyle="#1f2a3a";
+    for(const sd of [-1,1]){g.save();g.translate(sd*rad*0.72,rad*0.2);g.rotate(sd*(0.45+flap));
+      g.beginPath();g.ellipse(0,rad*0.2,Math.max(0,rad*0.2),Math.max(0,rad*0.55),0,0,TAU);g.fill();g.restore();}
+    let bg=g.createRadialGradient(-rad*0.25,-rad*0.4,Math.max(0,rad*0.1),0,rad*0.1,Math.max(0,rad*1.2));
+    bg.addColorStop(0,"#4a5a72");bg.addColorStop(1,"#18212f");
+    g.fillStyle=bg;g.beginPath();g.ellipse(0,rad*0.1,Math.max(0,rad*0.72),Math.max(0,rad*1.05),0,0,TAU);g.fill();
+    g.fillStyle="#f6fbff";g.beginPath();g.ellipse(0,rad*0.32,Math.max(0,rad*0.5),Math.max(0,rad*0.76),0,0,TAU);g.fill();
+    if(scarf){g.fillStyle=scarf;g.beginPath();g.ellipse(0,-rad*0.2,Math.max(0,rad*0.58),Math.max(0,rad*0.13),0,0,TAU);g.fill();
+      g.beginPath();g.moveTo(rad*0.2,-rad*0.16);g.lineTo(rad*0.48,-rad*0.12);g.lineTo(rad*0.4,rad*0.3);g.lineTo(rad*0.16,rad*0.26);g.closePath();g.fill();}
+    g.fillStyle="#ffffff";g.beginPath();g.arc(-rad*0.22,-rad*0.5,Math.max(0,rad*0.17),0,TAU);g.arc(rad*0.22,-rad*0.5,Math.max(0,rad*0.17),0,TAU);g.fill();
+    g.fillStyle="#111";g.beginPath();g.arc(-rad*0.21,-rad*0.49,Math.max(0,rad*0.08),0,TAU);g.arc(rad*0.23,-rad*0.49,Math.max(0,rad*0.08),0,TAU);g.fill();
+    g.fillStyle="#ff9a2e";g.beginPath();g.moveTo(-rad*0.17,-rad*0.34);g.lineTo(rad*0.17,-rad*0.34);g.lineTo(0,-rad*0.12);g.closePath();g.fill();
+    g.fillStyle="rgba(255,150,150,.45)";g.beginPath();g.arc(-rad*0.4,-rad*0.32,Math.max(0,rad*0.09),0,TAU);g.arc(rad*0.4,-rad*0.32,Math.max(0,rad*0.09),0,TAU);g.fill();
+    if(flash>0){g.globalAlpha=Math.min(1,flash*0.6);g.fillStyle="#fff";g.beginPath();g.ellipse(0,rad*0.1,Math.max(0,rad*0.72),Math.max(0,rad*1.05),0,0,TAU);g.fill();}
+    g.restore();
+  }
+  function drawPenguin(m){
+    const rad=m.mR||R;
+    const rise=ease(m.state==="rise"?m.born:(m.state==="melt"?m.born:1));
+    const y=m.y-(1-rise)*rad*0.6;
+    const sq=clamp(m.squash,0.4,1.2);
+    const fade=m.state==="melt"?clamp(m.born,0,1):1;
+    const wal=m.state==="up"?Math.sin(tGlobal*0.45+m.bob*2):0;   // よちよち歩き
+    const hop=Math.abs(wal)*rad*0.06;
+    g.save();g.globalAlpha=fade;
+    g.translate(m.x,y-hop);g.rotate(wal*0.1+(m.wobble>0?Math.sin(tGlobal*0.4)*m.wobble*0.1:0));g.scale(rise,rise*sq);
+    g.save();g.shadowBlur=0;g.fillStyle="rgba(60,110,150,.25)";g.beginPath();
+    g.ellipse(0,rad*1.25+hop,Math.max(0,rad*0.85),Math.max(0,rad*0.22),0,0,TAU);g.fill();g.restore();
+    penguinBody(rad,wal*0.3,m.flash,m.scarf);
+    if(m.scarf===luckyColor&&(m.state==="up"||m.state==="rise"))luckyHintStar(rad*0.6,-rad*1.2,fade,rad);
+    g.restore();g.globalAlpha=1;
+  }
+  // ペンギン 倒れ: ひっくり返って おなかで すべっていく
+  function drawPenguinSlide(m){
+    const rad=m.mR||R;
+    const sq=clamp(m.squash,0,1),fall=1-sq,dir=m.fallDir||1;
+    g.save();g.globalAlpha=sq;
+    g.fillStyle="rgba(60,110,150,.2)";g.beginPath();
+    g.ellipse(m.x+dir*fall*rad*2.2,m.y+rad*1.25,Math.max(0,rad*0.95),Math.max(0,rad*0.2),0,0,TAU);g.fill();
+    g.translate(m.x+dir*fall*rad*2.2,m.y+fall*rad*0.4);g.rotate(dir*Math.min(1,fall*1.6)*Math.PI*0.5);
+    penguinBody(rad,fall*1.2,0,null);
     g.restore();g.globalAlpha=1;
   }
   function luckyHintStar(hx,hy,fade,rad){

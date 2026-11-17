@@ -234,7 +234,8 @@ function buildRobot(api){
         floats.push({x:shooter.x,y:shooter.y-10,txt:"＋2",life:1,vy:-1.2,col:"#ffd23f",size:30,pop:1.6});
         shooter=null;return;
       }
-      if(!best)return;
+      /* 空ぶり: 小さな白い波紋だけ(得点なし) */
+      if(!best){waves.push({x:px,y:py,r:6,max:Math.max(30,slotW*0.5),life:0.55});return;}
       // PERFECT = tap close to the building's centre
       const perfect=Math.abs(best.x-px)<best.w*0.22;
       stomp(best,perfect);
@@ -443,13 +444,13 @@ function buildRobot(api){
   function drawHUD(dt){
     // --- stage progress bar (top) : "ビルを N棟ふみつぶせ！" ---
     {
-      const bw=clamp(api.W*0.5,200,360),bh=18,bx=api.W/2-bw/2,by=8;
+      const bw=clamp(api.W*0.5,220,400),bh=24,bx=api.W/2-bw/2,by=8;
       const prog=clamp(stageDone/stageNeed,0,1);
       g.save();
       g.fillStyle="rgba(20,16,34,.55)";roundRect(bx,by,bw,bh,bh/2);g.fill();
       const sc=["#ffd23f","#7adcff","#ff8c42","#ff5d8a","#b56cff"][(stage-1)%5];
       g.fillStyle=sc;g.shadowColor=sc;g.shadowBlur=10;roundRect(bx,by,Math.max(bh,bw*prog),bh,bh/2);g.fill();g.shadowBlur=0;
-      g.textAlign="center";g.textBaseline="middle";g.font="900 12px 'Hiragino Maru Gothic ProN',system-ui";
+      g.textAlign="center";g.textBaseline="middle";g.font="900 16px 'Hiragino Maru Gothic ProN',system-ui";
       const left=Math.max(0,stageNeed-stageDone);
       const lbl="ステージ"+stage+"  のこり "+left+"棟！";
       g.lineWidth=4;g.strokeStyle="rgba(0,0,0,.6)";g.strokeText(lbl,api.W/2,by+bh/2+1);
@@ -461,20 +462,20 @@ function buildRobot(api){
       g.save();g.textAlign="center";g.textBaseline="middle";
       g.font="900 20px 'Hiragino Maru Gothic ProN',system-ui";
       g.shadowColor="#ff3b6b";g.shadowBlur=16;
-      g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.6)";g.strokeText("むそう！ "+Math.ceil(rampageT),api.W/2,52);
-      g.fillStyle="#ffd23f";g.fillText("むそう！ "+Math.ceil(rampageT),api.W/2,52);
+      g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.6)";g.strokeText("むそう！ "+Math.ceil(rampageT),api.W/2,66);
+      g.fillStyle="#ffd23f";g.fillText("むそう！ "+Math.ceil(rampageT),api.W/2,66);
       g.restore();
     }
     const target=combo>0?clamp(comboT/0.9,0,1):0;comboBar+=(target-comboBar)*0.25*dt;
     // combo meter (top-center) when active — score lives in the shared HUD
     if(combo>1&&comboBar>0.02){
-      const bw=clamp(api.W*0.4,160,300),bh=14,bx=api.W/2-bw/2,by=32;
+      const bw=clamp(api.W*0.4,180,320),bh=20,bx=api.W/2-bw/2,by=36;
       g.save();
       g.fillStyle="rgba(40,30,60,.5)";roundRect(bx,by,bw,bh,bh/2);g.fill();
       const col=combo>=9?"#ff3b6b":combo>=6?"#ff8c42":"#ffd23f";
       const fw2=Math.max(bh,bw*comboBar);
       g.fillStyle=col;g.shadowColor=col;g.shadowBlur=10;roundRect(bx,by,fw2,bh,bh/2);g.fill();g.shadowBlur=0;
-      g.textAlign="center";g.textBaseline="middle";g.font="900 12px 'Hiragino Maru Gothic ProN',system-ui";
+      g.textAlign="center";g.textBaseline="middle";g.font="900 16px 'Hiragino Maru Gothic ProN',system-ui";
       g.lineWidth=4;g.strokeStyle="rgba(0,0,0,.55)";g.strokeText("れんぞく x"+combo,api.W/2,by+bh/2+1);
       g.fillStyle="#fff";g.fillText("れんぞく x"+combo,api.W/2,by+bh/2+1);
       g.restore();
@@ -649,7 +650,7 @@ function buildRobot(api){
     let bg=g.createLinearGradient(x,y,x+w,y);
     bg.addColorStop(0,shade(b.color,0.18));bg.addColorStop(0.5,b.color);bg.addColorStop(1,shade(b.color,-0.22));
     g.fillStyle=bg;g.shadowColor="rgba(0,0,0,.4)";g.shadowBlur=6;
-    g.beginPath();g.moveTo(x,bodyTop);g.lineTo(x,bodyBot);g.ellipse(cx,bodyBot,rx,ry,0,0,Math.PI);g.lineTo(x+w,bodyTop);g.ellipse(cx,bodyTop,rx,ry,0,Math.PI,0,true);g.closePath();g.fill();
+    g.beginPath();g.moveTo(x,bodyTop);g.lineTo(x,bodyBot);g.ellipse(cx,bodyBot,rx,ry,0,Math.PI,0,true);g.lineTo(x+w,bodyTop);g.ellipse(cx,bodyTop,rx,ry,0,0,Math.PI,true);g.closePath();g.fill();
     g.shadowBlur=0;
     // top cap highlight
     g.fillStyle=shade(b.color,0.28);g.beginPath();g.ellipse(cx,bodyTop,rx,ry,0,0,TAU);g.fill();

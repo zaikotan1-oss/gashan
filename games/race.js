@@ -20,6 +20,7 @@ function buildRace(api){
   const CARCOL=["#e85d75","#4aa6c0","#7be08a","#ffb347","#b58bff","#ff7bd0","#5a9af0"];
   // ---- 隠し発見レイヤー(クレーン/パンチ/ハンマー/トラックと同じ思想) ----
   let luckyColor,luckySeen,luckyTeachT,rbMsgT,stageMiss,sunWink,sunCD;
+  let quietT=0,lastCount=0,lastMoveT=-99;   // 無得点の静けさ秒 / 前フレームの得点 / 最後に自機が動いたtick(連打ぶれ防止)
   const sunHit={x:0,y:0,r:0};   // ④ おひさま ひみつタップの当たり判定(描画と一致)
   const COLNAME={"#e85d75":"あか","#4aa6c0":"みずいろ","#7be08a":"みどり","#ffb347":"オレンジ","#b58bff":"むらさき","#ff7bd0":"ピンク","#5a9af0":"あお","#ffd23f":"きいろ"};
   // per-stage themes: grass/sky tints + road tone + accent. loops after last.
@@ -45,9 +46,11 @@ function buildRace(api){
   // 7〜8歳向けの手応え: ステージ目標 6→8台(以降 +2/面・上限+8)、ボスHP 3→4、出現間隔 少し短く
   function needFor(s){return 8+Math.min((s-1)*2,8);}
   const BOSS_HP=4;
+  const WALL_P=0.25;   // stage2+ の出現のうち『かべ』になる確率
+  const MOVE_CD=11;    // 連打で左右にぶれて当たりを拾うのを減らす 0.18秒(約11フレーム)。得点0のあいだは無し
   function reset(){enemies=[];sparks=[];shards=[];lines=[];floats=[];rings=[];dust=[];player=null;scroll=0;scrollSpd=4;count=0;combo=0;comboT=0;spawnT=0;boost=0;tick=0;flash=0;wash=0;
     stage=1;stageKills=0;stageNeed=needFor(1);clearT=0;clearMsg="";bannerCol="#ffd23f";finaleT=0;spin=0;boss=null;beat=0;
-    luckyColor=pick(CARCOL);luckySeen=false;luckyTeachT=0;rbMsgT=0;stageMiss=0;sunWink=0;sunCD=0;
+    luckyColor=pick(CARCOL);luckySeen=false;luckyTeachT=0;rbMsgT=0;stageMiss=0;sunWink=0;sunCD=0;quietT=0;lastCount=0;lastMoveT=-99;
     motes=[];for(let i=0;i<18;i++)motes.push({x:rnd(0,api.W),y:rnd(0,api.H),r:rnd(2,5),sp:rnd(0.3,1.1),ph:rnd(0,TAU),hue:pick(["#fff7c8","#ffd6f0","#cdeaff","#d7ffd0"])});
     clouds=[];for(let i=0;i<4;i++)clouds.push({x:rnd(0,api.W),y:rnd(0,api.H*0.9),r:rnd(40,80),sp:rnd(0.2,0.5)});
     layout();}
@@ -57,7 +60,8 @@ function buildRace(api){
     // ただし出現地点だけ寄せても、上から降りてくる間(1〜2秒)に自機が何度もタップで動くため
     // 結局ズレて外れることを実測で確認した→ 加えて 降下中も自機へ ごく弱く寄っていく homing を
     // 得点0の間だけ付ける(frame側)ことで、最初の成功を安定して3秒以内に近づける(軸3)
-    const earlyGame=(count===0);
+    // 軸3(静けさ対策): 得点が4秒以上止まったときも 同じ『自機へ寄せる』救済を使う(無反応が12秒を超えない)
+    const earlyGame=(count===0||quietT>4);
     const lane=earlyGame?clamp(player.lane+rint(-1,1),0,lanes-1):rint(0,lanes-1);
     const w=laneW*0.62,h=laneW*1.0;
     // avoid stacking too close in same lane
@@ -76,10 +80,26 @@ function buildRace(api){
         }
       }
     }
+    // 軸3(狙う意味): stage2以降ときどき『かべ』=あき1レーン以外をコーンで塞ぎ、あいた1レーンに車を1台。
+    // どのレーンへ寄せるか選ばないと コーンに当たる(減速+コンボ切れだけ・ゲームオーバー無し)
+    if(!earlyGame&&stage>=2&&lanes>=3&&rnd(0,1)<WALL_P){
+      let clear=true;
+      for(const e of enemies){if(e.y<h*2.2){clear=false;break;}}
+      if(clear){
+        const wy=-h;
+        for(let l=0;l<lanes;l++){
+          if(l===lane)continue;
+          enemies.push({x:laneCx(l),y:wy,lane:l,w:w*0.5,h:h*0.7,color:"#ff7a18",state:"drive",kind:"cone",vx:0,vy:0,rot:0,vr:0,ownSpd:0});
+        }
+        enemies.push({x:laneCx(lane),y:wy,lane,w,h,color:pick(CARCOL),state:"drive",kind:"car",vx:0,vy:0,rot:0,vr:0,ownSpd:0});
+        return;
+      }
+    }
     // decide kind based on stage (gentle escalation of variety)
     const r=rnd(0,1);
     let kind="car";
-    if(stage>=2&&r<0.045)kind="rainbow";          // ① 激レア にじいろカー(数%だけ・いつ来るか分からない)
+    if(earlyGame){/* 救済/最初の出現はふつうの車だけ */}
+    else if(stage>=2&&r<0.045)kind="rainbow";          // ① 激レア にじいろカー(数%だけ・いつ来るか分からない)
     else if(stage>=2&&r<0.185)kind="coin";        // bonus coin car (stage2+)
     else if(stage>=2&&r<0.345)kind="cone";        // unbreakable obstacle (avoid)
     if(kind==="cone"){
@@ -99,15 +119,15 @@ function buildRace(api){
     if(cv<0.22){
       const tw=laneW*0.55,th=laneW*1.3;   // 荷台の長いトラック型(縦長)
       // ③ 得点0のあいだだけ 出現Yを浅く(助走距離を短縮)。count>=1の通常出現には触れない(軸3aの難度は不変)
-      enemies.push({x:laneCx(lane),y:earlyGame?-th*0.55:-th,lane,w:tw,h:th,color:pick(CARCOL),state:"drive",kind:"truck",vx:0,vy:0,rot:0,vr:0,ownSpd:rnd(-0.5,0.6),homing:earlyGame});
+      enemies.push({x:laneCx(lane),y:earlyGame?-th*0.55:-th,lane,w:tw,h:th,color:pick(CARCOL),state:"drive",kind:"truck",vx:0,vy:0,rot:0,vr:0,ownSpd:rnd(-0.5,0.6),homing:earlyGame,rescue:earlyGame});
       return;
     }
     if(cv<0.40){
       const bw=laneW*0.75,bh=laneW*0.85;  // 幅広バス型(横広)
-      enemies.push({x:laneCx(lane),y:earlyGame?-bh*0.55:-bh,lane,w:bw,h:bh,color:pick(CARCOL),state:"drive",kind:"bus",vx:0,vy:0,rot:0,vr:0,ownSpd:rnd(-0.5,0.7),homing:earlyGame});
+      enemies.push({x:laneCx(lane),y:earlyGame?-bh*0.55:-bh,lane,w:bw,h:bh,color:pick(CARCOL),state:"drive",kind:"bus",vx:0,vy:0,rot:0,vr:0,ownSpd:rnd(-0.5,0.7),homing:earlyGame,rescue:earlyGame});
       return;
     }
-    enemies.push({x:laneCx(lane),y:earlyGame?-h*0.55:-h,lane,w,h,color:pick(CARCOL),state:"drive",kind:"car",vx:0,vy:0,rot:0,vr:0,ownSpd:rnd(-0.6,0.8),homing:earlyGame});
+    enemies.push({x:laneCx(lane),y:earlyGame?-h*0.55:-h,lane,w,h,color:pick(CARCOL),state:"drive",kind:"car",vx:0,vy:0,rot:0,vr:0,ownSpd:rnd(-0.6,0.8),homing:earlyGame,rescue:earlyGame});
   }
   function spawnBoss(){
     // giant trailer spanning two lanes; needs a few hits (7〜8歳向け: 4)
@@ -275,6 +295,8 @@ function buildRace(api){
         count+=1;api.setScore(count);
         floats.push({x:sunHit.x,y:sunHit.y-sunHit.r,txt:"+1",life:1,vy:-1,col:"#ffd23f",size:24});
       }
+      if(count>0&&tick-lastMoveT<MOVE_CD)return;   // 連打ぶれ防止(得点0のあいだはクールダウン無し=最初の成功を守る)
+      lastMoveT=tick;
       if(px<api.W/2)player.lane=clamp(player.lane-1,0,lanes-1);
       else player.lane=clamp(player.lane+1,0,lanes-1);
       player.tx=laneCx(player.lane);
@@ -282,6 +304,8 @@ function buildRace(api){
     },
     frame(dt,now){
       tick+=dt;beat+=dt;
+      // 得点が増えたら静けさをリセット、増えない間は秒で貯める(得点0に戻る終幕も増減どちらでも追従)
+      if(count!==lastCount){if(count>lastCount)quietT=0;lastCount=count;}else quietT+=dt/60;
       if(sunCD>0)sunCD-=dt;
       if(sunWink>0){sunWink-=0.02*dt;if(sunWink<0)sunWink=0;}
       const TH=theme();
@@ -362,7 +386,7 @@ function buildRace(api){
           if(e.hurt>0)e.hurt=Math.max(0,e.hurt-0.06*dt);   // ミニトラックのヒット無敵(未定義の他kindには影響なし)
           if(e.sq>0)e.sq=Math.max(0,e.sq-0.08*dt);
           // ③ 得点0のあいだだけ ごく弱く自機へ寄っていく(降下中に自機がタップで動いても最初の成功を逃さない/軸3)
-          if(e.homing&&count===0)e.x+=(player.x-e.x)*0.08*dt;
+          if(e.homing&&(count===0||e.rescue))e.x+=(player.x-e.x)*0.08*dt;
           // collide with player (not while spinning out)
           if(!stunned&&Math.abs(e.x-player.x)<(e.w+player.w)/2-6 && Math.abs(e.y-player.y)<(e.h+player.h)/2-8) smash(e);
         }else{e.x+=e.vx*dt;e.y+=(e.vy+scrollSpd*0.4)*dt;e.rot+=e.vr*dt;e.vx*=0.99;if(e.sq>0)e.sq=Math.max(0,e.sq-0.06*dt);}
@@ -461,7 +485,7 @@ function buildRace(api){
         g.save();g.translate(api.W/2,api.H*0.28);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(luckyTeachT*1.2,0,1);g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
         const txt="きょうのラッキー色は "+(COLNAME[luckyColor]||"")+"！";
-        g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.45)";g.strokeText(txt,0,0);
+        g.lineWidth=8;g.strokeStyle="rgba(0,0,0,.75)";g.strokeText(txt,0,0);
         g.fillStyle=luckyColor;g.fillText(txt,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(luckyTeachT<0)luckyTeachT=0;}
       // finale: full-screen celebration
@@ -481,9 +505,9 @@ function buildRace(api){
     g.fillStyle="#fff7d6";g.fillText(label,api.W/2,14);
     // mini-goal progress bar + goal text, centered as one unit below the label
     const goal=(boss?"ボスを たおせ！":"あと "+Math.max(0,stageNeed-stageKills)+"だい！");
-    g.font="800 12px 'Hiragino Maru Gothic ProN',system-ui";
-    const gm=g.measureText(goal),gw=(gm&&gm.width)||goal.length*12;
-    const bw=Math.min(api.W*0.42,160),bh=10,gap=8,totalW=bw+gap+gw,bx=api.W/2-totalW/2,byy=28;
+    g.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";
+    const gm=g.measureText(goal),gw=(gm&&gm.width)||goal.length*16;
+    const bw=Math.min(api.W*0.36,150),bh=12,gap=8,totalW=bw+gap+gw,bx=api.W/2-totalW/2,byy=28;
     g.fillStyle="rgba(0,0,0,.35)";roundRect(bx,byy,bw,bh,5);g.fill();
     const prog=boss?(boss.maxhp-boss.hp)/boss.maxhp:clamp(stageKills/stageNeed,0,1);
     g.fillStyle=boss?"#ff6a4a":TH.acc;roundRect(bx,byy,Math.max(6,bw*prog),bh,5);g.fill();

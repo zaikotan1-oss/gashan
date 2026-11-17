@@ -17,6 +17,9 @@ function buildCannon(api){
   let castlesCleared,shotsThisCastle,comboChain,winBanner,winTimer,crowns;
   // ⑥ 見やすさ: 「Nれんさ！」は毎ヒットで新規pushせず、この1個のフロートを使い回す(位置固定)。
   let comboFloat=null;
+  // ③ 歯ごたえ: 連打だけで勝てないよう、発射のあとに「つぎの たまごめ」の間(ま)を置く。弱い弾ほど長い。
+  let idleT=0,lastCnt=0; // 無反応が続いた時間(フレーム)。長く続いたら手前の数個が ぐらぐら〜 で倒れる救済
+  let fireCool=0,coolMax=1,holdT=0; // holdT=いま押している長さ(フレーム)。しっかり溜めた弾は間に関係なく必ず撃てる
   let starRating=0,starTimer=0;   // 星評価(canvas手描き・絵文字は使わない)
   const GOAL=12; // ぜんぶで12城こわしたらクリア（7〜8歳向けに少し長く）
   // drifting ambient magic motes (deterministic-ish, cheap)
@@ -91,7 +94,7 @@ function buildCannon(api){
     }
   }
   let rebuilding=false,calmT=0,hsCool=0;
-  function reset(){level=1;count=0;charging=false;power=0;powDir=1;elev=0.7;elevDir=1;balls=[];shards=[];dust=[];floats=[];sparks=[];trail=[];muzzle=0;tSky=0;sweptHint=0;flashWash=0;rebuilding=false;calmT=0;hsCool=0;castlesCleared=0;shotsThisCastle=0;comboChain=0;comboFloat=null;winBanner=false;winTimer=0;crowns=[];starRating=0;starTimer=0;luckyColor=pick(COLORS);luckySeen=false;luckyMsgT=0;rbMsgT=0;luckyPops=[];shootStar=null;shootTimer=rnd(150,300);sunWink=0;buildCastle();}
+  function reset(){level=1;count=0;charging=false;power=0;powDir=1;elev=0.7;elevDir=1;balls=[];shards=[];dust=[];floats=[];sparks=[];trail=[];muzzle=0;tSky=0;sweptHint=0;flashWash=0;fireCool=0;coolMax=1;idleT=0;lastCnt=0;rebuilding=false;calmT=0;hsCool=0;castlesCleared=0;shotsThisCastle=0;comboChain=0;comboFloat=null;winBanner=false;winTimer=0;crowns=[];starRating=0;starTimer=0;luckyColor=pick(COLORS);luckySeen=false;luckyMsgT=0;rbMsgT=0;luckyPops=[];shootStar=null;shootTimer=rnd(150,300);sunWink=0;buildCastle();}
   function burst(x,y,col,n,spread){
     for(let i=0;i<n;i++){const a=rnd(0,TAU),sp=rnd(1.5,spread);
       sparks.push({x:x,y:y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-rnd(0,2),r:rnd(1.5,3.4),life:1,decay:rnd(0.03,0.06),col:col});}
@@ -136,7 +139,7 @@ function buildCannon(api){
     // ⑦ やぐら(2倍サイズ)崩壊: 普段より大きいburst/shakeで「大きい物が倒れた」手応えを別枠で出す
     if(b.kind==="yagura"){
       count+=6;api.setScore(count);
-      floats.push({x:b.x+b.w/2,y:b.y,txt:"どしーん！",col:"#ffb36a",life:1.2,vy:-0.7,size:32});
+      floats.push({x:b.x+b.w/2,y:b.y-S*0.8,txt:"どしーん！",col:"#ffb36a",life:1.2,vy:-0.7,size:32});
       burst(b.x+b.w/2,b.y+b.h/2,"#c98b52",26,11);burst(b.x+b.w/2,b.y+b.h/2,"#8a5a34",18,9);
       api.boom(0.6);api.shake(12);
       api.tone(140,0.18,"square",0.12);api.slide(220,80,0.22,0.12,"sine");
@@ -144,7 +147,7 @@ function buildCannon(api){
     // KING block down: big bonus burst + "どっかんクリア！" + crown souvenir
     if(b.kind==="king"){
       count+=10;api.setScore(count);
-      floats.push({x:b.x+b.w/2,y:b.y,txt:"どっかんクリア！",col:"#ffe14a",life:1.2,vy:-0.7,size:34});
+      floats.push({x:b.x+b.w/2,y:Math.max(b.y-S*1.4,200),txt:"どっかんクリア！",col:"#ffe14a",life:1.2,vy:-0.7,size:34});
       burst(b.x+b.w/2,b.y+b.h/2,"#fff3b0",24,9);burst(b.x+b.w/2,b.y+b.h/2,"#ffd23f",18,8);
       api.boom(0.55);api.shake(9);api.tone(880,0.16,"square",0.12);api.slide(660,1320,0.2,0.1,"sine");
       crowns.push({x:b.x+b.w/2,y:b.y,vy:-2.4,vx:rnd(-1,1),rot:0,vr:rnd(-0.1,0.1),life:1});
@@ -187,15 +190,17 @@ function buildCannon(api){
     //  着地したその場の柱1本だけを崩し、しっかり溜めた一撃(shotPower≈1)ほど左右の柱まで
     //  巻き込んで崩せる。「狙って強く当てるほど気持ちよく崩れる」歯ごたえに作り替えつつ、
     //  毎ショットどこかしらは崩れるテンポ(=退屈しない)は保つ。
-    const R=S*(0.48+0.31*pow+0.5*(shotPower||0));
+    const R=S*(0.44+0.31*pow+0.85*(shotPower||0)); // 第6R: 溜めた一撃ほど横にも広く崩れる(0.5→0.85)
     api.shake(3+4*pow);api.noise(0.1,0.25,320,"lowpass");
     for(let i=0;i<8;i++)dust.push({x:x+rnd(-R*0.6,R*0.6),y:groundY-rnd(0,6),r:rnd(5,11),vr:rnd(0.7,1.4),life:1,decay:0.05});
     for(const b of blocks){
       if(b.loose)continue;
       const cx=b.x+b.w/2,d=Math.abs(cx-x);
+      // ③ 第6ラウンドで「雑な着地は下の段だけ」を試したが、上の段が宙に残って無反応が26秒に伸びたため戻した(縦は全段のまま)。
       if(d<R)loosen(b,cx>x?1:-1,-0.5,clamp(8*(1-d/R)+3,3,10));
     }
   }
+  const COOL_WEAK=100,COOL_STRONG=14; // 約1.7秒(雑なタップ)〜0.23秒(しっかり溜めた弾)
   function fire(){
     const spd=shotSpeed();
     const mx=baseX+Math.cos(elev)*S*1.8, my=baseY-S*0.7-Math.sin(elev)*S*1.8;
@@ -209,6 +214,7 @@ function buildCannon(api){
     balls.push({x:mx,y:my,vx:Math.cos(elev)*spd,vy:-Math.sin(elev)*spd,r:S*0.42,life:1,sq:1.4,power:power});
     api.slide(180,60,0.3,0.5,"sine");api.noise(0.22,0.4,500,"lowpass");api.shake(6+power*6);api.boom(0.4+power*0.4);
     muzzle=1;
+    coolMax=Math.round(lerp(COOL_WEAK,COOL_STRONG,clamp(power,0,1)));fireCool=coolMax;
     // smoke puffs + bright ember sparks from the muzzle
     for(let i=0;i<7;i++)dust.push({x:mx,y:my,r:rnd(6,12),vr:rnd(0.8,1.6),life:1,decay:0.04});
     burst(mx,my,"#ffd86b",10+Math.floor(power*8),5+power*4);
@@ -217,12 +223,17 @@ function buildCannon(api){
   return{
     resize(){const had=blocks.length;layout();if(!had)buildCastle();},
     input(px,py,type){
-      if(type==="down"){charging=true;power=0;powDir=1;}
-      else if(type==="up"){if(charging){charging=false;fire();}}
+      if(type==="down"){charging=true;power=0;powDir=1;holdT=0;}
+      else if(type==="up"){if(charging){charging=false;
+        if(fireCool>0&&holdT<12){ // ちょん押しの連打で まだ たまごめ中: 発射せず、小さな煙と ぽふっ だけ(叱らない)
+          const mx=baseX+Math.cos(elev)*S*1.8, my=baseY-S*0.7-Math.sin(elev)*S*1.8;
+          for(let i=0;i<3;i++)dust.push({x:mx,y:my,r:rnd(4,8),vr:rnd(0.6,1.1),life:1,decay:0.07});
+          api.tone(260,0.05,"sine",0.04);
+        }else fire();}}
     },
     frame(dt,now){
       tSky+=dt*0.02;ensureStars();
-      hsCool=Math.max(0,hsCool-dt);
+      hsCool=Math.max(0,hsCool-dt);fireCool=Math.max(0,fireCool-dt);
       // ④ ながれ星: 移動としっぽ更新、画面外で消滅、いない時はときどき再出現
       if(shootStar){shootStar.x+=shootStar.vx*dt;shootStar.y+=shootStar.vy*dt;
         shootStar.tail.push({x:shootStar.x,y:shootStar.y});if(shootStar.tail.length>10)shootStar.tail.shift();
@@ -302,6 +313,7 @@ function buildCannon(api){
       g.globalAlpha=1;dust=dust.filter(d=>d.life>0);
       // charging meters
       if(charging){
+        holdT+=dt;
         power+=0.022*dt*powDir;if(power>=1){power=1;powDir=-1;}if(power<=0){power=0;powDir=1;}
         elev+=0.012*dt*elevDir;if(elev>1.05){elev=1.05;elevDir=-1;}if(elev<0.35){elev=0.35;elevDir=1;}
       }
@@ -311,6 +323,8 @@ function buildCannon(api){
         if(b.loose){b.vy+=grav*dt;b.x+=b.vx*dt;b.y+=b.vy*dt;b.rot+=b.vr*dt;
           if(b.y+b.h>groundY){b.y=groundY-b.h;if(Math.abs(b.vy)>3){b.vy*=-0.32;b.vx*=0.7;b.vr*=0.6;}else{b.vy=0;b.vx*=0.8;b.vr*=0.7;if(Math.abs(b.vx)<0.3)b.vx=0;}
             if(Math.abs(b.vy)<2)b.vy=0;}
+          // ⑥ 大砲の足もとに倒れたブロックが積もって砲身を隠さないよう、地面に止まったら すーっと消す
+          if(b.vy===0&&b.y+b.h>=groundY-1&&b.x<baseX+S*1.6)b.gone=Math.min(1,(b.gone||0)+0.015*dt);
         }
       }
       // balls
@@ -369,9 +383,9 @@ function buildCannon(api){
               // ⑥ 見やすさ: 毎ヒットごとにfloatsへ新規pushしていたのをやめ、1個のフロートを
               //  使い回す(位置も画面上部の固定位置に固定)。ヒットの度に違う座標へ増えていくのをやめれば、
               //  複数の「Nれんさ」が別々の場所に積み重なって衝突すること自体が起きなくなる。
-              const cfx=api.W/2,cfy=130; // おしろHUD(hudY=58,高さ26)の下に十分な余白を空けて固定
-              if(!comboFloat||floats.indexOf(comboFloat)<0){comboFloat={x:cfx,y:cfy,txt:comboChain+"れんさ！",col:comboChain>=6?"#ff5fae":"#ffd23f",life:0.7,vy:0,size:clamp(22+comboChain*2,22,44)};floats.push(comboFloat);}
-              else{comboFloat.txt=comboChain+"れんさ！";comboFloat.col=comboChain>=6?"#ff5fae":"#ffd23f";comboFloat.size=clamp(22+comboChain*2,22,44);comboFloat.life=0.7;}
+              const cfx=api.W*0.42,cfy=150; // 王様の「どっかんクリア！」(城の上・右寄り)と横に重ならないよう少し左 // おしろHUD(hudY=58,高さ26)の下に十分な余白を空けて固定
+              if(!comboFloat||floats.indexOf(comboFloat)<0){comboFloat={x:cfx,y:cfy,txt:comboChain+"れんさ！",col:comboChain>=6?"#ff3d9a":"#ffd23f",life:1.2,vy:0,size:clamp(22+comboChain*2,22,44)};floats.push(comboFloat);}
+              else{comboFloat.txt=comboChain+"れんさ！";comboFloat.col=comboChain>=6?"#ff3d9a":"#ffd23f";comboFloat.size=clamp(22+comboChain*2,22,44);comboFloat.life=1.2;}
               api.slide(440+comboChain*40,880+comboChain*80,0.14,0.09,"sine");
               if(comboChain>=5){api.shake(6);api.boom(0.4);}
             }
@@ -448,16 +462,26 @@ function buildCannon(api){
       const standing=standArr.length;
       // last-stragglers forgiveness: leftover blocks wobble for a bit, then tumble by themselves
       // (prevents a soft-lock when the final blocks sit outside any reachable trajectory)
-      if(standing>0&&standing<=3&&!rebuilding){
+      if(standing>0&&standing<=4&&!rebuilding){
         calmT+=dt;
-        for(const b of standArr)b.wob=clamp(calmT/190,0,1);
-        if(calmT>=190){
+        for(const b of standArr)b.wob=clamp(calmT/150,0,1);
+        if(calmT>=150){
           floats.push({x:standArr[0].x+standArr[0].w/2,y:standArr[0].y-12,txt:"ぐらぐら〜！",col:"#fff",life:1,vy:-0.7,size:24});
           for(const b of standArr)loosen(b,rnd(-1,1),-0.6,rnd(5,8));
           api.shake(6);api.noise(0.16,0.3,360,"lowpass");
           calmT=0;
         }
       }else calmT=0;
+      // ③ 救済(第6ラウンド): ちょん押しの連打が増えても、9秒なにも倒れなければ手前の3こが ぐらぐら〜 と自分で倒れる
+      //  (奥の列に届かず固まるのを防ぐ。力は弱いので連鎖はしない)
+      if(count!==lastCnt){lastCnt=count;idleT=0;}else idleT+=dt;
+      if(idleT>=540&&standing>3&&!rebuilding){
+        const front=standArr.slice().sort((a,b)=>(a.x-b.x)||(b.y-a.y)).slice(0,3);
+        floats.push({x:front[0].x+front[0].w/2,y:front[0].y-S*0.8,txt:"ぐらぐら〜！",col:"#fff",life:1,vy:-0.7,size:24});
+        for(const b of front)loosen(b,rnd(-0.3,1),-0.6,rnd(5,8));
+        api.shake(5);api.noise(0.14,0.28,360,"lowpass");
+        idleT=0;lastCnt=count;
+      }
       // NOTE: don't wait for balls to disappear — kids spam-tap constantly, so
       // requiring an empty sky would soft-lock the rebuild forever
       if(standing===0&&blocks.length&&!rebuilding){
@@ -569,9 +593,9 @@ function buildCannon(api){
         drawStar(p.x,p.y,clamp(S*0.16,5,9)*(0.6+p.life*0.6),luckyColor,Math.max(0,p.life),true);}
       luckyPops=luckyPops.filter(p=>p.life>0);
       // floats
-      for(const f of floats){f.y+=f.vy*dt;f.life-=0.012*dt;g.globalAlpha=Math.max(0,f.life);
+      for(const f of floats){f.y+=f.vy*dt;f.life-=0.012*dt;g.globalAlpha=Math.min(1,Math.max(0,f.life)*2.5); // 消える直前まで不透明(雲や黄色いブロックの上でも読める)
         g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-        g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText(f.txt,f.x,f.y);g.fillStyle=f.col;g.fillText(f.txt,f.x,f.y);}
+        g.lineWidth=8;g.lineJoin="round";g.strokeStyle="rgba(40,20,70,.85)";g.strokeText(f.txt,f.x,f.y);g.fillStyle=f.col;g.fillText(f.txt,f.x,f.y);}
       g.globalAlpha=1;g.textAlign="left";floats=floats.filter(f=>f.life>0);
       // star rating (canvas手描き — 絵文字グリフは使わない)
       if(starTimer>0){starTimer-=0.012*dt;
@@ -613,9 +637,10 @@ function buildCannon(api){
     }
   };
   function drawBlock(b){
+    if(b.gone>=1)return;
     if(b.flash)b.flash=Math.max(0,b.flash-0.12);
     if(b.dent)b.dent=Math.max(0,b.dent-0.05);
-    g.save();g.translate(b.x+b.w/2,b.y+b.h/2);
+    g.save();if(b.gone>0)g.globalAlpha=1-b.gone;g.translate(b.x+b.w/2,b.y+b.h/2);
     if(b.loose)g.rotate(b.rot);else if(b.wob)g.rotate(Math.sin(b.blink*7)*0.09*b.wob);
     // ⑦ 形のバラエティ: circle=まるい岩(円)/wide=丸太(端を丸く)/tall=石柱(角を丸く)/square=従来のれんが
     const isCircle=b.shapeKey==="circle";

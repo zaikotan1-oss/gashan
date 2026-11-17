@@ -133,18 +133,18 @@ function drawBossHPBar(obj){
   const totHP=obj.sections.filter(s=>s.alive).reduce((s,sec)=>s+sec.hp,0);
   const ratio=totHP/totMax;
   ctx.save();
-  ctx.fillStyle='rgba(0,0,0,0.65)';ctx.fillRect(W*0.05,66,W*0.9,46);
-  ctx.fillStyle='#FFEE99';ctx.font='11px Arial';ctx.textAlign='center';
-  ctx.fillText(BOSS_KANA[obj.bossType]||obj.bossName,W/2,78);
-  ctx.fillStyle='#FFD700';ctx.font='bold 15px Arial';ctx.textAlign='center';
-  ctx.fillText('BOSS: '+obj.bossName,W/2,95);
-  ctx.fillStyle='#222';ctx.fillRect(W*0.07,102,W*0.86,13);
+  ctx.fillStyle='rgba(0,0,0,0.65)';ctx.fillRect(W*0.05,66,W*0.9,36);
+  ctx.fillStyle='#FFD700';ctx.font='bold 18px Arial';ctx.textAlign='center';
+  ctx.lineWidth=4;ctx.lineJoin='round';ctx.strokeStyle='rgba(0,0,0,.6)';
+  const bt='ボス: '+(BOSS_KANA[obj.bossType]||obj.bossName);
+  ctx.strokeText(bt,W/2,85);ctx.fillText(bt,W/2,85);
+  ctx.fillStyle='#222';ctx.fillRect(W*0.07,89,W*0.86,10);
   const g=ctx.createLinearGradient(W*0.07,0,W*0.93,0);
   g.addColorStop(0,'#FF2200');g.addColorStop(0.5,'#FF8800');g.addColorStop(1,'#FFEE00');
-  ctx.fillStyle=g;ctx.fillRect(W*0.07,102,W*0.86*ratio,13);
+  ctx.fillStyle=g;ctx.fillRect(W*0.07,89,W*0.86*ratio,10);
   // Pulse when low
   if(ratio<0.3){ctx.globalAlpha=0.3+Math.abs(Math.sin(Date.now()*0.008))*0.4;
-    ctx.fillStyle='#FF0000';ctx.fillRect(W*0.07,102,W*0.86*ratio,13);}
+    ctx.fillStyle='#FF0000';ctx.fillRect(W*0.07,89,W*0.86*ratio,10);}
   ctx.restore();
 }
 function drawTokyoTower(obj,sx,gY){
@@ -1047,9 +1047,16 @@ function drawSunMoon(){
 }
 
 // ── HIT DETECTION ─────────────────────────────────────────────
+// 同じ物に指(バケット先端)を置きっぱなしのままでは効きにくくする(ゴリゴリ掘る=指を動かす遊びにする)
+let lastHitObj=null,lastHitX=-999,lastHitY=-999;
+function repeatMul(obj,tp){
+  const same=lastHitObj===obj&&Math.hypot(tp.x-lastHitX,tp.y-lastHitY)<30;
+  if(!same){lastHitObj=obj;lastHitX=tp.x;lastHitY=tp.y;}
+  return same?0.4:1;
+}
 function checkHit(){
   if(hitCD>0)return;
-  const tp=getTip(),m=feverActive?120:34;
+  const tp=getTip(),m=feverActive?80:24;
 
   flyingObjs.forEach(obj=>{
     if(!obj.alive)return;
@@ -1091,7 +1098,7 @@ function checkHit(){
       if(obj.posts.every(p=>!p.alive))obj.alive=false;
     } else {
       if(tp.y<gY-obj.h-m||tp.y>gY+m)return;
-      const dmg=feverActive?40:16+rng()*10;
+      const dmg=(feverActive?40:16+rng()*10)*repeatMul(obj,tp);
       obj.hp=Math.max(0,obj.hp-dmg);
       if(obj.shakeDx!==undefined)obj.shakeDx=(rng()-0.5)*14;
       if(obj.kind==='car'||obj.kind==='bus'||obj.kind==='truck')obj.vx=(rng()-0.5)*80;
@@ -1113,7 +1120,7 @@ function hitBuilding(obj,tp,sx,gY,m){
     if(tp.y<st-topM||tp.y>sb+botM)continue;
     // ボスは総HPが重いので、フィーバー中でなくても1発あたりのダメージを底上げして詰まり感を減らす
     // 第3ラウンド改善: ボスは総HPが重く長い無得点区間の主因だったため、1発ダメージの下限を底上げ。
-    const dmg=feverActive?50:(obj.kind==='boss'?22+rng()*14:15+rng()*10);
+    const dmg=(feverActive?50:(obj.kind==='boss'?22+rng()*14:15+rng()*10))*repeatMul(obj,tp);
     sec.hp=Math.max(0,sec.hp-dmg);sec.shakeDx=(rng()-0.5)*14;obj.shakeDx=(rng()-0.5)*6;
     spawnHitFx(tp.x,tp.y,obj.col,14);addScore(12);addCombo();
     playHit(sec.hp/sec.maxHp<0.3);addShake(8);hitCD=feverActive?2:7;
@@ -1156,7 +1163,7 @@ function hitMegaBuilding(obj,tp,sx){
     const st=sec.drawTopY,sb=st+sec.h;
     // 上方向は小さいマージン（幽霊当たり防止）
     if(tp.y<st-16||tp.y>sb+40)continue;
-    const dmg=feverActive?999:18+rng()*14;
+    const dmg=feverActive?999:(18+rng()*14)*repeatMul(obj,tp);
     sec.hp=Math.max(0,sec.hp-dmg);
     sec.shakeDx=(rng()-0.5)*10;
     spawnHitFx(tp.x,tp.y,sec.col,10);
@@ -1194,7 +1201,7 @@ function destroyObj(obj,sx,gY){
 function feverAttack(){
   if(!feverActive)return;
   const tp=getTip();
-  const radius=160;
+  const radius=110;
   worldObjs.forEach(obj=>{
     if(!obj.alive)return;
     const sx=toS(obj.wx),gY=toSY(obj.groundY);
@@ -1204,7 +1211,7 @@ function feverAttack(){
       // damage lowest alive section (daruma-otoshi: knock out foundation)
       for(let i=0;i<obj.sections.length;i++){
         const sec=obj.sections[i];if(!sec.alive)continue;
-        sec.hp-=2;
+        sec.hp-=1.2;
         if(sec.hp<=0){
           collapseFrom(obj,i,sx,gY);
           addScore(20);
@@ -1306,7 +1313,7 @@ function drawStageGoalBanner(){
   ctx.fillStyle='#FF4500';ctx.fillRect(sx-15,gY-190,115,25);
   // Text
   ctx.fillStyle='white';ctx.font='bold 16px Arial';ctx.textAlign='center';
-  ctx.fillText('GOAL',sx+45,gY-173);
+  ctx.fillText('ゴール',sx+45,gY-173);
   // Flag
   ctx.fillStyle=['#FF4500','#4CAF50','#2196F3','#9C27B0','#FFD700'][currentStage];
   ctx.beginPath();ctx.moveTo(sx+5,gY-180);ctx.lineTo(sx+40,gY-165);ctx.lineTo(sx+5,gY-148);ctx.fill();
@@ -1449,7 +1456,7 @@ function drawVehicle(obj){
     for(let i=1;i<5;i++){ctx.beginPath();ctx.moveTo(sx+8+i*(obj.w-16)/5,gY-obj.h*1.42);ctx.lineTo(sx+8+i*(obj.w-16)/5,gY-obj.h*0.84);ctx.stroke();}
     // 行先表示
     ctx.fillStyle='#FFD700';ctx.fillRect(sx+8,gY-obj.h*1.58,60,12);
-    ctx.fillStyle='#333';ctx.font='bold 8px Arial';ctx.textAlign='left';ctx.fillText('TOKYO',sx+11,gY-obj.h*1.5);
+    ctx.fillStyle='#333';ctx.font='bold 8px Arial';ctx.textAlign='left';ctx.fillText('バス',sx+11,gY-obj.h*1.5);
     // ドア
     ctx.fillStyle='rgba(0,0,0,0.2)';ctx.fillRect(sx+obj.w*0.15,gY-obj.h*0.84,22,obj.h*0.55);
   } else if(isTruck){
@@ -2048,7 +2055,9 @@ function initScene(keepScore){
   powerFill.style.width='0%';powerFill.style.background='linear-gradient(90deg,#FF6600,#FFD700)';
   currentStage=0;stNumEl.textContent=1;stageClearing=false;stageClearTimer=0;
   stageUsedAssist=false;   // ③ パーフェクト区間の判定をリセット
-  clearMsg.classList.remove('show');nextSpawnX=260;_s=Date.now()|0;
+  clearMsg.classList.remove('show');_s=Date.now()|0;
+  // さいしょの目の前には必ず当てやすい物(樽→くるま)を置く(木や柵だけだと最初の1点が遅れるため)
+  worldObjs.push(mkBarrel(exWorldX+250));worldObjs.push(mkCar(exWorldX+340));nextSpawnX=exWorldX+470;
   resetCombo();
   while(nextSpawnX<camX+W+700)spawnScene();
   spawnAllBosses(); // 全ボスを事前配置
@@ -2090,7 +2099,7 @@ function initScene(keepScore){
     ctx.fillStyle='#7be0ff';rrect(gx,gy,gw*prog,7,3.5);ctx.fill();
     // コンボ(ボスHPバー表示中はその下(132px)へずらして重ならないようにする)
     if(comboCount>=2){
-      const comboY=bossHudShown?132:72;
+      const comboY=bossHudShown?112:72;
       ctx.font="900 22px 'Hiragino Maru Gothic ProN',system-ui";
       ctx.lineWidth=6;ctx.strokeStyle='rgba(60,10,0,.6)';
       const ct='コンボ x'+comboCount;
@@ -2143,8 +2152,9 @@ function initScene(keepScore){
       ctx.fillStyle=col;ctx.fillText('にじいろジェム！',0,0);
       ctx.restore();ctx.globalAlpha=1;if(rbMsgT<0)rbMsgT=0;}
     // ② きょうのラッキー色 はっけん!(初回だけ中央上で教える)
+    if(luckyMsgT>0&&clearMsg._show)luckyMsgT=0;   // クリア文字と同時に出さない(重なって読めなくなるため)
     if(luckyMsgT>0){luckyMsgT-=0.016*dt;
-      ctx.save();ctx.translate(cx,H*0.28);ctx.textAlign='center';
+      ctx.save();ctx.translate(cx,H*0.5);ctx.textAlign='center';
       ctx.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
       ctx.globalAlpha=clamp(luckyMsgT*1.3,0,1);
       const tt='きょうのラッキー色は '+luckyName+'！';

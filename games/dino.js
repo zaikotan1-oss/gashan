@@ -2,7 +2,7 @@ function buildDino(api){
   const g=api.g;
   api.preload(["bg.jpg","dino.png","castle.png","tree.png"]);   // 画像アセット(無ければ従来の手描きにフォールバック)
   let objs=[],shards=[],dust=[],arcs=[],floats=[],sparks=[],rings=[],clouds=[],motes=[];
-  let groundY,slotW,cx,facing,sweepT,sweeping,sweepHit,sweepDir,bob,count,combo,comboT,flash,tNow,squash,wash,washHue,blink;
+  let tapX=0,groundY,slotW,cx,facing,sweepT,sweeping,sweepHit,sweepDir,bob,count,combo,comboT,flash,tNow,squash,wash,washHue,blink;
   // progression/super-gauge/banner state
   let stage,stageHits,stageGoal,banner,gauge,superFlash,roar,grow,finaleT,superCD;
   const BCOL=["#e0563a","#3a8ee6","#f5c518","#ff8c42","#9b6bff","#e85d9a"];
@@ -69,9 +69,9 @@ function buildDino(api){
   function reset(){objs=[];shards=[];dust=[];arcs=[];floats=[];sparks=[];rings=[];facing=1;sweepT=0;sweeping=false;sweepDir=1;bob=0;count=0;combo=0;comboT=0;flash=0;tNow=0;squash=0;wash=0;washHue=48;blink=0;
     stage=0;stageHits=0;stageGoal=stageGoalFor(0);banner=null;gauge=0;superFlash=0;roar=0;grow=0;finaleT=0;superCD=0;
     luckyColor=pick(BCOL);luckySeen=false;luckyMsgT=0;rbMsgT=0;comboKept=true;sunWink=0;luckyStars=[];
-    layout();}
+    tapX=api.W/2;layout();}
   // ステージクリア演出-次ステージへ
-  function nextStage(){
+  function nextStage(delayed){
     const last=stage>=STAGE_MAX-1;
     // ③ ノンストップ ボーナス: このステージをコンボ切らさず走り切ったら +5 & みどりのキラキラ祝福。
     // 考えどころ=「テンポよく なぎ続けると 得」。気づかなくてもクリアはできる(操作はそのまま)。
@@ -84,7 +84,7 @@ function buildDino(api){
     // 咆哮ファンファーレ
     api.tone(523,0.16,"triangle",0.25);api.tone(784,0.2,"triangle",0.22);api.tone(1046,0.24,"triangle",0.18);
     if(last){
-      finaleT=1;grow=1.0;banner={txt:"ぜんぶ こわした！ キングきょうりゅう！",sub:"もっと あそべるよ！",life:1,t:0,big:true};
+      finaleT=1;grow=1.0;banner={txt:"ぜんぶ こわした！ キングきょうりゅう！",sub:"もっと あそべるよ！",life:1,t:delayed?-20:0,big:true};
       // 全画面紙吹雪を sparks で大量噴出
       for(let k=0;k<60;k++){const a=rnd(0,TAU),sp=rnd(3,12);sparks.push({x:cx,y:groundY-api.H*0.3,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-4,life:1,decay:rnd(0.012,0.025),hue:rnd(0,60)});}
       wash=1;washHue=46;
@@ -93,7 +93,7 @@ function buildDino(api){
       stage++;
       grow=Math.min(0.8,(grow||0)+0.16); // ステージごとに恐竜が少しずつ大きく
       stageHits=0;stageGoal=stageGoalFor(stage);
-      banner={txt:"ステージ クリア！",sub:"つぎは「"+stageDef().name+"」",life:1,t:0,big:false};
+      banner={txt:"ステージ クリア！",sub:"つぎは「"+stageDef().name+"」",life:1,t:delayed?-20:0,big:false};
       wash=1;washHue=stage>=3?28:48;
     }
     comboKept=true; // 次ステージのノンストップ判定をリセット
@@ -101,9 +101,9 @@ function buildDino(api){
     objs.forEach(o=>{o.state="gone";o.respawnT=rnd(8,28);});
     layout(); // 背景空色を更新
   }
-  function doSweep(dir){
+  function doSweep(dir,px){
     if(sweeping)return;
-    facing=dir;sweeping=true;sweepHit=false;sweepT=0;sweepDir=dir;
+    tapX=px;facing=dir;sweeping=true;sweepHit=false;sweepT=0;sweepDir=dir;
     api.slide(260,90,0.3,0.4,"sawtooth");api.noise(0.18,0.3,700,"lowpass");
   }
   function smash(o,extraStrong){
@@ -146,13 +146,14 @@ function buildDino(api){
     for(let k=0;k<34;k++){const a=rnd(0,TAU),sp=rnd(3,11);
       sparks.push({x:o.x,y:groundY-o.h*0.55,vx:Math.cos(a)*sp+sweepDir*2,vy:Math.sin(a)*sp-3,life:1,decay:rnd(0.014,0.028),hue:(k*45)%360});}
   }
+  const HIT_R=0.9;   // 当たり判定の半径(スロット幅の倍数)。中心を押すと1棟・境目を押すと2棟
   function applyHits(){
     // reach/背面判定を縮小: 以前は片側の大半(4〜5棟)がまとめて壊れていたのを、狙った側の2〜3棟だけに絞る(軸3対策)
-    const reach=slotW*2.4;let hit=0,contact=false;
+    // 押した場所基準: 押した所の1〜2棟だけ壊れる(画面のどこを連打しても当たる、をやめて「ビルを ねらう」遊びに。軸3)
+    const reach=slotW*HIT_R;let hit=0,contact=false;
     arcs.push({dir:sweepDir,life:1});
     for(const o of objs){if(o.state!=="stand")continue;
-      const rel=(o.x-cx)*sweepDir;
-      if(rel>-slotW*0.3&&rel<reach){
+      if(Math.abs(o.x-tapX)<reach){
         contact=true;
         // 硬いビル/お城は複数回ヒット
         if((o.hp||1)>1){o.hp--;o.flash=1;combo++;comboT=0.9;
@@ -167,6 +168,8 @@ function buildDino(api){
     }
     // 当たった時だけ揺れ/フラッシュ/スクワッシュを発火(空振りと当たりの体感差をはっきりさせる。軸2対策)
     if(contact){api.shake(12);flash=1;squash=1;}
+    else{ // 空振り: 押した所に小さな土ぼこりだけ(ねらいが ずれたと分かる・叱らない)
+      dust.push({x:tapX,y:groundY,r:slotW*0.18,vr:1.2,vx:0,life:1,decay:0.05});}
     api.setScore(count);
     if(hit>=2)floats.push({x:cx+sweepDir*slotW*2,y:groundY-api.H*0.2,txt:hit+"なぎ！",life:1,vy:-1.1,
       col:hit>=5?"#ff3b3b":hit>=3?"#ff8c42":"#ffd23f",size:hit>=4?44:32,t:0});
@@ -185,13 +188,13 @@ function buildDino(api){
     // 同一フレームで白フラッシュ+加算ウォッシュ+超ブレスが重なると準白飛びするため、点火alphaを抑える
     api.shake(30);api.hitStop(9);api.boom(0.8);flash=0.55;wash=0.7;washHue=12;superFlash=0.85;roar=1;
     api.slide(120,900,0.6,0.5,"sawtooth");api.noise(0.35,0.4,500,"lowpass");api.tone(1046,0.2,"triangle",0.3);
-    floats.push({x:cx,y:groundY-api.H*0.35,txt:"ちょうドラゴンブレス！！",life:1,vy:-0.7,col:"#ff5a2a",size:46,t:0});
+    floats.push({x:cx,y:groundY-api.H*0.12,txt:"ちょうドラゴンブレス！！",life:1,vy:-0.7,col:"#ff5a2a",size:46,t:0});
     let n=0;
     for(const o of objs){if(o.state!=="stand")continue;
       sweepDir=o.x<cx?-1:1;o.hp=1;smash(o,true);n++;}
     api.setScore(count);
     for(let k=0;k<50;k++){const a=rnd(0,TAU),sp=rnd(5,14);sparks.push({x:cx,y:groundY-api.H*0.2,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-3,life:1,decay:rnd(0.015,0.03),hue:rnd(0,50)});}
-    if(stageHits>=stageGoal&&!banner)nextStage();
+    if(stageHits>=stageGoal&&!banner)nextStage(true); // ブレス文字とクリアバナーが同時に出ないよう約0.3秒遅らせる
   }
   reset();
   return{
@@ -202,7 +205,7 @@ function buildDino(api){
         sunWink=1;api.tone(1318,0.1,"triangle",0.1);api.tone(1760,0.12,"triangle",0.08);
         for(let i=0;i<8;i++){const a=rnd(-TAU*0.5,0),sp=rnd(2,6);
           sparks.push({x:sunHit.x,y:sunHit.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1,life:1,decay:rnd(0.018,0.03),hue:rnd(44,52)});}}
-      doSweep(px<cx?-1:1);}
+      doSweep(px<cx?-1:1,px);}
     ,
     frame(dt,now){
       tNow+=dt;
@@ -280,7 +283,7 @@ function buildDino(api){
           o.state="rise";o.rise=0;}}
         else if(o.state==="rise"){o.rise=Math.min(1,o.rise+0.05*dt);if(o.rise>=1)o.state="stand";}
         else if(o.state==="fly"){o.vy+=0.5*dt;o.x+=o.vx*dt;o.fy=(o.fy||0)+o.vy*dt;o.rot+=o.vr*dt;
-          if(groundY-o.h+o.fy>api.H+40||o.x<-o.w*2||o.x>api.W+o.w*2){o.state="gone";o.respawnT=rnd(30,70);o.fy=0;}}
+          if(groundY-o.h+o.fy>api.H+40||o.x<-o.w*2||o.x>api.W+o.w*2){o.state="gone";o.respawnT=rnd(40,85);o.fy=0;}}
         o.sway+=0.03*dt;
       }
       // draw objects behind dino
@@ -339,8 +342,8 @@ function buildDino(api){
         const pop=1+Math.max(0,0.4-f.t*0.05);g.save();g.globalAlpha=Math.max(0,f.life);
         g.translate(f.x,f.y);g.scale(pop,pop);
         g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-        g.shadowColor=f.col;g.shadowBlur=18;
-        g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText(f.txt,0,0);
+        g.shadowColor=f.col;g.shadowBlur=4; // 背景に溶けないよう光彩は弱く・黒縁を太く濃く
+        g.lineWidth=8;g.strokeStyle="rgba(0,0,0,.75)";g.strokeText(f.txt,0,0);
         g.fillStyle=f.col;g.fillText(f.txt,0,0);g.restore();}
       g.globalAlpha=1;g.textAlign="left";floats=floats.filter(f=>f.life>0);
       // full-screen impact flash
@@ -361,7 +364,7 @@ function buildDino(api){
       // ① にじいろビル！ 発見バナー(虹色に色替わり・中央上=HUD安全帯)
       if(rbMsgT>0){rbMsgT-=0.016*dt;
         const pop=1+Math.max(0,rbMsgT-1)*1.3,col="hsl("+((tNow*4)%360)+",90%,62%)";
-        g.save();g.translate(api.W/2,api.H*0.2);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
+        g.save();g.translate(api.W/2,api.H*0.235);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(rbMsgT*1.4,0,1);g.font="900 38px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor=col;g.shadowBlur=18;
         g.lineWidth=7;g.strokeStyle="rgba(0,0,0,.45)";g.strokeText("にじいろビル！",0,0);
@@ -528,18 +531,18 @@ function buildDino(api){
     // ステージ表示（上部中央＝engine HUDと衝突しない安全帯）
     g.save();g.font="800 15px 'Hiragino Maru Gothic ProN',system-ui";g.textBaseline="middle";g.textAlign="left";
     const st="ステージ "+(stage+1)+"／"+STAGE_MAX+"  「"+stageDef().name+"」";
-    const m=g.measureText(st),tw=(m&&m.width)||120,pw=tw+24,px=api.W/2-pw/2,py=8,ph=28;
-    g.fillStyle="rgba(58,142,74,.82)";roundRect(px,py,pw,ph,ph/2);g.fill();
-    g.fillStyle="#fffce8";g.fillText(st,px+12,py+ph/2);
-    // 進捗バー（中央）
+    const m=g.measureText(st),tw=(m&&m.width)||120,pw=tw+24,px=api.W/2-pw/2,py=8,ph=34;
+    g.fillStyle="rgba(58,142,74,.88)";roundRect(px,py,pw,ph,14);g.fill();
+    g.fillStyle="#fffce8";g.fillText(st,px+12,py+13);
+    // 進捗バー（ステージ帯の中の下端に入れて1段にまとめる）
     const prog=clamp(stageHits/stageGoal,0,1);
-    const bx=px,by=py+ph+5,bw=pw,bh=8;
-    g.fillStyle="rgba(0,0,0,.25)";roundRect(bx,by,bw,bh,bh/2);g.fill();
-    g.fillStyle="#ffd23f";roundRect(bx,by,bw*prog,bh,bh/2);g.fill();
+    const bx=px+12,by=py+ph-12,bw=pw-24,bh=6;
+    g.fillStyle="rgba(0,0,0,.32)";roundRect(bx,by,bw,bh,bh/2);g.fill();
+    if(prog>0){g.fillStyle="#ffd23f";roundRect(bx,by,Math.max(bh,bw*prog),bh,bh/2);g.fill();}
     g.restore();
     // 必殺ゲージ（中央・ステージ表示の下）
     g.save();g.textBaseline="middle";
-    const gw=clamp(api.W*0.32,120,220),gx=api.W/2-gw/2,gy=py+ph+5+bh+8,gh=20;
+    const gw=clamp(api.W*0.32,120,220),gx=api.W/2-gw/2,gy=py+ph+6,gh=20;
     g.fillStyle="rgba(0,0,0,.3)";roundRect(gx,gy,gw,gh,gh/2);g.fill();
     if(gauge>0){
       const full=gauge>=1,pulse=full?0.5+0.5*Math.sin(tNow*0.3):0;
@@ -554,11 +557,12 @@ function buildDino(api){
     g.restore();g.textAlign="left";g.textBaseline="alphabetic";
   }
   function drawBanner(dt){
-    banner.t+=dt;banner.life-=(banner.big?0.006:0.012)*dt;
+    banner.t+=dt;if(banner.t<0)return; // 遅延中はまだ描かない
+    banner.life-=(banner.big?0.006:0.012)*dt;
     if(banner.life<=0){banner=null;return;}
     const pop=banner.t<10?ease?ease(clamp(banner.t/10,0,1)):clamp(banner.t/10,0,1):1;
     const sc=0.6+pop*0.4,al=Math.max(0,Math.min(1,banner.life*2));
-    g.save();g.globalAlpha=al;g.translate(api.W/2,api.H*0.32);
+    g.save();g.globalAlpha=al;g.translate(api.W/2,api.H*0.15);
     if(banner.big){g.rotate(Math.sin(banner.t*0.06)*0.03);}
     g.scale(sc,sc);
     g.font="900 "+(banner.big?34:40)+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";g.textBaseline="middle";
@@ -577,7 +581,7 @@ function buildDino(api){
     return"rgb("+r+","+gg+","+b+")";
   }
   function drawHint(){
-    const txt="ひだり/みぎ タップ！ きょうりゅうが しっぽで なぎはらう！";
+    const txt="ビルを タップ！ しっぽで なぎはらう！";
     g.save();g.font="800 15px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";g.textBaseline="middle";
     const m=g.measureText(txt),tw=(m&&m.width)||txt.length*8,pw=tw+34,ph=34,px=api.W/2-pw/2,py=api.H-ph-8;
     const bobY=Math.sin(tNow*0.06)*2;

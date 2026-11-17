@@ -23,7 +23,7 @@ function build_ashbomb(api){
     R=clamp(Math.min(api.W,api.H)*0.06,22,46);
     // lava bubbles along the crater glow line
     lavabubs=[];for(let i=0;i<10;i++)lavabubs.push({
-      x:api.W*((i+0.5)/10)+rnd(-api.W*0.03,api.W*0.03),ph:rnd(0,TAU),
+      x:craterX()+rnd(-R*3,R*3),ph:rnd(0,TAU),   // 画面全幅に並べず火口の近くだけ(的に見える淡い丸が下端に並ばないように)
       sp:rnd(0.03,0.08),r:rnd(R*0.2,R*0.45)});
   }
   layout();
@@ -31,7 +31,7 @@ function build_ashbomb(api){
   function craterY(){return api.H*0.94;}
   function spawn(){
     // ① 長く無反応なら同時に飛ぶ岩の上限も少し増やす(画面が寂しくならないように)
-    const cap=fever>0?14:(dryT>3?12:10);
+    const cap=fever>0?14:stage===1?(dryT>3?12:10):(dryT>3?10:8);   // 画面中が的だらけで連打でも当たる状況を減らす
     if(bombs.length>=cap)return;
     const cx=craterX(),cy=craterY();
     // launch from crater up into the air, arcs back down (gravity)
@@ -218,10 +218,12 @@ function build_ashbomb(api){
       // ① 無反応が長いほど当たり判定を広げる「救済」(通常時は狙いが要る低学年向け難度を保つ)
       // 軸3(b)対策: 無反応0秒目から緩やかに当たり判定を広げる(1秒待たずに効き始め、firstScoreSecの遅いテールを縮める)。
       // すぐ当たっている試行はdryTが小さいままなのでassistもほぼ0→scorePerTap(軸3a)は悪化しない。
-      const assist=clamp(dryT*0.12,0,0.55);
+      // ステージ1は広いまま(firstScoreSecを支える)。ステージ2以降は判定と救済の上限を絞って「狙う」手応えを出す
+      const assist=stage===1?clamp(dryT*0.12,0,0.55):clamp(dryT*0.2,0,0.55);   // 2以降は普段の判定は狭く、無反応が続くと素早く広がる
+      const hitBase=stage===1?1.45:1.2;
       for(let i=bombs.length-1;i>=0;i--){const b=bombs[i];
         if(b.dead)continue;
-        if(Math.hypot(px-b.x,py-b.y)<b.r*(1.45+assist)){
+        if(Math.hypot(px-b.x,py-b.y)<b.r*(hitBase+assist)){
           if(b.big&&b.hp>1){
             b.hp--;b.col="#ff8a3a";flash=Math.min(1,flash+0.18);
             api.noise(0.08,0.16,1800,"highpass",0.9);api.tone(300,0.08,"square",0.12);
@@ -322,7 +324,7 @@ function build_ashbomb(api){
       // bubbling lava blobs in the crater
       g.save();g.globalCompositeOperation="lighter";
       for(const lb of lavabubs){lb.ph+=lb.sp*dt;
-        const by=cy-Math.abs(Math.sin(lb.ph))*R*0.4,ba=0.4+0.4*Math.abs(Math.sin(lb.ph));
+        const by=cy-Math.abs(Math.sin(lb.ph))*R*0.4,ba=0.15+0.2*Math.abs(Math.sin(lb.ph));
         g.globalAlpha=ba;g.fillStyle="#ffce6a";
         g.beginPath();g.arc(lb.x,by,lb.r*(0.6+0.4*Math.abs(Math.sin(lb.ph))),0,TAU);g.fill();}
       g.restore();g.globalAlpha=1;
@@ -356,7 +358,7 @@ function build_ashbomb(api){
         // ① 出現間隔を少し縮め、さらに無反応が続くほど早く追加する(軸1・軸3の待たされ対策)
         const baseSpawn=clamp(42-(stage-1)*4,20,42);
         // 軸1/軸3(b): 開始直後(dryT=0)から前倒しで効かせ、2本目以降の岩を早く出して最初の成功を早める
-        const dryBoost=clamp(dryT*20,0,40);
+        const dryBoost=clamp(dryT*28,0,40);
         // 軸3(b): ゲーム開始直後(tsec<2)だけ2本目の岩をすぐ足し、画面に岩が2つ以上ある時間を増やす
         // (ランダムタップでも早く当たりやすくして firstScoreSec の遅いテールを縮める。開始直後限定なので歯ごたえは変えない)
         spawnT=fever>0?rint(10,16):(tsec<2?24:Math.max(16,baseSpawn-dryBoost));}}
@@ -467,7 +469,7 @@ function build_ashbomb(api){
       // ---- fever gauge / fever timer (bottom-center) ----
       drawFeverGauge();
       // ---- FEVER banner ----
-      if(feverBanner>0){feverBanner-=0.016*dt;
+      if(feverBanner>0&&clearT<=0){feverBanner-=0.016*dt;   // クリア表示が出ている間は止めて、重ならないよう後から出す
         const a=clamp(feverBanner*1.4,0,1),pop=1+Math.max(0,feverBanner-1.4)*2;
         g.save();g.translate(api.W/2,api.H*0.38);g.scale(pop,pop);g.globalAlpha=a;
         g.textAlign="center";g.font="900 44px 'Hiragino Maru Gothic ProN',system-ui";

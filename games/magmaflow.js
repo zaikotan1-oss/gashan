@@ -5,9 +5,9 @@ function build_magmaflow(api){
   // ---- state (all closed inside build) ----
   let src,laneY,laneH,dir,lanes,items,blobs,sparks,embers,smokes,rings,heatT,tGlobal;
   let count,combo,comboT,flash,erupt,eruptT,clearT,clearStage,paused;
-  let stage,stageEat,stageGoal,spawnT;
+  let stage,stageEat,stageGoal,spawnT,spawnN;
   let fever,feverGauge,feverBanner,hsCool,floats;
-  let dirCool;   // 軸3対策: タップ成立後の短いクールダウン(連打だけで勝てないように)
+  let dirCool,idleT;   // idleT: 最後に食べてからの経過フレーム(長く何も起きない時の救済用)   // 軸3対策: タップ成立後の短いクールダウン(連打だけで勝てないように)
   // ---- 隠し発見レイヤー(ハンマー/トラックと同じ思想) ----
   let luckyType,luckyName,luckyCol,luckyMsgT;   // ② きょうのラッキー色(=ラッキーな種類の色)
   let rbMsgT,rbComingT;                          // ① にじいろ ようがん: 発見/接近の告知
@@ -56,8 +56,9 @@ function build_magmaflow(api){
   dir=1;
   items=[];blobs=[];sparks=[];embers=[];smokes=[];rings=[];heatT=0;tGlobal=0;
   count=0;combo=0;comboT=0;flash=0;erupt=0;eruptT=0;clearT=0;clearStage=0;paused=false;
-  stage=1;stageEat=0;stageGoal=goalFor(1);spawnT=20;
-  fever=0;feverGauge=0;feverBanner=0;hsCool=0;floats=[];dirCool=0;
+  // 軸3対策(4R): 最初の1個を すぐ(8f)出し、最初の2個は光る道に出す=何もしなくても最初の1個は食われる
+  stage=1;stageEat=0;stageGoal=goalFor(1);spawnT=8;spawnN=0;
+  fever=0;feverGauge=0;feverBanner=0;hsCool=0;floats=[];dirCool=0;idleT=0;
   luckyType=pick(["rock","tree","crate"]);luckyName=LTNAME[luckyType];luckyCol=LTCOL[luckyType];luckyMsgT=2.2;
   rbMsgT=0;rbComingT=0;stageWaste=0;perfectT=0;shootStar=null;starSeen=false;
 
@@ -68,7 +69,7 @@ function build_magmaflow(api){
   function lavaPos(d,t){const L=laneFor(d);return {x:lerp(L.x0,L.x1,t),y:lerp(L.y0,L.y1,t)};}
 
   function spawn(){
-    if(items.length>14)return;
+    if(items.length>14)return true;
     let type=pick(ITEMS);
     // ① にじいろ ようがん: 数%の激レア。虹色に光り 大量得点。いつ流れてくるか分からない=ドキドキ
     const rbP=0.02+(stage-1)*0.004;
@@ -82,7 +83,14 @@ function build_magmaflow(api){
     // 少し(22%)は そのまま流れ込むので、何もしなくても時々は成果が出る(低学年の安心設計は保つ)。
     // 軸3対策(3R): 0.74→0.78に引き上げ、タップ不要で流れ込む「自動得点」の割合を約26%→約22%に下げる
     // (0.85まで上げるとfirstScoreSec/maxQuietSecが悪化することをN=12計測で確認したため、やり過ぎない範囲に留める)
-    const d=Math.random()<0.78?-dir:dir;
+    let d=Math.random()<0.78?-dir:dir;
+    // 軸6対策(4R): 同じ道の入り口(t<0.22)に すでに物がいるなら 重ねて団子にしない(少し待ってから出す。
+    // 道を振り替えると 光る道へ流れる=自動得点が増えて軸3が崩れるので、道は変えず出現だけ遅らせる)
+    // 軸3対策(4R): 最初の2個は光る道(dir)に出す
+    // 軸3対策(4R): 5秒(300f)なにも食べられていない時は 次の1個を光る道へ出す=低学年が長く放置されない救済
+    if(spawnN<2||idleT>300)d=dir;
+    else if(items.some(o=>!o.eaten&&o.d===d&&o.t<0.22))return false;
+    spawnN++;
     const gold=type==="gold",rb=type==="rainbow";
     // 軸7対策: big_boulder は特大、pebble は極小(サイズ差をはっきりつける)
     let s;
@@ -103,6 +111,7 @@ function build_magmaflow(api){
       rings.push({x:p0.x,y:p0.y-laneH*0.2,r:6,vr:laneH*0.34,life:1,decay:0.05,col:"#4db8ff"});
       rbComingT=1.3;
     }
+    return true;
   }
 
   function eat(it){
@@ -113,7 +122,7 @@ function build_magmaflow(api){
     const lucky=!gold&&!rb&&it.type===luckyType;
     let pts=(gold?5:(rb?10:1))*(fever>0?2:1);   // fever = double points
     if(lucky)pts+=1;
-    count+=pts;stageEat++;combo++;comboT=1;
+    count+=pts;stageEat++;combo++;comboT=1;idleT=0;
     api.setScore(count);
     // 軸7対策: big_boulder はどっしり重い手応え、pebble は軽くパッと消える手応え(rock/tree/crateは従来どおり)
     const heavy=it.type==="big_boulder",light=it.type==="pebble";
@@ -151,7 +160,7 @@ function build_magmaflow(api){
     }
     // fever gauge charges from eating; full gauge auto-triggers FEVER TIME
     if(fever<=0){feverGauge=Math.min(1,feverGauge+(gold?0.34:0.1));
-      if(feverGauge>=1&&clearT<=0)startFever();}
+      if(feverGauge>=1&&clearT<=0&&stageEat<stageGoal)startFever();}   // 軸6対策(4R): クリアと同じ食べではフィーバーを始めない(次の食べまで遅らせ バナーを重ねない)
     // 軸7対策: 壊れ方の色を種類ごとに変え(rock/big_boulderは灰,treeは緑,crateは茶,pebbleは白っぽい)、
     // big_boulderは破片を多く大きく・長めの余韻、pebbleは一瞬でパッと消えるだけにする
     const splashCol=TYPE_SPLASH[it.type]||["#ffd23f","#ff8a20","#ff5b14"];
@@ -413,6 +422,9 @@ function build_magmaflow(api){
       let near=false;
       for(const it of items){
         if(it.eaten)continue;
+        // 軸3対策(4R): 光っている道(it.d===dir)の物は もう流れているので狙い先にしない。
+        // 「いま流れていない(冷えた道の)物」の近くを叩いたときだけ切り替える=流れていない物を狙って叩くのが本筋
+        if(it.d===dir)continue;
         const p=lavaPos(it.d,it.t);
         // 軸3対策(2R): 1.5→1.1に絞り、アイテムの すぐ近くでないと「狙った」扱いにしない
         // 軸3対策(3R): ①②だけではscorePerTapの下がりが足りなかったため、1.1→0.95・下限34→28にもう一段絞る
@@ -426,7 +438,7 @@ function build_magmaflow(api){
       }
       // 軸3の補助策: 距離条件をくぐった連打にも短いクールダウンを追加(効果は座標条件が主)
       if(dirCool>0){api.tone(280,0.05,"sine",0.05);return;}
-      dirCool=22;   // 軸3対策(2R): 10→22(約350〜370ms)にして連打の切替頻度そのものを下げる
+      dirCool=30;   // 軸3対策(4R): 22→30(約0.5秒)。やり過ぎ(40以上)は低学年が反応待ちになるので避ける
       // tap toggles flow direction; but only items near the tap point snap into the new lane
       // (軸3対策(2R): 全アイテム一括切替をやめ、当たり判定を「叩いた場所の近く」だけに絞る。
       //  遠くのアイテムは連動しないので、1回当てただけで画面上の全部が得点化される連鎖を防ぐ)
@@ -436,7 +448,8 @@ function build_magmaflow(api){
       // 軸3対策(3R): 140/0.22→100/0.14に縮小し、1タップで同時に向きが変わるアイテム数を減らす
       // (1タップ=1個のはずのscorePerTapが高止まりしていたのは、この半径が広すぎて連鎖していたのが主因。
       //  100/0.15まで絞るとfirstScoreSec/maxQuietSecが悪化したため、104/0.14相当に留める)
-      const infR=Math.max(100,api.W*0.14);
+      // 軸3対策(4R): 100/0.14→80/0.11。団子になった冷えた道でも1タップで向きが変わるのは1〜2個に絞る
+      const infR=Math.max(80,api.W*0.11);
       for(const it of items){
         if(it.eaten)continue;
         const p=lavaPos(it.d,it.t);
@@ -447,6 +460,7 @@ function build_magmaflow(api){
       tGlobal+=dt;heatT+=dt;
       if(hsCool>0)hsCool-=dt;
       if(dirCool>0)dirCool-=dt;
+      if(clearT<=0)idleT+=dt;
       paused=clearT>0;
       if(fever>0&&!paused){fever-=0.016*dt;if(fever<=0)endFever();}
       const P=pal();
@@ -510,8 +524,9 @@ function build_magmaflow(api){
 
       // ---- spawn + advance items ----
       // 7〜8歳向け: 出現間隔 60→48f、流れ 0.006→0.0072 と 2割ほど速く(操作は変えない)
-      if(!paused){spawnT-=dt;if(spawnT<=0){spawn();
-        spawnT=fever>0?rint(8,13):clamp(48-(stage-1)*5,24,48);}}
+      if(!paused){spawnT-=dt;if(spawnT<=0){
+        if(spawn())spawnT=fever>0?rint(8,13):clamp(48-(stage-1)*5,24,48);
+        else spawnT=rint(5,9);}}   // 出口が詰まっていたら 少し待って出し直す
       const flowSpd=(0.0072+(stage-1)*0.001)*(fever>0?1.7:1);
       // FEVER: rainbow lava fountain from the crater
       if(fever>0&&!paused&&tGlobal%3<dt){const a=-TAU/4+rnd(-0.7,0.7),sp=rnd(6,11);
@@ -531,7 +546,7 @@ function build_magmaflow(api){
         if(!paused){
           // items only flow if they're riding the active lane
           if(it.d===dir){it.t+=flowSpd*dt;}
-          else{it.t+=flowSpd*0.25*dt;}
+          else{it.t+=flowSpd*0.4*dt;}   // 軸6対策(4R): 冷えた道の流速 0.25→0.4倍(団子の渋滞をほどく。0.5超は自動得点が増えて軸3が崩れる)
         }
         // reaching the molten mouth zone -> consumed
         if(it.d===dir&&it.t>=0.42){eat(it);continue;}
@@ -608,14 +623,16 @@ function build_magmaflow(api){
 
       // ---- combo text (top center) ----
       if(combo>1){
-        const pop=1+Math.max(0,comboT-0.7)*1.2;
-        g.save();g.translate(api.W/2,api.H*0.13);g.scale(pop,pop);
+        const pop=1+Math.max(0,comboT-0.7)*0.8;
+        g.save();g.translate(api.W/2,api.H*0.105);   // 軸6対策(4R): 光る火口(H*0.2付近)の発光から離すため H*0.13→0.105
+        g.scale(pop,pop);
         g.font="800 30px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.globalAlpha=clamp(comboT,0,1);
-        g.shadowColor="rgba(255,140,40,.9)";g.shadowBlur=14;
+        // 軸6対策(4R): 暗い太縁取りを先に描き、金文字を黄橙の発光の上でも読めるようにする(白い細線は廃止)
+        g.lineWidth=5;g.lineJoin="round";g.strokeStyle="rgba(30,10,4,.8)";g.strokeText("コンボ x"+combo,0,0);
+        g.shadowColor="rgba(255,140,40,.6)";g.shadowBlur=8;
         g.fillStyle="#ffd23f";g.fillText("コンボ x"+combo,0,0);
-        g.shadowBlur=0;g.lineWidth=1.5;g.strokeStyle="rgba(255,255,255,.6)";
-        g.strokeText("コンボ x"+combo,0,0);
+        g.shadowBlur=0;g.lineJoin="miter";
         g.restore();g.globalAlpha=1;g.textAlign="left";
       }
 
@@ -623,7 +640,7 @@ function build_magmaflow(api){
       for(const f of floats){f.y+=f.vy*dt;f.life-=0.018*dt;
         g.save();g.globalAlpha=clamp(f.life,0,1);g.textAlign="center";
         g.font="900 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";
-        g.lineWidth=4;g.lineJoin="round";g.strokeStyle="rgba(30,10,4,.6)";g.strokeText(f.txt,f.x,f.y);
+        g.lineWidth=4;g.lineJoin="round";g.strokeStyle="rgba(30,10,4,.85)";g.strokeText(f.txt,f.x,f.y);
         g.fillStyle=f.col;g.fillText(f.txt,f.x,f.y);g.restore();}
       g.globalAlpha=1;g.textAlign="left";
       floats=floats.filter(f=>f.life>0);
@@ -649,7 +666,7 @@ function build_magmaflow(api){
       // 軸6対策(3R): フィーバー開始バナー(H*0.30)と同座標に重なっていた欠陥を修正。
       // フィーバー中はだいふんか!バナーを出さない(コンボ8達成とフィーバーゲージ満タンは
       // 「たくさん当てた直後」に同時に起きやすく、実プレイで重なる余地があった)
-      if(eruptT>0.5&&feverBanner<=0){
+      if(eruptT>0.5&&feverBanner<=0&&clearT<=0){
         g.save();g.translate(api.W/2,api.H*0.30);
         g.globalAlpha=clamp((eruptT-0.5)*2,0,1);
         g.font="900 44px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";

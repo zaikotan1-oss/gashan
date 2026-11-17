@@ -185,8 +185,8 @@ function buildChain(api){
     if(n>=2)stageScore+=n+bonus;
     // big-chain extra punch (no hitStop here, detonate already added a small one)
     if(n>=6){api.boom(clamp(0.4+n*0.03,0.4,0.7));}
-    if(n>=2)floats.push({x:api.W/2,y:api.H*0.32,txt:n+"れんさ！"+(bonus?" +"+bonus:"")+(isTarget?" おだいクリア!":""),
-      col:isTarget?"#ffe27a":n>=8?"#ff3b3b":n>=4?"#ff8c42":"#ffd23f",life:1,vy:-1,size:n>=6||isTarget?52:38,born:0});
+    if(n>=2)floats.push({x:api.W/2,y:api.H*0.38,txt:n+"れんさ！"+(bonus?" +"+bonus:"")+(isTarget?" おだいクリア!":""),
+      col:isTarget?"#ffe27a":n>=8?"#ff3b3b":n>=4?"#ff8c42":"#ffd23f",life:1,vy:-0.3,size:n>=6||isTarget?52:38,born:0});
     // ③ 軸3(c) maxQuietSec対策: 大きいチェインを割った直後で場が薄くなったときだけ、
     // spawnGapのタイマーを待たずに即補充する(判定半径・得点係数はそのまま)。
     // 「大きく減った直後だけ無音区間を切る」効果に絞るため、閾値を割った時だけ動く。
@@ -213,7 +213,7 @@ function buildChain(api){
       sparks.push({x:rnd(0,api.W),y:rnd(-20,api.H*0.2),vx:rnd(-2,2),vy:rnd(2,6),
         r:rnd(2,6),life:1,decay:rnd(0.008,0.016),col:pick(COLORS),glow:true});
     }
-    floats.push({x:api.W/2,y:api.H*0.4,txt:last?"ぜんステージ クリア！":"ステージ "+stage+" クリア！",
+    floats.push({x:api.W/2,y:api.H*0.47,txt:last?"ぜんステージ クリア！":"ステージ "+stage+" クリア！",
       col:last?"#ffe27a":"#7be08a",life:1.4,vy:-0.4,size:54,born:0});
   }
   function nextStage(){
@@ -227,7 +227,7 @@ function buildChain(api){
     // ③ 軸3(b)(c)対策: reset()と同じく、切り替え直後も薄くしない(13固定→orbCapまで満たす)。
     // ステージ切り替えは90秒中に何度も起きるので、ここが13のままだと毎回そこで無音区間が生まれる。
     orbs=[];for(let i=0;i<orbCap;i++)spawn();
-    floats.push({x:api.W/2,y:api.H*0.5,txt:"おだいの いろ: "+(COLNAME[targetCol]||""),
+    floats.push({x:api.W/2,y:api.H*0.55,txt:"おだいの いろ: "+(COLNAME[targetCol]||""),
       col:targetCol,life:1.2,vy:-0.3,size:34,born:0});
   }
   function spawnStar(){
@@ -468,7 +468,7 @@ function buildChain(api){
       // ① にじいろチェイン！ バナー(虹色に色替わり)
       if(rbMsgT>0){rbMsgT-=0.016*dt;
         const col=COLORS[Math.floor(t*0.1)%COLORS.length],pop=1+Math.max(0,rbMsgT-0.9)*1.3;
-        g.save();g.translate(api.W/2,api.H*0.2);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
+        g.save();g.translate(api.W/2,api.H*0.17);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(rbMsgT*1.4,0,1);g.font="900 34px 'Hiragino Maru Gothic ProN',system-ui";
         g.lineWidth=7;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText("にじいろチェイン！",0,0);
         g.fillStyle=col;g.fillText("にじいろチェイン！",0,0);
@@ -476,7 +476,7 @@ function buildChain(api){
       // ② パーフェクト！ バナー
       if(perfMsgT>0){perfMsgT-=0.016*dt;
         const pop=1+Math.max(0,perfMsgT-0.9)*1.3;
-        g.save();g.translate(api.W/2,api.H*0.27);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
+        g.save();g.translate(api.W/2,api.H*0.24);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(perfMsgT*1.4,0,1);g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";
         g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText("パーフェクト！",0,0);
         g.shadowColor="#7be08a";g.shadowBlur=14;g.fillStyle="#c7ffcf";g.fillText("パーフェクト！",0,0);g.shadowBlur=0;

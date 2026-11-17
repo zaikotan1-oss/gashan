@@ -5,17 +5,22 @@ function buildCrater(api){
   let craters=[],shards=[],rings=[],sparks=[],embers=[],heat=[],floats=[];
   let cols,rows,R0,fieldX,fieldY,fieldW,fieldH,tsec=0,count=0,combo=0,comboT=0,flash=0,flashHue="#ff8a3a";
   // stage progression: pop GOAL bubbles -> "ステージ クリア!" -> harder endless. No game over.
-  let stage=1,stagePop=0,stageGoal=15,clearT=0,clearStage=0,endingT=0;
+  let stage=1,stagePop=0,stageGoal=stageGoalFor(1),clearT=0,clearStage=0,endingT=0;
+  let rushT=0,rushQ=false,chainDepth=0;   // 軸4: ステージ途中の「あわラッシュ」 / 軸7: ばくだんの連鎖
   const STAGES=5;
   let novaT=0;                 // combo reward: all bubbles burst at once
   const BUB=["#ff7a2a","#ff5b3a","#ffb347","#ff9a3a","#ffd23f"];
   // --- added spice: gold bubbles / boss stage / next-stage hints ---
   let bossHp=0,bossMaxHp=0,bossWarnT=0,bossActive=false,bossDefeatT=0,bossDone=false;
   let bossX=0,bossY=0,bossSquish=0,bossHitT=0,hitCd=0;
-  const BOSS_HP={3:8,5:12};      // boss appears at the end of these stages（7〜8歳向けに少しタフに）
+  const BOSS_HP={2:6,4:10,5:14};      // boss appears at the end of these stages（7〜8歳向けに少しタフに）
   const RAINBOW=["#ff4d8d","#ffd23f","#3fffb0","#5ad0ff","#b066ff","#ff8a3a"];
-  const HINTS={2:"つぎは きんいろの あわが でるぞ!",3:"つぎは …ボスが くる!!",
-    4:"つぎは もっと はやい!",5:"さいごは でっかい ボス!!"};
+  const HINTS={2:"つぎは …ボスが くる!!",3:"つぎは きんいろの あわが でるぞ!",
+    4:"つぎは はやい! ボスも くる!!",5:"さいごは でっかい ボス!!"};
+  // 軸4: ステージごとに空の色を変える(絵は触らず「場所が変わった」感)
+  const TINT=[null,"#3a6bff","#ff3a1a","#8a1aff","#ffb02a"];
+  const EMBER_COLS=[["#ffd23f","#ff8a3a","#ff5b3a","#fff0a6"],["#9ad0ff","#5a8aff","#d8ecff","#7ab0ff"],
+    ["#ffd23f","#ff8a3a","#ff5b3a","#fff0a6"],["#d9a8ff","#b066ff","#f0d8ff","#9a5aff"],["#fff0a6","#ffd23f","#ffb02a","#ffffff"]];
   // ---- 隠し発見レイヤー(クレーン/ハンマー/トラックと同じ思想) ----
   // 溶岩バブルは色が一様なので、②ラッキー色は「バブルの中の宝石コア(5色)」で表現する。
   const GEM=[{c:"#ff5b6b",n:"あか"},{c:"#5ad0ff",n:"みず"},{c:"#7be08a",n:"みどり"},
@@ -34,7 +39,7 @@ function buildCrater(api){
     return stage3BoostT>0?Math.min(0.28,boosted+0.10):boosted;
   }
   function bossRadius(){return clamp(Math.min(api.W,api.H)*0.18,70,150);}
-  function stageGoalFor(s){return 9+(s-1)*2;}             // 9,11,13,15,17（軸4: ステージ1+2+3累計を48→33個に短縮しボス到達を早める）
+  function stageGoalFor(s){return 8+(s-1)*2;}             // 8,10,12,14,16（軸4: ボス到達を早める）
   function spawnInterval(){return clamp(34-(stage-1)*4,14,34);}
   // bubble swell speed per stage。旧: 出現→自然破裂が約0.08秒しかなく運ゲーだった。
   // 1個が出現(bub=0.04)から自然破裂(bub>=1)まで約1.0〜2.0秒かけて育つように調整。
@@ -49,7 +54,7 @@ function buildCrater(api){
   function buildAmbient(){
     embers=[];for(let i=0;i<26;i++)embers.push({x:rnd(0,api.W),y:rnd(0,api.H),
       r:rnd(1,3.4),sp:rnd(0.3,1.1),sway:rnd(0,TAU),sv:rnd(0.02,0.06),
-      col:pick(["#ffd23f","#ff8a3a","#ff5b3a","#fff0a6"])});
+      col:pick(EMBER_COLS[Math.min(stage,STAGES)-1]||EMBER_COLS[0])});
     heat=[];for(let i=0;i<6;i++)heat.push({x:rnd(api.W*0.1,api.W*0.9),ph:rnd(0,TAU),
       w:rnd(40,90),sp:rnd(0.03,0.07)});
     smokes=[];for(let i=0;i<4;i++)smokes.push({x:rnd(0,api.W),y:api.H*rnd(0.05,0.3),
@@ -76,8 +81,10 @@ function buildCrater(api){
         gold:false,      // rare golden bubble (big points + fanfare)
         scale:1,         // 軸7: 通常サイズ(下で一部だけ大きくする)
         aspect:rnd(0.5,1.6),  // 軸7: 縦長(積み上がった印象)/横長(寝そべった印象)を混在させ丸一辺倒を崩す(下限を0.7→0.5に広げ体感しやすく)
-        shapeType:"bubble"    // 軸7: 大半は丸バブル。一部だけ下で角ばった"lump"に差し替える
+        shapeType:"bubble",   // 軸7: 出現のたびに抽選(bubble/lump/bomb/twin)。最初の数個は必ず丸バブル
+        asp:1,twinLeft:2,twinGone:0
       });
+      craters[craters.length-1].asp=craters[craters.length-1].aspect;
     }
     // 軸7(壊す物のバラエティ): 15個前後のうち3〜4個だけ一回り大きいクレーター/バブルにして
     // 大小が混ざって見えるようにする(全部同じ大きさの丸を色違いにしただけ、を避ける)。
@@ -92,24 +99,7 @@ function buildCrater(api){
         craters[i].scale=rnd(1.3,1.4);
         // 軸7補助: 大きい個体は寝そべった溶岩だまりに見えるよう、はっきり潰れたaspectを強制する
         // (ランダムaspectだと1.0近くに当たり単なる大きい丸にしか見えないケースがあったため)
-        craters[i].aspect=rnd(0.42,0.6);
-      }
-    }
-    // 軸7(壊す物のバラエティ): 1〜2枠だけ丸バブルと違うシルエット(角ばった溶岩の塊=lump)を割り当てる。
-    // 通常の楕円メッシュではなく専用ポリゴン描画にし、破片も常にchunk/sliver寄りにする(drawCrater/burst参照)。
-    {
-      const nLump=Math.min(craters.length,rint(1,2));
-      const idxs=[];
-      while(idxs.length<nLump){
-        const i=Math.floor(rnd(0,craters.length));
-        if(!idxs.includes(i)) idxs.push(i);
-      }
-      for(const i of idxs){
-        const c=craters[i];
-        c.shapeType="lump";
-        c.aspect=rnd(0.8,1.1);   // ポリゴン自体が角ばっているので極端な引き伸ばしは不要
-        const nPts=rint(7,9);
-        c.lumpPts=[]; for(let k=0;k<nPts;k++) c.lumpPts.push(rnd(0.68,1.15));
+        craters[i].aspect=rnd(0.42,0.6); craters[i].asp=craters[i].aspect;
       }
     }
     // keep craters dormant while a boss owns the arena (also on resize)
@@ -125,10 +115,62 @@ function buildCrater(api){
   // start a few bubbles so the first frame is lively
   for(let i=0;i<craters.length;i++) if(i%2===0){craters[i].growing=true;craters[i].cd=0;craters[i].bub=rnd(0.05,0.2);}
 
-  function burst(c,big){
+  // 軸7: 出現する物の種類を毎回抽選(丸あわ66% / 石の塊12% / ばくだん12% / ふたご10%)
+  function rollShape(){
+    const r=Math.random();
+    return r<0.66?"bubble":(r<0.78?"lump":(r<0.90?"bomb":"twin"));
+  }
+  function bombRadius(){return R0*3.2;}
+  function spawnBubble(c,startBub){
+    const cR=R0*(c.scale||1);
+    c.growing=true;c.bub=startBub||0.04;
+    c.shapeType=rollShape(); c.twinLeft=2; c.twinGone=0;
+    c.asp=c.aspect;
+    if(c.shapeType!=="bubble"){
+      c.gold=false; c.rainbow=false; c.gemCol=null; c.gemName="";
+      if(c.shapeType==="lump"){
+        c.asp=rnd(0.8,1.1);
+        const nPts=rint(7,9); c.lumpPts=[]; for(let k=0;k<nPts;k++) c.lumpPts.push(rnd(0.68,1.15));
+      }else{ c.asp=1; }
+      return;
+    }
+    c.gold=Math.random()<goldChance(); c.rainbow=false; c.gemCol=null; c.gemName="";
+    // rare golden bubble: chime + gold ring so it catches the eye instantly
+    if(c.gold){
+      api.tone(1568,0.1,"triangle",0.09); api.tone(2093,0.14,"triangle",0.07);
+      rings.push({x:c.x,y:c.y-cR*0.2,r:cR*0.2,vr:cR*0.5,life:1,decay:0.06,col:"#ffe14a"});
+    }
+    // ① にじいろバブル: 予告(よかん)が出ていたら次の1個がにじいろで確定=ドキドキの答え合わせ
+    else if(rainbowQueued){
+      c.rainbow=true; rainbowQueued=false;
+      api.tone(1319,0.1,"triangle",0.08); api.tone(1760,0.12,"triangle",0.07);
+      for(let k=0;k<RAINBOW.length;k++)
+        rings.push({x:c.x,y:c.y-cR*0.2,r:cR*0.18,vr:cR*(0.45+k*0.12),life:1,decay:0.06,col:RAINBOW[k]});
+    }
+    // ときどき「にじいろの よかん…」を先に出す(=次の1個が激レア)。stage2以降だけ。
+    else if(stage>=2 && Math.random()<0.03){
+      rainbowQueued=true; rainbowSoonT=1.5;
+      api.tone(660,0.14,"sine",0.07); api.tone(990,0.16,"sine",0.05);
+    }
+    // ② ラッキー色: 一部のバブルに宝石コア(5色)を仕込む。ラッキー色を割ると隠しボーナス。
+    else if(Math.random()<0.34){
+      const gm=pick(GEM); c.gemCol=gm.c; c.gemName=gm.n;
+    }
+  }
+
+  function burst(c,big,side){
     const R=R0*(c.scale||1);   // 軸7: 大きいクレーターは判定/演出も一回り大きく
-    const hx=c.x, hy=c.y-R*0.2;
+    const stype=c.shapeType||"bubble";
+    const isLump=stype==="lump", isBomb=stype==="bomb", isTwin=stype==="twin";
+    const chained=chainDepth>0;
+    // ふたご: 片方だけ割る(side指定かつ2個とも残っている時)。のこりは育ち続ける
+    const partial=isTwin&&side&&c.twinLeft===2;
     const size=c.bub;
+    let hx=c.x, hy=c.y-R*0.2;
+    if(isTwin&&(partial||c.twinLeft===1)){
+      const sd=partial?side:(c.twinGone===-1?1:-1);
+      hx=c.x+sd*R*(0.32+size*0.88)*0.58; hy=c.y-R*0.2-size*R*0.5;
+    }
     const gold=!!c.gold;
     const rainbow=!!c.rainbow;
     // ② ラッキー色: 宝石コアが今日のラッキー色と一致したら隠しボーナス
@@ -136,27 +178,56 @@ function buildCrater(api){
     // bigger bubble = more points + bigger fx (1..4); gold x5 / にじいろ x8 / ラッキー +2
     let gain=(1+Math.round(size*3))*(rainbow?8:(gold?5:1));
     if(isLucky) gain+=2;
+    if(chained) gain+=1;   // ばくだんの連鎖 1個ごとに+1
+    if(stagePop+1===Math.floor(stageGoal/2)) rushQ=true;   // 軸4: ステージ半ばで あわラッシュ
     count+=gain; stagePop++; api.setScore(count);
     combo++; comboT=1; flashHue=rainbow?RAINBOW[Math.floor(tsec*6)%RAINBOW.length]:(gold?"#ffe14a":pick(BUB));
     flash=Math.min(1,flash+(rainbow?0.6:(gold?0.7:0.25+size*0.35)));
     // sound scales with size + combo
-    api.slide(360+size*180,90,0.18+size*0.12,0.34,"sawtooth");
-    api.noise(0.14+size*0.18,0.26,800,"lowpass",0.8);
-    api.tone(420*Math.pow(2,clamp(combo,0,10)/12),0.12,"triangle",0.12);
-    if(size>0.6){api.boom(0.4+size*0.25);api.shake(6+size*8);api.hitStop(size>0.85?4:3);}
-    else{api.shake(3+size*4);api.hitStop(2);}
-    // shockwave rings
-    rings.push({x:hx,y:hy,r:R*0.4*size,vr:R*(0.5+size*0.5),life:1,decay:0.05,col:flashHue});
-    rings.push({x:hx,y:hy,r:R*0.2*size,vr:R*(0.4+size*0.4),life:1,decay:0.06,col:"#fff0a6"});
+    if(isLump){
+      // 石: 高い音なしの低い「ガラガラ」(ノイズ200Hz)。輪は出さず、破片が重く崩れ落ちる
+      api.noise(0.26+size*0.2,0.32,200,"lowpass",0.9);
+      api.slide(160,55,0.2+size*0.1,0.3,"square");
+      api.boom(0.3+size*0.3); api.shake(4+size*6);
+      if(!chained) api.hitStop(2);
+    }else if(isBomb){
+      // ばくだん: どかーん(連鎖の1個目だけ大きく鳴らす)
+      api.slide(300,40,0.5,0.4,"sawtooth"); api.noise(0.5,0.4,500,"lowpass",0.8);
+      api.boom(0.85); api.shake(18);
+      if(!chained&&hitCd<=0){api.hitStop(5);hitCd=34;}
+    }else{
+      api.slide(360+size*180,90,0.18+size*0.12,0.34,"sawtooth");
+      api.noise(0.14+size*0.18,0.26,800,"lowpass",0.8);
+      api.tone(420*Math.pow(2,clamp(combo,0,10)/12),0.12,"triangle",0.12);
+      if(size>0.6){api.boom(0.4+size*0.25);api.shake(6+size*8);if(!chained)api.hitStop(size>0.85?4:3);}
+      else{api.shake(3+size*4);if(!chained)api.hitStop(2);}
+    }
+    // shockwave rings(石は出さない)
+    if(!isLump){
+      rings.push({x:hx,y:hy,r:R*0.4*size,vr:R*(0.5+size*0.5),life:1,decay:0.05,col:flashHue});
+      rings.push({x:hx,y:hy,r:R*0.2*size,vr:R*(0.4+size*0.4),life:1,decay:0.06,col:"#fff0a6"});
+    }
+    if(isBomb){
+      // 爆風の大きな輪(「まわりも ふっとぶ」範囲が見える)
+      rings.push({x:hx,y:hy,r:R*0.5,vr:bombRadius()*0.09,life:1,decay:0.05,col:"#ff5b3a"});
+      rings.push({x:hx,y:hy,r:R*0.3,vr:bombRadius()*0.07,life:1,decay:0.06,col:"#ffe14a"});
+      floats.push({x:hx,y:hy-R*1.2,txt:"どかーん!",life:1,vy:-0.8,col:"#ffd23f",size:30});
+    }
     // lava shards (gold / にじいろ bursts spray rainbow)
-    const n=(big?16:8)+Math.round(size*10)+Math.min(combo,6)+(gold?10:0)+(rainbow?14:0);
+    const n=isLump?3:((big?16:8)+Math.round(size*10)+Math.min(combo,6)+(gold?10:0)+(rainbow?14:0)+(isBomb?10:0));
     for(let i=0;i<n;i++){const a=rnd(0,TAU),sp=rnd(2.5,7)*(0.6+size);
       shards.push({x:hx,y:hy,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-rnd(1,4),
         r:rnd(3,8)*(0.6+size*0.7),life:1,decay:rnd(0.012,0.022),
         col:(gold||rainbow)?RAINBOW[i%RAINBOW.length]:(i%3===0?"#fff0a6":pick(BUB))});}
     // 軸7: 大きいクレーター・角ばった塊(lump)は必ず、通常サイズも低確率(20%)で、丸い破片に加えて
     // 角ばった岩片(chunk)や細長い破片(sliver)も混ぜる →「砕ける」一辺倒でなく壊れ方の違いを画面全体に広げる
-    if((c.scale||1)>1.05 || c.shapeType==="lump" || Math.random()<0.2){
+    if(isLump){
+      // 石がガラガラ崩れる: 角ばった岩片8〜10個。初速を下向きに+2して重く落ちる
+      for(let i=0;i<rint(8,10);i++){const a=rnd(0,TAU),sp=rnd(1.5,4.5)*(0.6+size);
+        shards.push({x:hx,y:hy,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp+2-rnd(0,1.5),
+          r:rnd(6,12)*(0.6+size*0.6),life:1,decay:rnd(0.012,0.02),gv:2.2,
+          col:i%3===0?"#8a4a2a":(i%3===1?"#5a2a14":"#b9744a"),shape:"chunk",sides:rint(5,7),ang:rnd(0,TAU)});}
+    }else if((c.scale||1)>1.05 || Math.random()<0.2){
       for(let i=0;i<rint(3,5);i++){const a=rnd(0,TAU),sp=rnd(2,6)*(0.6+size);
         shards.push({x:hx,y:hy,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-rnd(1,3),
           r:rnd(5,10)*(0.6+size*0.6),life:1,decay:rnd(0.01,0.018),
@@ -203,7 +274,23 @@ function buildCrater(api){
       for(let i=0;i<5;i++)lstars.push({x:hx+rnd(-R*0.4,R*0.4),y:hy-R*0.4,
         vy:-rnd(0.8,1.8),vx:rnd(-0.6,0.6),life:1,r:rnd(4,7),rot:rnd(0,TAU),vr:rnd(-0.2,0.2),col:c.gemCol});
     }
-    c.bub=0; c.growing=false; c.gold=false; c.rainbow=false; c.gemCol=null; c.pop=1; c.cd=rint(8,spawnInterval());  // 軸4補助: spawnIntervalを反映(旧: rint(18,72)固定)
+    if(partial){
+      // ふたご: 片方だけ消える。のこりの1個はそのまま育つ(倒れる/残る)
+      c.twinLeft=1; c.twinGone=side; c.pop=0.6;
+    }else{
+      c.bub=0; c.growing=false; c.gold=false; c.rainbow=false; c.gemCol=null; c.pop=1; c.cd=rint(8,spawnInterval());  // 軸4補助: spawnIntervalを反映(旧: rint(18,72)固定)
+      c.twinLeft=2; c.twinGone=0;
+    }
+    // ばくだん: 半径内で育っている他のあわを連鎖でふっとばす(1個ごと +1 ボーナスは burst 内)
+    if(isBomb){
+      chainDepth++;
+      const rr=bombRadius();
+      for(const c2 of craters){
+        if(c2===c||!c2.growing||c2.bub<=0.06) continue;
+        if(Math.hypot(c2.x-c.x,c2.y-c.y)<=rr) burst(c2,true);
+      }
+      chainDepth--;
+    }
     // big-hit climax wash
     if(combo>=3){api.tone(220,0.2,"sawtooth",0.07);}
     if(combo>0&&combo%8===0) nova();
@@ -219,7 +306,7 @@ function buildCrater(api){
     for(let i=0;i<8;i++){const a=rnd(0,TAU),sp=rnd(1.5,4);
       shards.push({x:hx,y:hy,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1.5,r:rnd(3,6),
         life:1,decay:rnd(0.02,0.03),col:i%2?"#8a4a2a":"#5a2a14"});}
-    c.bub=0; c.growing=false; c.gold=false; c.rainbow=false; c.gemCol=null; c.pop=0.6; c.cd=rint(24,80);
+    c.bub=0; c.growing=false; c.gold=false; c.rainbow=false; c.gemCol=null; c.pop=0.6; c.cd=rint(24,80); c.twinLeft=2; c.twinGone=0;
   }
   function nova(){
     novaT=1; flash=1; flashHue="#ffd23f"; api.boom(0.7); api.shake(16); api.hitStop(6);
@@ -314,17 +401,28 @@ function buildCrater(api){
       // boss phase: whack the giant bubble (generous hit circle)
       if(bossActive&&Math.hypot(x-bossX,y-bossY)<bossRadius()*1.4){ bossHit(x,y); return; }
       // pop the bubble whose grown circle is under the finger; prefer biggest
-      let best=null,bestSize=-1;
+      let best=null,bestSize=-1,bestSide=0;
       for(const c of craters){
         if(!c.growing||c.bub<=0.06) continue;
         const R=R0*(c.scale||1);   // 軸7: 大きいクレーターは当たり判定も一回り大きく
         const by=c.y-R*0.2-c.bub*R*0.5;
         const br=R*(0.35+c.bub*0.85);
+        if(c.shapeType==="twin"){
+          // ふたご: 2つの小さなあわをそれぞれ判定(近い方を割る)
+          let sd=0,dd=1e9;
+          for(const s2 of [-1,1]){
+            if(c.twinGone===s2) continue;
+            const d=Math.hypot(x-(c.x+s2*br*0.58),y-by);
+            if(d<br*0.62+R*0.3&&d<dd){dd=d;sd=s2;}
+          }
+          if(sd&&c.bub>bestSize){best=c;bestSize=c.bub;bestSide=sd;}
+          continue;
+        }
         if(Math.hypot(x-c.x,y-by)<br+R*0.2){
-          if(c.bub>bestSize){best=c;bestSize=c.bub;}
+          if(c.bub>bestSize){best=c;bestSize=c.bub;bestSide=0;}
         }
       }
-      if(best){ burst(best,false); return; }
+      if(best){ burst(best,false,bestSide); return; }
       // ④ ひみつの ほし: バブルに当たらなかったタップが上空の星に届いたら キラッ+金コイン(減点なし)
       if(sunPos.r>0 && Math.hypot(x-sunPos.x,y-sunPos.y)<sunPos.r){
         sunWink=1; api.tone(1568,0.1,"triangle",0.09); api.tone(2093,0.13,"triangle",0.07);
@@ -351,7 +449,8 @@ function buildCrater(api){
       let imgBg=false;
       if(api.drawCover("bg.jpg")){ imgBg=true;
         // 画像背景: 後半ステージほど空を少し赤く染めて「熱くなってきた」感を出す(薄く)
-        if(stage>=3){g.save();g.globalAlpha=0.06*(stage-2);g.fillStyle="#ff3a1a";g.fillRect(0,0,api.W,api.H);g.restore();}
+        const tn=TINT[Math.min(stage,STAGES)-1];
+        if(tn){g.save();g.globalAlpha=0.12;g.fillStyle=tn;g.fillRect(0,0,api.W,api.H);g.restore();}
       } else {
         // volcanic sky gradient (deep sunset -> lava glow at base)
         let grd=g.createLinearGradient(0,0,0,api.H);
@@ -361,6 +460,8 @@ function buildCrater(api){
         grd.addColorStop(0.82,"#d4581a");
         grd.addColorStop(1,"#ffae3a");
         g.fillStyle=grd; g.fillRect(0,0,api.W,api.H);
+        const tn2=TINT[Math.min(stage,STAGES)-1];
+        if(tn2){g.save();g.globalAlpha=0.12;g.fillStyle=tn2;g.fillRect(0,0,api.W,api.H);g.restore();}
         // hazy sun low on the horizon
         const sunx=api.W*0.5,suny=api.H*0.92;
         let sun=g.createRadialGradient(sunx,suny,0,sunx,suny,api.W*0.7);
@@ -439,6 +540,16 @@ function buildCrater(api){
       // ---- craters: update + draw ----
       // 軸1補助: 開始3秒だけ育つ速さを半分にして、最初の成功までの時間のブレを縮める
       const growGrace=tsec<3?0.5:1;
+      // 軸4: ステージ半ばの「あわラッシュ」: 空いている穴のうち最大6個が一気に出てくる(ステージの節目以外の出来事)
+      if(rushQ){ rushQ=false;
+        if(!paused&&clearT<=0&&!bossActive&&bossWarnT<=0&&bossDefeatT<=0&&stagePop<stageGoal-2){
+          const idle=craters.filter(c=>!c.growing);
+          for(let i=idle.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));const t=idle[i];idle[i]=idle[j];idle[j]=t;}
+          for(const c of idle.slice(0,6)) c.cd=rnd(2,40);
+          rushT=1.2; api.tone(523,0.1,"triangle",0.1); api.tone(784,0.12,"triangle",0.1);
+          setTimeout(()=>{api.tone(1046,0.14,"triangle",0.1);},100);
+        }
+      }
       for(const c of craters){
         const cR=R0*(c.scale||1);   // 軸7: 大きいクレーターは演出も一回り大きく
         c.wob+=0.06*dt; c.gloop+=0.04*dt;
@@ -446,29 +557,7 @@ function buildCrater(api){
         if(!paused){
           if(!c.growing){
             c.cd-=dt;
-            if(c.cd<=0){c.growing=true;c.bub=0.04;
-              c.gold=Math.random()<goldChance(); c.rainbow=false; c.gemCol=null; c.gemName="";
-              // rare golden bubble: chime + gold ring so it catches the eye instantly
-              if(c.gold){
-                api.tone(1568,0.1,"triangle",0.09); api.tone(2093,0.14,"triangle",0.07);
-                rings.push({x:c.x,y:c.y-cR*0.2,r:cR*0.2,vr:cR*0.5,life:1,decay:0.06,col:"#ffe14a"});
-              }
-              // ① にじいろバブル: 予告(よかん)が出ていたら次の1個がにじいろで確定=ドキドキの答え合わせ
-              else if(rainbowQueued){
-                c.rainbow=true; rainbowQueued=false;
-                api.tone(1319,0.1,"triangle",0.08); api.tone(1760,0.12,"triangle",0.07);
-                for(let k=0;k<RAINBOW.length;k++)
-                  rings.push({x:c.x,y:c.y-cR*0.2,r:cR*0.18,vr:cR*(0.45+k*0.12),life:1,decay:0.06,col:RAINBOW[k]});
-              }
-              // ときどき「にじいろの よかん…」を先に出す(=次の1個が激レア)。stage2以降だけ。
-              else if(stage>=2 && Math.random()<0.03){
-                rainbowQueued=true; rainbowSoonT=1.5;
-                api.tone(660,0.14,"sine",0.07); api.tone(990,0.16,"sine",0.05);
-              }
-              // ② ラッキー色: 一部のバブルに宝石コア(5色)を仕込む。ラッキー色を割ると隠しボーナス。
-              else if(Math.random()<0.34){
-                const gm=pick(GEM); c.gemCol=gm.c; c.gemName=gm.n;
-              }}
+            if(c.cd<=0) spawnBubble(c,0.04);
           }else{
             c.bub+=c.grow*dt*60*0.5*growGrace;
             if(c.bub>=1){ fizzle(c); }
@@ -480,7 +569,7 @@ function buildCrater(api){
       if(bossActive) drawBoss();
       // ---- shards (lava blobs, gravity + fade) ----
       for(const s of shards){
-        s.vy+=0.4*dt; s.x+=s.vx*dt; s.y+=s.vy*dt; s.life-=s.decay*dt;
+        s.vy+=0.4*(s.gv||1)*dt; s.x+=s.vx*dt; s.y+=s.vy*dt; s.life-=s.decay*dt;
         g.save(); g.globalAlpha=Math.max(0,s.life);
         g.shadowBlur=8; g.shadowColor=s.col; g.fillStyle=s.col;
         if(s.shape==="chunk"){
@@ -565,6 +654,15 @@ function buildCrater(api){
         g.shadowColor=luckyGem.c; g.shadowBlur=14; g.fillStyle=luckyGem.c;
         g.fillText("きょうの ラッキーは "+luckyGem.n+"!",0,0);
         g.restore(); g.shadowBlur=0; g.globalAlpha=1; g.textAlign="left"; if(luckyMsgT<0)luckyMsgT=0;}
+      // ---- 軸4: あわラッシュ バナー(0.335H=ラッキー0.29H・クリア0.45Hと重ねない) ----
+      if(rushT>0){ rushT-=0.016*dt;
+        const pop=1+Math.max(0,rushT-0.9)*1.6;
+        g.save(); g.translate(api.W/2,api.H*0.335); g.scale(pop,pop); g.textAlign="center";
+        g.globalAlpha=clamp(rushT*2,0,1); g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";
+        g.lineWidth=5; g.strokeStyle="rgba(60,20,0,.7)"; g.strokeText("あわが いっぱい!",0,0);
+        g.shadowColor="rgba(255,200,60,.9)"; g.shadowBlur=14; g.fillStyle="#fff3b0";
+        g.fillText("あわが いっぱい!",0,0);
+        g.restore(); g.shadowBlur=0; g.globalAlpha=1; g.textAlign="left"; if(rushT<0)rushT=0;}
       // ---- ③ ノーミス ボーナス! バナー(下側=クリア文字と重ねない) ----
       if(noMissT>0){ noMissT-=0.014*dt;
         const pop=1+Math.max(0,noMissT-1.3)*1.4;
@@ -651,8 +749,8 @@ function buildCrater(api){
         g.restore(); g.globalAlpha=1; g.textAlign="left";
         if(endingT<=0){endingT=0;stage=1;stageGoal=stageGoalFor(1);stagePop=0;combo=0;
           bossDone=false;bossActive=false;bossWarnT=0;bossDefeatT=0;bossHp=0;
-          stageFizzle=0;rainbowQueued=false;rainbowSoonT=0;stage3BoostT=0;
-          for(const c of craters){c.grow=growRate();c.bub=0;c.growing=false;c.gold=false;c.rainbow=false;c.gemCol=null;c.cd=rint(10,80);}
+          stageFizzle=0;rainbowQueued=false;rainbowSoonT=0;stage3BoostT=0;rushT=0;rushQ=false;
+          for(const c of craters){c.grow=growRate();c.bub=0;c.growing=false;c.gold=false;c.rainbow=false;c.gemCol=null;c.cd=rint(10,80);c.shapeType="bubble";c.asp=c.aspect;c.twinLeft=2;c.twinGone=0;}
           buildAmbient();}
       }
       // 白飛び防止の総仕上げ: フレーム終端で加算合成を必ず標準に戻す(溜まり漏れゼロ)
@@ -775,7 +873,8 @@ function buildCrater(api){
       // outer heat halo
       g.globalCompositeOperation="lighter";
       const halo=g.createRadialGradient(x,by,0,x,by,br*1.8);
-      const hp=danger?(0.4+0.4*Math.sin(tsec*16)):((c.gold||c.rainbow)?0.4+0.15*Math.sin(tsec*10):0.3);
+      const hp0=danger?(0.4+0.4*Math.sin(tsec*16)):((c.gold||c.rainbow)?0.4+0.15*Math.sin(tsec*10):0.3);
+      const hp=(c.shapeType==='lump'||c.shapeType==='bomb')?hp0*0.6:hp0;
       if(c.rainbow){
         halo.addColorStop(0,"rgba(255,255,255,"+hp+")");
         halo.addColorStop(0.5,"rgba(255,235,180,"+(hp*0.4)+")");
@@ -790,94 +889,135 @@ function buildCrater(api){
         halo.addColorStop(1,"rgba(255,90,40,0)");
       }
       g.fillStyle=halo; g.beginPath(); g.arc(x,by,br*1.8,0,TAU); g.fill();
+      if(c.shapeType==="bomb"&&s>0.3){
+        // ばくだん: 爆風の届く範囲をうっすら輪で見せる(「まわりも ふっとぶ」)
+        g.globalAlpha=0.18+0.1*Math.sin(tsec*8); g.strokeStyle="#ff5b3a"; g.lineWidth=3;
+        g.beginPath(); g.arc(x,by,Math.max(0,bombRadius()),0,TAU); g.stroke();
+      }
       g.restore();
       g.save();
       g.translate(x+wob,by);
-      // 軸7: c.aspectで縦長/横長を混在させる(丸一辺倒を崩す)。半径は常にMath.maxで非負クランプ。
-      const bh=Math.max(0,br*(0.96+0.06*Math.sin(c.wob*1.3))*(c.aspect||1));
-      // bubble.png は生成2回とも台座/背景が抜けきらず不採用→従来の手描きマグマ玉のみを使う
-      let bimg=null;
-      if(bimg){
-        api.drawSrc(bimg,0,0,br*2.2,bh*2.2,{center:true});
-      }else{
-      // bubble body: molten orb with gradient
-      const bg=g.createRadialGradient(-br*0.3,-br*0.4,br*0.1,0,0,br*1.1);
-      if(c.rainbow){
-        const rc=Math.floor(tsec*4)%RAINBOW.length;
-        bg.addColorStop(0,"#ffffff"); bg.addColorStop(0.4,RAINBOW[rc]);
-        bg.addColorStop(0.75,RAINBOW[(rc+2)%RAINBOW.length]); bg.addColorStop(1,RAINBOW[(rc+4)%RAINBOW.length]);
-      }else if(c.gold){
-        bg.addColorStop(0,"#fffbe0"); bg.addColorStop(0.35,"#ffe14a");
-        bg.addColorStop(0.7,"#ffb020"); bg.addColorStop(1,"#b06a00");
-      }else{
-        bg.addColorStop(0,"#fff3c0");
-        bg.addColorStop(0.35,danger?"#ffcf4a":"#ffb347");
-        bg.addColorStop(0.7,"#ff5b2a");
-        bg.addColorStop(1,"#c23010");
-      }
-      const isLump=c.shapeType==="lump"&&c.lumpPts;
-      g.fillStyle=bg;
-      if(isLump){ drawLump(0,0,br,bh,c.lumpPts,c.wob*0.25); g.fill(); }
-      else{ g.beginPath(); g.ellipse(0,0,Math.max(0,br),bh,0,0,TAU); g.fill(); }
-      // glossy highlight
-      g.fillStyle="rgba(255,255,255,.5)";
-      g.beginPath(); g.ellipse(-br*0.32,-br*0.4,br*0.26,br*0.16,-0.5,0,TAU); g.fill();
-      }
-      // rim light (② ラッキー色は宝石色のリムで色が分かる)
-      g.strokeStyle=c.rainbow?"rgba(255,255,255,.8)":(c.gold?"rgba(255,245,200,.7)":(c.gemCol?c.gemCol:"rgba(255,220,150,.4)"));
-      g.lineWidth=c.gemCol?2.6:2;
-      // 軸7: リムも本体と同じ形に合わせる(丸バブルは楕円/角ばったlumpはポリゴンでズレを防ぐ)
-      if(c.shapeType==="lump"&&c.lumpPts){ drawLump(0,0,br,bh,c.lumpPts,c.wob*0.25); g.stroke(); }
-      else{ g.beginPath(); g.ellipse(0,0,Math.max(0,br),bh,0,0,TAU); g.stroke(); }
-      // ② ラッキー色: 中の宝石コア(色がハッキリ分かる小さな発光。白飛びしないよう小さく)
-      if(c.gemCol){
-        const gcr=Math.max(0,br*0.24);
-        g.save(); g.globalCompositeOperation="lighter";
-        g.globalAlpha=0.5+0.25*Math.sin(tsec*6+c.gloop); g.fillStyle=c.gemCol;
-        g.beginPath(); g.arc(0,br*0.5,Math.max(0,gcr*1.5),0,TAU); g.fill();
-        g.restore(); g.globalAlpha=1;
-        g.fillStyle=c.gemCol; g.beginPath(); g.arc(0,br*0.5,gcr,0,TAU); g.fill();
-        g.fillStyle="rgba(255,255,255,.85)"; g.beginPath(); g.arc(-gcr*0.3,br*0.5-gcr*0.35,Math.max(0,gcr*0.4),0,TAU); g.fill();
-      }
-      // gold / にじいろ bubble: orbiting twinkle stars (additive)
-      if(c.gold||c.rainbow){
-        g.save(); g.globalCompositeOperation="lighter";
-        for(let i=0;i<4;i++){
-          const a=tsec*3+i*TAU/4;
-          const sx2=Math.cos(a)*br*1.2, sy2=Math.sin(a)*br*0.95;
-          const tw=0.5+0.5*Math.sin(tsec*8+i*2);
-          const ss=br*0.14*(0.6+tw*0.6);
-          g.globalAlpha=0.4+0.6*tw; g.fillStyle=c.rainbow?RAINBOW[(i+Math.floor(tsec*5))%RAINBOW.length]:"#fff8c0";
-          g.beginPath();
-          g.moveTo(sx2,sy2-ss); g.lineTo(sx2+ss*0.35,sy2-ss*0.35); g.lineTo(sx2+ss,sy2);
-          g.lineTo(sx2+ss*0.35,sy2+ss*0.35); g.lineTo(sx2,sy2+ss); g.lineTo(sx2-ss*0.35,sy2+ss*0.35);
-          g.lineTo(sx2-ss,sy2); g.lineTo(sx2-ss*0.35,sy2-ss*0.35); g.closePath(); g.fill();
-        }
-        g.restore(); g.globalAlpha=1;
-      }
-      // cute face on bigger bubbles (kawaii character)
-      if(s>0.45){
-        const er=br*0.16;
-        if(danger){
-          // worried squint when about to pop
-          g.strokeStyle="#3a1208"; g.lineWidth=Math.max(2,br*0.07); g.lineCap="round";
-          g.beginPath(); g.moveTo(-br*0.42,-br*0.18); g.lineTo(-br*0.14,-br*0.1); g.stroke();
-          g.beginPath(); g.moveTo(br*0.42,-br*0.18); g.lineTo(br*0.14,-br*0.1); g.stroke();
-          // open shout mouth
-          g.fillStyle="#5a1408"; g.beginPath();
-          g.ellipse(0,br*0.28,br*0.16,br*0.2,0,0,TAU); g.fill();
+      // 軸7: c.asp(縦長/横長)で丸一辺倒を崩す。種類(shapeType)ごとに見た目と形を変える。半径はMath.maxで非負クランプ。
+      const asp=c.asp||1, stype=c.shapeType||"bubble";
+      const drawOrb=(ox,br,bh)=>{
+        g.save(); g.translate(ox,0);
+        const isLump=stype==="lump"&&!!c.lumpPts, isBomb=stype==="bomb";
+        const bg=g.createRadialGradient(-br*0.3,-br*0.4,br*0.1,0,0,br*1.1);
+        if(c.rainbow){
+          const rc=Math.floor(tsec*4)%RAINBOW.length;
+          bg.addColorStop(0,"#ffffff"); bg.addColorStop(0.4,RAINBOW[rc]);
+          bg.addColorStop(0.75,RAINBOW[(rc+2)%RAINBOW.length]); bg.addColorStop(1,RAINBOW[(rc+4)%RAINBOW.length]);
+        }else if(c.gold){
+          bg.addColorStop(0,"#fffbe0"); bg.addColorStop(0.35,"#ffe14a");
+          bg.addColorStop(0.7,"#ffb020"); bg.addColorStop(1,"#b06a00");
+        }else if(isLump){
+          // 石の塊: 溶岩ではなく岩の色(茶〜こげ茶)
+          bg.addColorStop(0,"#b9744a"); bg.addColorStop(0.4,"#8a4a2a");
+          bg.addColorStop(0.75,"#5a2a14"); bg.addColorStop(1,"#2a120a");
+        }else if(isBomb){
+          // ばくだん: 黒い鉄の玉
+          bg.addColorStop(0,"#8a8a9a"); bg.addColorStop(0.35,"#3a3a46");
+          bg.addColorStop(0.75,"#16161e"); bg.addColorStop(1,"#08080c");
         }else{
-          g.fillStyle="#3a1208";
-          g.beginPath(); g.arc(-br*0.28,-br*0.12,er,0,TAU); g.arc(br*0.28,-br*0.12,er,0,TAU); g.fill();
-          g.fillStyle="rgba(255,255,255,.9)";
-          g.beginPath(); g.arc(-br*0.32,-br*0.16,er*0.4,0,TAU); g.arc(br*0.24,-br*0.16,er*0.4,0,TAU); g.fill();
-          // smile
-          g.strokeStyle="#3a1208"; g.lineWidth=Math.max(2,br*0.06); g.lineCap="round";
-          g.beginPath(); g.arc(0,br*0.06,br*0.22,0.15*Math.PI,0.85*Math.PI); g.stroke();
+          bg.addColorStop(0,"#fff3c0");
+          bg.addColorStop(0.35,danger?"#ffcf4a":"#ffb347");
+          bg.addColorStop(0.7,"#ff5b2a");
+          bg.addColorStop(1,"#c23010");
         }
-        // rosy cheeks
-        g.fillStyle="rgba(255,120,80,.4)";
-        g.beginPath(); g.arc(-br*0.46,br*0.06,br*0.12,0,TAU); g.arc(br*0.46,br*0.06,br*0.12,0,TAU); g.fill();
+        const shapePath=()=>{
+          if(isLump) drawLump(0,0,br,bh,c.lumpPts,c.wob*0.25);
+          else{ g.beginPath(); g.ellipse(0,0,Math.max(0,br),Math.max(0,bh),0,0,TAU); }
+        };
+        g.fillStyle=bg; shapePath(); g.fill();
+        // glossy highlight
+        g.fillStyle=isLump?"rgba(255,230,200,.22)":"rgba(255,255,255,.5)";
+        g.beginPath(); g.ellipse(-br*0.32,-br*0.4,Math.max(0,br*0.26),Math.max(0,br*0.16),-0.5,0,TAU); g.fill();
+        // rim light (② ラッキー色は宝石色のリムで色が分かる / 石とばくだんは明るい縁で背景から浮かせる)
+        g.strokeStyle=c.rainbow?"rgba(255,255,255,.8)":(c.gold?"rgba(255,245,200,.7)":
+          (isLump?"rgba(255,215,160,.8)":(isBomb?((danger&&Math.sin(tsec*16)>0)?"rgba(255,90,60,.95)":"rgba(255,255,255,.65)"):
+          (c.gemCol?c.gemCol:"rgba(255,220,150,.4)"))));
+        g.lineWidth=(isLump||isBomb)?3:(c.gemCol?2.6:2);
+        shapePath(); g.stroke();
+        // ② ラッキー色: 中の宝石コア(色がハッキリ分かる小さな発光。白飛びしないよう小さく)
+        if(c.gemCol){
+          const gcr=Math.max(0,br*0.24);
+          g.save(); g.globalCompositeOperation="lighter";
+          g.globalAlpha=0.5+0.25*Math.sin(tsec*6+c.gloop); g.fillStyle=c.gemCol;
+          g.beginPath(); g.arc(0,br*0.5,Math.max(0,gcr*1.5),0,TAU); g.fill();
+          g.restore(); g.globalAlpha=1;
+          g.fillStyle=c.gemCol; g.beginPath(); g.arc(0,br*0.5,gcr,0,TAU); g.fill();
+          g.fillStyle="rgba(255,255,255,.85)"; g.beginPath(); g.arc(-gcr*0.3,br*0.5-gcr*0.35,Math.max(0,gcr*0.4),0,TAU); g.fill();
+        }
+        // gold / にじいろ bubble: orbiting twinkle stars (additive)
+        if(c.gold||c.rainbow){
+          g.save(); g.globalCompositeOperation="lighter";
+          for(let i=0;i<4;i++){
+            const a=tsec*3+i*TAU/4;
+            const sx2=Math.cos(a)*br*1.2, sy2=Math.sin(a)*br*0.95;
+            const tw=0.5+0.5*Math.sin(tsec*8+i*2);
+            const ss=br*0.14*(0.6+tw*0.6);
+            g.globalAlpha=0.4+0.6*tw; g.fillStyle=c.rainbow?RAINBOW[(i+Math.floor(tsec*5))%RAINBOW.length]:"#fff8c0";
+            g.beginPath();
+            g.moveTo(sx2,sy2-ss); g.lineTo(sx2+ss*0.35,sy2-ss*0.35); g.lineTo(sx2+ss,sy2);
+            g.lineTo(sx2+ss*0.35,sy2+ss*0.35); g.lineTo(sx2,sy2+ss); g.lineTo(sx2-ss*0.35,sy2+ss*0.35);
+            g.lineTo(sx2-ss,sy2); g.lineTo(sx2-ss*0.35,sy2-ss*0.35); g.closePath(); g.fill();
+          }
+          g.restore(); g.globalAlpha=1;
+        }
+        if(isLump){
+          // ひび割れ2本(暗い線+中の溶岩のチラ見え)。顔は付けない
+          g.lineCap="round"; g.lineJoin="round";
+          for(let pass=0;pass<2;pass++){
+            g.strokeStyle=pass?"rgba(255,140,50,.7)":"#1a0a06"; g.lineWidth=pass?Math.max(1,br*0.025):Math.max(2,br*0.07);
+            g.beginPath(); g.moveTo(-br*0.5,-bh*0.4); g.lineTo(-br*0.12,-bh*0.05); g.lineTo(-br*0.3,bh*0.4); g.stroke();
+            g.beginPath(); g.moveTo(br*0.5,-bh*0.3); g.lineTo(br*0.14,bh*0.12); g.lineTo(br*0.38,bh*0.5); g.stroke();
+          }
+        }else if(isBomb){
+          // 導火線+チカチカ光る火花(顔は付けない)
+          g.strokeStyle="#c8a46a"; g.lineWidth=Math.max(2,br*0.09); g.lineCap="round";
+          const tx=br*0.55, ty=-bh*1.3;
+          g.beginPath(); g.moveTo(br*0.12,-bh*0.92); g.quadraticCurveTo(br*0.2,-bh*1.25,tx,ty); g.stroke();
+          const bl=0.5+0.5*Math.sin(tsec*18+c.gloop);
+          g.save(); g.globalCompositeOperation="lighter";
+          g.fillStyle=bl>0.5?"#ff4a2a":"#ffd23f";
+          g.beginPath(); g.arc(tx,ty,Math.max(0,br*0.2*(0.6+bl*0.7)),0,TAU); g.fill();
+          g.fillStyle="#fff"; g.beginPath(); g.arc(tx,ty,Math.max(0,br*0.08),0,TAU); g.fill();
+          g.restore();
+        }else if(s>0.45){
+          // cute face on bigger bubbles (kawaii character)
+          const er=br*0.16;
+          if(danger){
+            // worried squint when about to pop
+            g.strokeStyle="#3a1208"; g.lineWidth=Math.max(2,br*0.07); g.lineCap="round";
+            g.beginPath(); g.moveTo(-br*0.42,-br*0.18); g.lineTo(-br*0.14,-br*0.1); g.stroke();
+            g.beginPath(); g.moveTo(br*0.42,-br*0.18); g.lineTo(br*0.14,-br*0.1); g.stroke();
+            // open shout mouth
+            g.fillStyle="#5a1408"; g.beginPath();
+            g.ellipse(0,br*0.28,Math.max(0,br*0.16),Math.max(0,br*0.2),0,0,TAU); g.fill();
+          }else{
+            g.fillStyle="#3a1208";
+            g.beginPath(); g.arc(-br*0.28,-br*0.12,er,0,TAU); g.arc(br*0.28,-br*0.12,er,0,TAU); g.fill();
+            g.fillStyle="rgba(255,255,255,.9)";
+            g.beginPath(); g.arc(-br*0.32,-br*0.16,er*0.4,0,TAU); g.arc(br*0.24,-br*0.16,er*0.4,0,TAU); g.fill();
+            // smile
+            g.strokeStyle="#3a1208"; g.lineWidth=Math.max(2,br*0.06); g.lineCap="round";
+            g.beginPath(); g.arc(0,br*0.06,br*0.22,0.15*Math.PI,0.85*Math.PI); g.stroke();
+          }
+          // rosy cheeks
+          g.fillStyle="rgba(255,120,80,.4)";
+          g.beginPath(); g.arc(-br*0.46,br*0.06,br*0.12,0,TAU); g.arc(br*0.46,br*0.06,br*0.12,0,TAU); g.fill();
+        }
+        g.restore();
+      };
+      if(stype==="twin"){
+        // ふたご: 小さなあわが2つ並ぶ。片方を割ると、のこりは育ち続ける
+        const pr=br*0.62, off=br*0.58;
+        for(const sd of [-1,1]){
+          if(c.twinGone===sd) continue;
+          drawOrb(sd*off,pr,Math.max(0,pr*(0.96+0.06*Math.sin(c.wob*1.3+sd))));
+        }
+      }else{
+        drawOrb(0,br,Math.max(0,br*(0.96+0.06*Math.sin(c.wob*1.3))*asp));
       }
       g.restore();
     }

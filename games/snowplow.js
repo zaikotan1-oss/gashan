@@ -70,17 +70,21 @@ function buildSnowplow(api){
     }
     return best;
   }
+  const HIT_T_W=0.9,HIT_T_H=1.0,HIT_O_W=0.5,HIT_O_H=0.6; // 標的は広め/それ以外は狭め
   function aimHit(x,y){
     // 軸1: 記念すべき最初の1体は、どこをタップしても狙い成功(最初の成功を確実に)
     const freebie=obstacles.find(o=>o.free&&!o.dead);
     if(freebie)return freebie;
     // 軸3: 「狙って当てた」= いずれかの未破壊オブジェクトの、横も縦もその物のすぐ近くをタップしたか。
     // オブジェクトごとに横距離・縦距離の両方が近いときだけ命中(画面下1/4ならどこでも、という粗い帯判定は廃止)。
+    // 軸3: リングの付いた「次の標的」は広めに(低学年が外さない)、それ以外の物は狭く(帯のどこを連打しても当たる、をやめる)
+    const tgt=nextTarget();
     let best=null,bestD=Infinity;
     for(const o of obstacles){
       if(o.dead)continue;
       const d=Math.abs(o.x-x),dy=Math.abs(o.y-y);
-      if(d<o.w*0.75&&dy<o.h*0.9&&d<bestD){bestD=d;best=o;}
+      const isT=o===tgt,ww=isT?o.w*HIT_T_W:o.w*HIT_O_W,hh=isT?o.h*HIT_T_H:o.h*HIT_O_H;
+      if(d<ww&&dy<hh&&d<bestD){bestD=d;best=o;}
     }
     return best;
   }
@@ -387,7 +391,7 @@ function buildSnowplow(api){
           if(o.x<stopX)o.x=stopX;
           // 軸3: 直近0.6秒以内に「狙い成功」タップがあったときだけ、刃に着いたオブジェクトを壊す。
           // タップの正誤に関係なく壊れていた自動衝突をやめ、放っておくと刃の手前で渋滞するようにする。
-          if(lastAimT>0&&o.x<=bladeStop+0.01){hitObstacle(o);}
+          if(lastAimT>0&&o.x<=bladeStop+0.01){hitObstacle(o);if(!fever)lastAimT=0;} // 軸3: 1タップで壊すのは1体だけ(フィーバー中だけ連鎖OK)
         }
         if(o.dead){o.squash-=0.1*dt;o.x-=speed*0.6*dt;
           if(o.type==="cone")o.rot=(o.rot||0)+0.25*dt; // 軸7: コーンは倒れて転がる
@@ -460,13 +464,13 @@ function buildSnowplow(api){
       // ---- combo text (top-center safe zone) ----
       if(combo>1){
         const pop=1+Math.max(0,comboT-0.7)*1.2;
-        g.save();g.translate(api.W/2,api.H*0.16);g.scale(pop,pop);
+        g.save();g.translate(api.W/2,api.H*0.13);g.scale(pop,pop);
         g.font="800 32px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.globalAlpha=clamp(comboT,0,1);
         g.shadowColor="rgba(80,160,220,.8)";g.shadowBlur=14;g.fillStyle="#4db8ff";
         g.fillText("コンボ x"+combo,0,0);
-        g.shadowBlur=0;g.lineWidth=1.5;g.strokeStyle="rgba(255,255,255,.7)";
-        g.strokeText("コンボ x"+combo,0,0);
+        g.shadowBlur=0;g.lineWidth=4;g.lineJoin="round";g.strokeStyle="rgba(10,42,58,.85)";
+        g.strokeText("コンボ x"+combo,0,0);g.fillText("コンボ x"+combo,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";}
 
       // ---- HUD: stage + progress (top-center) + fever gauge (bottom-center) ----
@@ -476,7 +480,7 @@ function buildSnowplow(api){
       // ---- FEVER TIME banner ----
       if(feverBannT>0){feverBannT-=0.016*dt;
         const a=clamp(feverBannT*1.6,0,1),pop=1+Math.max(0,feverBannT-1.2)*2.2+0.06*Math.sin(tsec*12);
-        g.save();g.translate(api.W/2,api.H*0.32);g.scale(pop,pop);g.globalAlpha=a;
+        g.save();g.translate(api.W/2,api.H*0.42);g.scale(pop,pop);g.globalAlpha=a;
         g.textAlign="center";g.font="900 46px 'Hiragino Maru Gothic ProN',system-ui";
         const fg=g.createLinearGradient(-140,0,140,0);
         RAINBOW.forEach((c,i)=>fg.addColorStop(i/(RAINBOW.length-1),c));
@@ -513,16 +517,17 @@ function buildSnowplow(api){
       if(pendingFeverBanner&&clearT<=0){pendingFeverBanner=false;feverBannT=1.5;}
 
       // ① にじいろプレゼント！ 中央バナー(虹色に色替わり=レアの大祝福)
-      if(rbMsgT>0){rbMsgT-=0.016*dt;
+      // 軸6: エンジンの称賛(H*0.22〜0.33)を避け、ほかの大型バナー(フィーバー/ステージクリア)が出ている間は順番待ちにする
+      if(rbMsgT>0&&clearT<=0&&feverBannT<=0){rbMsgT-=0.016*dt;
         const pop=1+Math.max(0,rbMsgT-1)*1.3,col=RAINBOW[Math.floor(tsec*6)%RAINBOW.length];
-        g.save();g.translate(api.W/2,api.H*0.22);g.scale(pop,pop);g.textAlign="center";
+        g.save();g.translate(api.W/2,api.H*0.40);g.scale(pop,pop);g.textAlign="center";
         g.globalAlpha=clamp(rbMsgT*1.4,0,1);g.font="900 40px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor=col;g.shadowBlur=18;g.fillStyle="#ffffff";g.fillText("にじいろプレゼント！",0,0);
         g.shadowBlur=0;g.lineWidth=2;g.strokeStyle=col;g.strokeText("にじいろプレゼント！",0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";if(rbMsgT<0)rbMsgT=0;}
       // ② きょうのラッキー色 中央の小ヒント(初回だけ大きめに一度教える)
-      if(luckyMsgT>0){luckyMsgT-=0.016*dt;
-        g.save();g.translate(api.W/2,api.H*0.28);g.textAlign="center";
+      if(luckyMsgT>0&&clearT<=0&&feverBannT<=0&&rbMsgT<=0){luckyMsgT-=0.016*dt;
+        g.save();g.translate(api.W/2,api.H*0.5);g.textAlign="center";
         g.globalAlpha=clamp(luckyMsgT*1.4,0,1);g.font="800 24px 'Hiragino Maru Gothic ProN',system-ui";
         const t2="きょうのラッキー色は "+(BLOCKNAME[luckyColor]||"")+"！";
         g.shadowColor=luckyColor;g.shadowBlur=12;
@@ -570,7 +575,7 @@ function buildSnowplow(api){
       if(bw*fr>8){g.save();rrect(bx,by,bw*fr,bh,bh/2);g.clip();
         g.globalAlpha=0.5;g.fillStyle="#fff";g.fillRect(sxp,by,3,bh);g.restore();}
     }
-    g.font="800 14px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
+    g.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
     g.lineWidth=4;g.lineJoin="round";g.strokeStyle="rgba(10,42,58,.6)";
     const label=fever?"フィーバー ちゅう！ てん 2ばい！":"フィーバー";
     if(fever){g.shadowBlur=10+5*Math.sin(tsec*8);g.shadowColor="#ffd23f";}
@@ -750,8 +755,11 @@ function buildSnowplow(api){
     // 軸3: 「ここを狙おう」の薄いリング(1体だけに重ねる=どこを押せばいいか分かる)
     if(isTarget){
       const pr=Math.max(2,w*0.62)*(1+0.04*Math.sin(tsec*6));
-      g.save();g.globalAlpha=0.5+0.25*Math.sin(tsec*6);
-      g.strokeStyle="rgba(255,255,255,.9)";g.lineWidth=Math.max(2,w*0.05);
+      const lw=Math.max(3,w*0.07);
+      g.save();g.globalAlpha=0.8+0.2*Math.sin(tsec*6);
+      g.strokeStyle="rgba(10,42,58,.6)";g.lineWidth=lw+5;   // 白い雪山の上でも見えるよう濃い青の縁
+      g.beginPath();g.arc(0,0,pr,0,TAU);g.stroke();
+      g.strokeStyle="#ffd23f";g.lineWidth=lw;
       g.beginPath();g.arc(0,0,pr,0,TAU);g.stroke();
       g.restore();g.globalAlpha=1;
     }

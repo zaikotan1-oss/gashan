@@ -6,9 +6,11 @@ function buildBalloon(api){
   let hsCD=0;      // hitStop cooldown (節目限定・30f以上あける)
   function tryHitStop(f){if(hsCD<=0){api.hitStop(f);hsCD=32;}}
   let balloons=[],pending=[],confetti=[],rings=[],floats=[],sparks=[],shines=[],links=[],motes=[];
+  let ghosts=[],puddles=[],gondolas=[]; // 壊れ方のバラエティ(軸7): 空気が抜けて飛ぶどうぶつ / みずたまり / 落ちるボスのゴンドラ
   let CHAINR,spawnT,count,waveN,clouds=[],hintPulse=0,flash=0,flashCol="#fff";
   let quietT=0,pityCD=0; // 軸3向けピティ: 無得点の経過フレーム(約60/秒)
-  const PITY_T=400,PITY_CD=80; // 無得点がPITY_T(約6.7秒)続いたら的カラーを差し込み、次はPITY_CD(約1.3秒)空ける
+  const PITY_T=300,PITY_CD=80; // 無得点がPITY_T(約5秒)続いたら的カラーを画面の中ほどに差し込み、次はPITY_CD(約1.3秒)空ける
+  const QUIET_ASSIST=240;       // 無得点が約4秒続いたら当たり判定を広げる(静かな時間だけ)
   const COLORS=["#e85d75","#4aa6c0","#7be08a","#ffd23f","#b58bff","#ff8c42"];
   const CNAME=["あか","みずいろ","みどり","きいろ","むらさき","オレンジ"];
   // ---- 隠し発見レイヤー(ハンマー/トラックと同じ思想) ----
@@ -32,7 +34,8 @@ function buildBalloon(api){
   // 見た目のバラエティ(軸7向け): まる中心に、細長い風船と、縦に連なる「つみかさなりふうせん」を低確率で混ぜる
   // stack(つみかさなり)を目に留まりやすく: 0.1→0.18(軸7向け)
   // round/long/stackに加え、低確率で「ハートふうせん」を混ぜて輪郭のバリエーションをもう1種類増やす(軸7向け)
-  function pickShape(){const r=Math.random();return r<0.18?'stack':(r<0.38?'long':(r<0.46?'heart':'round'));}
+  // みずふうせん(下ぶくれ・割れると水しぶき)を約8%追加(軸7向け)
+  function pickShape(){const r=Math.random();return r<0.18?'stack':(r<0.38?'long':(r<0.46?'heart':(r<0.54?'water':'round')));}
   function mk(y0,forceTarget){const r=clamp(api.W*0.06,28,50)*rnd(0.75,1.35); // 通常の丸ふうせんにも大小差をつける(軸7向け)
     return{x:rnd(r*1.5,api.W-r*1.5),y:y0!=null?y0:api.H+r*1.5,vy:-rnd(0.6,1.4)*stageSpeedMul(),r,
       // 無反応が続く時間(軸3)を縮めるため、一定確率で今の的の色を優先して出す。狙う必要性(missRate)自体は変えない
@@ -60,6 +63,8 @@ function buildBalloon(api){
     floats.push({x:b.x,y:b.y-40,txt:"だいあたり ＋8",life:1,vy:-1.1,t:0,col:"#ffd23f",size:34});
     if(targetLeft>0){targetLeft=Math.max(0,targetLeft-1);if(targetLeft<=0)clearStage();}
   }
+  // ピティ用: 画面の中ほど(中央寄り)にふわっと現れる的カラーの丸ふうせん。下から上ってくるのを待たずに押せる(軸3向け)
+  function mkPity(){const b=mk(rnd(api.H*0.5,api.H*0.82),true);b.x=rnd(api.W*0.25,api.W*0.75);b.shape='round';b.sq=0.3;return b;}
   function mkClouds(){clouds=[];for(let i=0;i<4;i++)clouds.push({x:rnd(0,api.W),y:rnd(api.H*0.08,api.H*0.4),s:rnd(0.7,1.5),vx:rnd(0.05,0.18)});}
   function mkMotes(){motes=[];const n=clamp(Math.round(api.W/34),14,30);for(let i=0;i<n;i++)motes.push({x:rnd(0,api.W),y:rnd(0,api.H),r:rnd(1.5,4.5),vy:-rnd(0.08,0.3),ph:rnd(0,TAU),drift:rnd(0.1,0.5)});}
   function newTarget(){const cols=stageColors();target=pick(cols);targetLeft=clamp(3+stage,4,8);}   // 7〜8歳向け: 的の数を1こ増やした
@@ -87,8 +92,13 @@ function buildBalloon(api){
     superRareT=rint(560,820);megaWarnT=0;perfectT=0;sunWink=0;escaped=0;
     luckyIntroT=luckyIntroShown?0:2.8;   // ① ラッキー色は初回だけ中央に教える
     nextStage(true);
-    for(let i=0;i<10;i++)balloons.push(mk(rnd(api.H*0.2,api.H)));}
-  function at(x,y){let best=null,bd=1e9;for(const b of balloons){if(b.popped)continue;const d=Math.hypot(b.x-x,b.y-y);if(d<b.r*1.05&&d<bd){bd=d;best=b;}}return best;}
+    ghosts=[];puddles=[];gondolas=[];
+    // 最初の10こは画面を10等分した帯に1こずつ(順番はシャッフル)。端に偏って押せない出だしを減らす(軸3向け)
+    const xo=[0,1,2,3,4,5,6,7,8,9];for(let i=xo.length-1;i>0;i--){const j=rint(0,i),t=xo[i];xo[i]=xo[j];xo[j]=t;}
+    for(let i=0;i<10;i++){const b=mk(rnd(api.H*0.3,api.H*0.85));b.x=clamp(api.W*(xo[i]+0.5)/10,b.r*1.2,api.W-b.r*1.2);balloons.push(b);}
+    quietT=QUIET_ASSIST;}   // 最初の1こ目を割るまでは判定を広めに(最初の成功を早く)。最初に割れたらquietTは0に戻り普段の判定へ
+  // 無得点が続いている間だけ判定を広げる(普段のタップ命中率は変えない)
+  function at(x,y){const k=quietT>=QUIET_ASSIST?1.6:1.05;let best=null,bd=1e9;for(const b of balloons){if(b.popped)continue;const d=Math.hypot(b.x-x,b.y-y);if(d<b.r*k&&d<bd){bd=d;best=b;}}return best;}
   function pop(b){
     if(b.popped)return;b.popped=true;
     quietT=0; // 軸3向けピティ: 得点が動いたので無得点タイマーをリセット
@@ -100,30 +110,60 @@ function buildBalloon(api){
       api.tone(1568,0.07,"triangle",0.05);
     }
     // count toward the stage target colour
-    if(targetLeft>0&&(b.color===target||b.rainbow)){
+    if(targetLeft>0&&b.color===target){   // にじいろは的を進めない(連鎖の吸着には今まで通り加わる)
       targetLeft--;
       floats.push({x:b.x,y:b.y-34,txt:"せいかい！",life:1,vy:-1.2,t:0,col:target,size:26});
       if(targetLeft<=0)clearStage();
     }
     const big=waveN>=6;
-    rings.push({x:b.x,y:b.y,r:b.r*0.6,max:b.r*(big?2.6:1.9),life:1,col:b.color,lw:big?6:4});
-    // soft glow flash
-    shines.push({x:b.x,y:b.y,r:b.r*1.2,max:b.r*(big?3.4:2.4),life:1,col:lightenC(b.color)});
     api.tone(500*Math.pow(2,clamp(waveN,0,18)/12),0.08,"triangle",0.1);api.noise(0.05,0.12,1800);
     api.slide(900,1500,0.06,0.05,"sine");
     api.shake(2+Math.min(waveN*0.4,7));
     if(big){flash=Math.max(flash,0.55);flashCol=lightenC(b.color,80);}   // ヒットストップは連鎖開始時(startChain)の1回だけ
-    // 壊れ方のバラエティ(軸7向け): つみかさなりふうせんは「砕け散る」の前に少し重めの粒がドサッと崩れ落ちる
+    // 壊れ方のバラエティ(軸7向け): 形ごとに壊れ方を変える(バラバラ/空気が抜けて飛ぶ/ハートが昇る/水しぶき/2段われ)
     if(b.shape==='stack'){
-      for(let k=rint(4,7);k>0;k--){const a=rnd(Math.PI*0.15,Math.PI*0.85),s=rnd(1.5,4);
-        confetti.push({x:b.x+rnd(-b.r*0.4,b.r*0.4),y:b.y+rnd(-b.r*0.4,b.r*0.4),vx:Math.cos(a)*s*0.4,vy:Math.abs(Math.sin(a))*s+2.2,s:rnd(5,9),color:b.color,rot:rnd(0,TAU),vr:rnd(-0.3,0.3),life:1,decay:rnd(0.008,0.014)});}
+      // つみかさなり: 上の小玉が先にパン! 6フレームおくれて下の大玉がドサッと割れる(「2つ割れた」と見える)
+      burst(b,b.x,b.y-b.r*0.85,b.r*0.62,big,5,3,false);
+      api.tone(1100,0.05,"triangle",0.07);
+      setTimeout2(()=>{
+        burst(b,b.x,b.y,b.r,big,rint(8,12),rint(5,8),false);
+        for(let k=rint(4,7);k>0;k--){const a=rnd(Math.PI*0.15,Math.PI*0.85),s=rnd(1.5,4);
+          confetti.push({x:b.x+rnd(-b.r*0.4,b.r*0.4),y:b.y+rnd(-b.r*0.4,b.r*0.4),vx:Math.cos(a)*s*0.4,vy:Math.abs(Math.sin(a))*s+2.2,s:rnd(5,9),color:b.color,rot:rnd(0,TAU),vr:rnd(-0.3,0.3),life:1,decay:rnd(0.008,0.014)});}
+        api.tone(330,0.09,"triangle",0.09);api.noise(0.06,0.12,900);api.shake(3);
+      },6);
+    } else if(b.shape==='long'){
+      // どうぶつふうせん: 割れずに「ぷしゅー」と空気が抜けて、ジグザグに飛び回りながら小さくなって消える
+      burst(b,b.x,b.y,b.r,big,2,rint(3,5),true);
+      ghosts.push({x:0,y:0,gx:b.x,gy:b.y,r:b.r,color:b.color,shape:'long',phase:b.phase,wob:b.wob,shimmer:b.shimmer,sq:1,boss:0,rainbow:false,
+        ang:rnd(0,TAU),sp:rnd(3.2,4.6),t:0,life:1,rot:rnd(-0.4,0.4)});
+      if(ghosts.length<=3){api.noise(0.45,0.1,1500,"bandpass",0.8);api.slide(900,260,0.4,0.05,"sawtooth");}
+    } else if(b.shape==='heart'){
+      // ハートふうせん: 小さなハートが上へふわっと昇る
+      burst(b,b.x,b.y,b.r,big,rint(3,5),rint(5,8),false);
+      for(let k=rint(6,8);k>0;k--){
+        confetti.push({x:b.x+rnd(-b.r*0.5,b.r*0.5),y:b.y+rnd(-b.r*0.3,b.r*0.3),vx:rnd(-0.9,0.9),vy:-rnd(1.1,2.4),g:0,s:rnd(8,14),color:Math.random()<0.6?b.color:"#ff9ec4",
+          rot:rnd(-0.3,0.3),vr:rnd(-0.04,0.04),life:1,decay:rnd(0.007,0.012),heart:true});}
+      api.tone(1318,0.08,"sine",0.06);
+    } else if(b.shape==='water'){
+      // みずふうせん: 青い水しぶきが下へ飛び、みずたまりが少し残る
+      burst(b,b.x,b.y,b.r,big,3,rint(4,6),false);
+      for(let k=rint(14,18);k>0;k--){
+        confetti.push({x:b.x+rnd(-b.r*0.4,b.r*0.4),y:b.y+rnd(-b.r*0.2,b.r*0.3),vx:rnd(-4,4),vy:rnd(-1.5,4),g:0.3,s:rnd(5,10),color:Math.random()<0.6?"#6ec6ff":"#c4ecff",
+          rot:0,vr:0,life:1,decay:rnd(0.014,0.022),drop:true});}
+      puddles.push({x:b.x,y:b.y+b.r*0.75,r:b.r*0.3,max:b.r*1.4,life:1});
+      api.noise(0.16,0.1,3200,"bandpass",1.2);api.slide(700,300,0.12,0.05,"sine");
+    } else {
+      burst(b,b.x,b.y,b.r,big,rint(8,13),rint(5,9),false);
     }
-    // 壊れ方のバラエティ(軸7向け): 細長い風船は矩形でなく縦の破片が上下に千切れて飛ぶ
-    for(let k=rint(8,13);k>0;k--){const a=rnd(0,TAU),s=rnd(2,7);
-      confetti.push({x:b.x,y:b.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,s:rnd(4,9),color:Math.random()<0.5?b.color:"#fff",rot:rnd(0,TAU),vr:rnd(-0.5,0.5),life:1,decay:rnd(0.012,0.022),long:b.shape==='long'});}
-    // sparkle burst
-    for(let k=rint(5,9);k>0;k--){const a=rnd(0,TAU),s=rnd(3,9);
-      sparks.push({x:b.x,y:b.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,decay:rnd(0.03,0.06),sz:rnd(2,5),col:Math.random()<0.4?"#fff":lightenC(b.color)});}
+  }
+  // 割れた時の共通の見せ場: 輪っか・光のにじみ・紙吹雪・キラキラ(x,y,r は割れる場所と大きさ)
+  function burst(b,x,y,r,big,nc,ns,long){
+    rings.push({x,y,r:r*0.6,max:r*(big?2.6:1.9),life:1,col:b.color,lw:big?6:4});
+    shines.push({x,y,r:r*1.2,max:r*(big?3.4:2.4),life:1,col:lightenC(b.color)});
+    for(let k=nc;k>0;k--){const a=rnd(0,TAU),s=rnd(2,7);
+      confetti.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,s:rnd(4,9),color:Math.random()<0.5?b.color:"#fff",rot:rnd(0,TAU),vr:rnd(-0.5,0.5),life:1,decay:rnd(0.012,0.022),long:long});}
+    for(let k=ns;k>0;k--){const a=rnd(0,TAU),s=rnd(3,9);
+      sparks.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,decay:rnd(0.03,0.06),sz:rnd(2,5),col:Math.random()<0.4?"#fff":lightenC(b.color)});}
   }
   // boss balloon takes several taps; final tap = big explosion
   function hitBoss(b){
@@ -136,6 +176,10 @@ function buildBalloon(api){
       b.popped=true;quietT=0;count++;api.setScore(count);
       api.boom(0.85);api.shake(13);tryHitStop(5);flash=Math.max(flash,0.7);flashCol=lightenC(b.color,80);
       if(targetLeft>0){targetLeft=Math.max(0,targetLeft-2);if(targetLeft<=0)clearStage();}
+      // 熱気球が壊れて、ゴンドラが切り離されて下へ落ちる(別の壊れ方)
+      {const brx=b.r*0.85,bry=b.r;
+       gondolas.push({x:b.x,y:b.y+bry*0.62+bry*0.21,w:Math.max(6,brx*0.34),h:Math.max(6,bry*0.42),vx:rnd(-1.2,1.2),vy:-2.2,rot:0,vr:rnd(-0.08,0.08),life:1});
+       api.slide(500,120,0.5,0.08,"triangle");}
       floats.push({x:b.x,y:b.y-30,txt:"ボス どっかーん！",life:1,vy:-1.1,t:0,col:"#ff3b3b",size:42});
       for(let k=40;k>0;k--){const a=rnd(0,TAU),s=rnd(3,12);
         confetti.push({x:b.x,y:b.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-3,s:rnd(5,11),color:pick(COLORS),rot:rnd(0,TAU),vr:rnd(-0.6,0.6),life:1,decay:rnd(0.01,0.02)});}
@@ -196,7 +240,11 @@ function buildBalloon(api){
     input(px,py,type){if(type!=="down")return;const b=at(px,py);
       if(b){b.sq=1.35;if(b.mega){hitMega(b);}else if(b.boss>0){hitBoss(b);}else{startChain(b);}return;}
       // ④ おひさま ひみつタップ(減点なしのごほうび): ふうせんに当たらなかったタップだけ反応
-      if(Math.hypot(px-sunX,py-sunY)<sunR){
+      if(Math.hypot(px-sunX,py-sunY)>=sunR){
+        // 外れにも小さな反応(得点にはしない・quietTは触らない): 押せていることだけは伝える
+        rings.push({x:px,y:py,r:6,max:26,life:1,col:'rgba(255,255,255,.8)',lw:3});api.tone(300,0.04,'sine',0.04);
+        return;}
+      {
         sunWink=1;api.tone(1318,0.1,"triangle",0.08);api.tone(1760,0.12,"triangle",0.06);
         for(let k=8;k>0;k--){const a=rnd(-TAU*0.5,0.2),s=rnd(2.5,6);
           sparks.push({x:sunX,y:sunY,vx:Math.cos(a)*s*0.7,vy:Math.sin(a)*s,life:1,decay:0.02,sz:rnd(3,6),col:"#ffe08a"});}
@@ -260,7 +308,7 @@ function buildBalloon(api){
       spawnT-=dt;if(spawnT<=0&&balloons.length<15){balloons.push(mk(null,quietT>=PITY_T));spawnT=stageSpawn();}
       // 軸3向けピティ: 無得点がPITY_T続いたら、通常の間隔/上限を少し越えてでも的カラーのふうせんを差し込む(連発しないようPITY_CDのクールダウン)
       // 通常spawnの上限(15)は「非照準タップの命中率を下げる」ための意図的な制限なので、ピティだけは専用の高めの上限(20)を使い分ける
-      if(quietT>=PITY_T&&pityCD<=0&&balloons.length<20){balloons.push(mk(null,true));pityCD=PITY_CD;}
+      if(quietT>=PITY_T&&pityCD<=0&&balloons.length<20){balloons.push(mkPity());pityCD=PITY_CD;}
       // occasional rainbow balloon (stage 2+)
       if(stage>=1){rainbowT-=dt;if(rainbowT<=0){if(balloons.length<15)balloons.push(mkRainbow());rainbowT=rint(360,560);}}
       // occasional boss balloon (stage 3+)
@@ -280,6 +328,13 @@ function buildBalloon(api){
       const go=pending.filter(p=>p.delay<=0);pending=pending.filter(p=>p.delay>0);
       for(const p of go)pop(p.b);
       balloons=balloons.filter(b=>!b.popped);
+      // みずたまり(みずふうせんが割れた跡・しばらく残る)
+      for(const pd of puddles){pd.r+=(pd.max-pd.r)*0.12*dt;pd.life-=0.011*dt;
+        const a=Math.max(0,pd.life);if(a<=0)continue;
+        g.save();g.globalAlpha=a*0.5;g.fillStyle="#8fd4ff";
+        g.beginPath();g.ellipse(pd.x,pd.y,Math.max(0.5,pd.r),Math.max(0.5,pd.r*0.3),0,0,TAU);g.fill();
+        g.globalAlpha=a*0.8;g.strokeStyle="#e8f8ff";g.lineWidth=2;g.stroke();g.restore();}
+      puddles=puddles.filter(pd=>pd.life>0);
       // glow shines (under balloons)
       for(const s of shines){s.r+=(s.max-s.r)*0.18*dt;s.life-=0.05*dt;
         const a=Math.max(0,s.life)*0.5;if(a<=0)continue;
@@ -308,6 +363,21 @@ function buildBalloon(api){
       // draw balloons (sorted by y so lower in front)
       const order=balloons.slice().sort((a,b)=>a.y-b.y);
       for(const b of order)drawBalloon(b);
+      // 空気が抜けて ぷしゅーと飛ぶどうぶつふうせん(ジグザグに飛んで小さくなって消える)
+      for(const gh of ghosts){gh.t+=dt;gh.life-=0.0085*dt;gh.ang+=Math.sin(gh.t*0.35)*0.22*dt;
+        gh.gx+=Math.cos(gh.ang)*gh.sp*dt;gh.gy+=Math.sin(gh.ang)*gh.sp*dt-0.4*dt;gh.r=Math.max(3,gh.r*Math.pow(0.987,dt));gh.rot+=0.12*dt*Math.sin(gh.t*0.35);
+        gh.phase+=0.3*dt;gh.wob+=0.3*dt;gh.shimmer+=0.06*dt;
+        if(gh.life<=0)continue;
+        g.save();g.globalAlpha=clamp(gh.life*1.6,0,1);g.translate(gh.gx,gh.gy);g.rotate(gh.rot+gh.ang*0.5);drawBalloon(gh);g.restore();}
+      g.globalAlpha=1;ghosts=ghosts.filter(gh=>gh.life>0&&gh.gx>-80&&gh.gx<api.W+80&&gh.gy>-120&&gh.gy<api.H+80);
+      // 落ちていくボスのゴンドラ
+      for(const gd of gondolas){gd.vy+=0.35*dt;gd.x+=gd.vx*dt;gd.y+=gd.vy*dt;gd.rot+=gd.vr*dt;gd.life-=0.011*dt;
+        if(gd.life<=0)continue;
+        g.save();g.globalAlpha=clamp(gd.life*1.5,0,1);g.translate(gd.x,gd.y);g.rotate(gd.rot);
+        g.strokeStyle="rgba(60,45,30,.6)";g.lineWidth=1.5;g.beginPath();g.moveTo(-gd.w,-gd.h*0.5);g.lineTo(-gd.w*0.6,-gd.h*1.4);g.moveTo(gd.w,-gd.h*0.5);g.lineTo(gd.w*0.6,-gd.h*1.4);g.stroke();
+        g.fillStyle="#7a5a3a";g.fillRect(-gd.w,-gd.h*0.5,gd.w*2,gd.h);
+        g.strokeStyle="rgba(0,0,0,.4)";g.lineWidth=1.5;g.strokeRect(-gd.w,-gd.h*0.5,gd.w*2,gd.h);g.restore();}
+      g.globalAlpha=1;gondolas=gondolas.filter(gd=>gd.life>0&&gd.y<api.H+80);
       // rings
       g.save();
       for(const r of rings){r.r+=(r.max-r.r)*0.25*dt;r.life-=0.06*dt;
@@ -316,9 +386,12 @@ function buildBalloon(api){
         g.beginPath();g.arc(r.x,r.y,r.r,0,TAU);g.stroke();}
       g.restore();g.globalAlpha=1;rings=rings.filter(r=>r.life>0);
       // confetti
-      for(const c of confetti){c.vy+=0.18*dt;c.x+=c.vx*dt;c.y+=c.vy*dt;c.rot+=c.vr*dt;c.life-=c.decay*dt;
+      for(const c of confetti){c.vy+=(c.g==null?0.18:c.g)*dt;c.x+=c.vx*dt;c.y+=c.vy*dt;c.rot+=c.vr*dt;c.life-=c.decay*dt;
         g.save();g.globalAlpha=Math.max(0,c.life);g.translate(c.x,c.y);g.rotate(c.rot);g.fillStyle=c.color;
-        if(c.long)g.fillRect(-c.s*0.18,-c.s*0.9,Math.max(0.5,c.s*0.36),Math.max(0.5,c.s*1.8));
+        if(c.heart){const hs=c.s;g.beginPath();g.moveTo(0,hs*0.45);g.bezierCurveTo(hs*0.9,-hs*0.1,hs*0.45,-hs*0.7,0,-hs*0.25);
+          g.bezierCurveTo(-hs*0.45,-hs*0.7,-hs*0.9,-hs*0.1,0,hs*0.45);g.closePath();g.fill();}
+        else if(c.drop){g.beginPath();g.arc(0,0,Math.max(0.5,c.s*0.45),0,TAU);g.fill();}
+        else if(c.long)g.fillRect(-c.s*0.18,-c.s*0.9,Math.max(0.5,c.s*0.36),Math.max(0.5,c.s*1.8));
         else g.fillRect(-c.s/2,-c.s/3,c.s,c.s*0.66);
         g.restore();}
       g.globalAlpha=1;confetti=confetti.filter(c=>c.life>0);
@@ -455,6 +528,15 @@ function buildBalloon(api){
         g.beginPath();g.ellipse(0,hiY,hiRx,hiRy,0,0,TAU);g.fill();
         g.save();g.globalAlpha=0.3;g.strokeStyle="rgba(30,50,80,.6)";g.lineWidth=Math.max(1,rx*0.14);
         g.beginPath();g.ellipse(0,-ry*0.05,Math.max(0.5,rx*0.42),Math.max(0.5,ry*0.15),0,0,TAU);g.stroke();g.restore();
+      } else if(b.shape==='water'){
+        // みずふうせん(軸7向け): 下ぶくれのしずく形。白いしずくの模様つき
+        g.beginPath();g.moveTo(0,-ry);
+        g.bezierCurveTo(rx*0.75,-ry,rx*1.35,ry*0.15,rx,ry*0.62);
+        g.bezierCurveTo(rx*0.7,ry*1.05,-rx*0.7,ry*1.05,-rx,ry*0.62);
+        g.bezierCurveTo(-rx*1.35,ry*0.15,-rx*0.75,-ry,0,-ry);
+        g.closePath();g.fill();
+        g.save();g.globalAlpha=0.7;g.fillStyle="#fff";g.beginPath();g.moveTo(rx*0.12,ry*0.05);
+        g.quadraticCurveTo(rx*0.42,ry*0.42,rx*0.12,ry*0.55);g.quadraticCurveTo(-rx*0.18,ry*0.42,rx*0.12,ry*0.05);g.fill();g.restore();
       } else if(b.shape==='heart'){
         // ハートふうせん(軸7向け): round/long/stackと明確に違う輪郭をもう1種類混ぜる
         const hw=rx,hh=ry;

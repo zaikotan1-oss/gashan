@@ -63,10 +63,12 @@ function build_gummy(api){
     // during a boss fight the center hole belongs to the king
     const free=holes.map((h,i)=>i).filter(i=>!holes[i].occ&&!(bossStage&&i===4));
     if(!free.length)return;
-    const hi=pick(free);holes[hi].occ=true;
+    // 最初の1匹は必ず真ん中の穴に丸いグミ: 吸着を狭めても最初の成功(押せば当たる)は確実に来る
+    const first=count===0&&moles.length===0&&!bossStage&&free.indexOf(4)>=0;
+    const hi=first?4:pick(free);holes[hi].occ=true;
     const dur=clamp(1500-(stage-1)*170,700,1500);   // 7〜8歳向け: 出現寿命を少し短く
-    const kind=pickKind();
-    let color=pick(GUM),hp=1,life=dur,size=1;
+    const kind=first?"gum":pickKind();
+    let color=pick(GUM),hp=1,life=first?dur*4:dur,size=1;
     if(kind==="jelly"){color="#9be0d2";hp=2;size=1.25;}          // 大きく頑丈
     else if(kind==="gold"){color="#ffd23f";life=dur*0.6;size=0.7;} // 小さく速い
     else if(kind==="rainbow"){color=pick(GUM);life=dur*0.8;} // 色は毎フレーム虹色に切り替わる(update側)
@@ -243,7 +245,9 @@ function build_gummy(api){
         const my=m.baseY-m.up*R*1.6;
         const d=Math.hypot(x-m.x,y-my);
         if(d<bd){bd=d;best=m;}}
-      if(best&&bd<Math.max(R*3.2,150)){smash(best);return;}
+      // さいしょの1こ(count===0)だけは広めに吸着=最初の成功を必ず来させる。2こ目からは狙わないと当たらない半径。
+      const assist=count===0?Math.max(R*3.2,150):Math.max(R*2.0,80);
+      if(best&&bd<assist){smash(best);return;}
       // ④ ひみつ発見: そらに ういている おかしを タップすると きらめき＋コイン(＋1)。げんてん なし。
       // 1こにつき1回だけ(画面外へ流れて再登場したら また光る) = 連打の的にならない
       for(const s of sweets){
@@ -336,11 +340,11 @@ function build_gummy(api){
       if(!paused){
         spawnT-=dt;
         // never leave the field empty: refill fast if no live gummy is out
-        if(!moles.some(m=>m.state!=="smashed")&&spawnT>8&&!boss)spawnT=8;
+        if(!moles.some(m=>m.state!=="smashed")&&spawnT>4&&!boss)spawnT=4;
         if(spawnT<=0){spawn();
           if(feverT>0&&Math.random()<0.5)spawn(); // fever: gummies flood out
-          spawnT=clamp(58-(stage-1)*7,28,58);   // 7〜8歳向け: 出現テンポを少し速く
-          if(bossStage&&boss)spawnT*=1.5;         // boss fight: fewer distractions
+          spawnT=clamp(38-(stage-1)*5,20,38);   // 7〜8歳向け: 出現テンポを少し速く
+          if(bossStage&&boss)spawnT*=1.15;        // boss fight: fewer distractions
           if(feverT>0)spawnT=Math.min(spawnT,15);
         }
       }

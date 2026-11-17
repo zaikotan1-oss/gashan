@@ -7,6 +7,7 @@ function build_chocofount(api){
   let spawnT=0,clearBanner=0,clearTxt="",celebrate=0,fountX=0,fountY=0;
   // stage progression: clear N sweets -> "ステージ クリア！" -> endless harder
   let stage=1,stageKill=0,stageGoal=10,stageClearing=false,clearStage=0,ending=0;
+  let lastScoreT=0,missStreak=0; // 最後に得点した時刻(tsec)。助け舟の判定用
   let fcount=0,lastStop=-99; // frame counter + hitStop throttle
   // A: rare rainbow candy / B: choco-meter fever time
   let fever=0,feverT=0,feverBanner=0,feverRain=[];
@@ -62,7 +63,7 @@ function build_chocofount(api){
   function spawn(){
     // count only live (unlaunched) sweets so flying/falling ones don't block respawn
     let live=0;for(const sw of sweets)if(!sw.launched)live++;
-    if(live>cols+3)return;
+    if(live>=Math.max(4,cols+1))return;   // 軸3: 画面に出しっぱなしの数を絞る(画面ぜんぶが的だと どこを連打しても当たる)
     const lane=rint(0,cols-1);
     const x=api.W*((lane+0.5)/cols)+rnd(-unit*0.4,unit*0.4);
     let type=pickType();
@@ -90,7 +91,7 @@ function build_chocofount(api){
     if(type==="rainbow"){
       api.tone(1318,0.12,"triangle",0.12);api.tone(1760,0.18,"triangle",0.1);
       floats.push({x:clamp(x,unit*2,api.W-unit*2),y:sy-unit*1.4,txt:"にじいろキャンディ！",
-        life:1,vy:-0.6,col:"#ff2bff",size:26});
+        life:1,vy:-0.6,col:"#ffffff",size:26});
     }
   }
   // pre-seed a few
@@ -103,7 +104,7 @@ function build_chocofount(api){
     api.noise(0.16,0.14,900,"lowpass",0.8);
     for(let i=0;i<rint(10,14);i++){
       drops.push({x:fountX+rnd(-unit*0.5,unit*0.5),y:groundY,
-        vx:rnd(-2.2,2.2),vy:rnd(-15,-22),r:rnd(unit*0.16,unit*0.34),
+        vx:rnd(-0.9,0.9),vy:rnd(-15,-22),r:rnd(unit*0.16,unit*0.34),
         life:1,col:i%4===0?"#a9683a":"#6b3f22"});
     }
     // splash sparkle at base
@@ -115,11 +116,16 @@ function build_chocofount(api){
     for(const sw of sweets){
       if(sw.launched)continue;
       // 軸3: ふん水の柱そのものの当たり幅も、狙わず連打しても勝ててしまわない程度に少し絞る(旧1.6)
-      if(Math.abs(sw.x-fountX)<sw.r*0.85 && sw.y<groundY){ hitSweet(sw); hit=true; }
+      if(Math.abs(sw.x-fountX)<sw.r*0.65 && sw.y<groundY){ hitSweet(sw); hit=true; }
     }
     // kid-friendly auto-aim: a near miss still splashes the closest sweet
     if(!hit){
-      let best=null,bd=unit*1.0; // 軸3: 連打が伸びすぎないよう狭めた「にがて吸着」(旧3.2=画面レーン幅相当だった)
+      // 軸3: 連打が伸びすぎないよう「にがて吸着」を狭める(旧3.2→1.0→0.75)。
+      // 助け舟: 最初の1個まではかなり広く / 5秒ぶり無得点のあとの1タップだけ広めに(投げ出さない保険)
+      let best=null,bd=unit*0.75;
+      if(count===0)bd=1e9;                       // 最初の1個は どこを押しても一番ちかい子に当てる
+      else if(tsec-lastScoreT>4.5)bd=1e9;        // 4.5秒ぶり無得点なら次の1タップは一番ちかい子に当てる
+      else if(missStreak>=3)bd=unit*2.6;         // 3回つづけて外したら、ちょっと広めに助ける
       for(const sw of sweets){
         if(sw.launched)continue;
         const d=Math.abs(sw.x-fountX);
@@ -127,7 +133,7 @@ function build_chocofount(api){
       }
       if(best){hitSweet(best);hit=true;}
     }
-    if(!hit){combo=0;comboT=0;comboKept=false;}   // ③ 空ぶり=ノーミス失敗
+    if(!hit){combo=0;comboT=0;comboKept=false;missStreak++;}   // ③ 空ぶり=ノーミス失敗
   }
   function hitSweet(sw){
     if(sw.type==="choco"&&sw.hp>1){
@@ -149,7 +155,7 @@ function build_chocofount(api){
       floats.push({x:sw.x,y:sw.y-unit*0.6,txt:"ラッキー！",life:1,vy:-0.9,col:luckyColor,size:26});
       luckyStars.push({x:sw.x,y:sw.y-sw.r*1.1,life:1,ph:rnd(0,TAU)}); // 頭上のキラッ
       api.tone(1046,0.12,"triangle",0.11);api.tone(1568,0.14,"triangle",0.07);}
-    count+=gain;stageKill+=1;api.setScore(count);
+    count+=gain;stageKill+=1;api.setScore(count);lastScoreT=tsec;missStreak=0;
     combo++;comboT=1.0;
     flashHue=sw.col;flash=Math.min(1,flash+0.32+combo*0.02);
     api.boom(0.4+Math.min(combo,8)*0.02);
@@ -368,7 +374,7 @@ function build_chocofount(api){
         if(d.vy<0){
           for(const sw of sweets){
             if(sw.launched)continue;
-            if(Math.abs(sw.x-d.x)<sw.r&&Math.abs(sw.y-d.y)<sw.r){hitSweet(sw);d.life-=0.4;}
+            if(Math.abs(sw.x-d.x)<sw.r*0.55&&Math.abs(sw.y-d.y)<sw.r){hitSweet(sw);d.life-=0.4;}
           }
         }
       }
@@ -425,7 +431,7 @@ function build_chocofount(api){
       for(const f of floats){f.y+=f.vy*dt;f.life-=0.018*dt;
         g.globalAlpha=Math.max(0,f.life);
         g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-        g.lineWidth=6;g.strokeStyle="rgba(80,40,20,.5)";g.strokeText(f.txt,f.x,f.y);
+        g.lineWidth=7;g.strokeStyle="rgba(60,20,50,.9)";g.strokeText(f.txt,f.x,f.y);
         g.fillStyle=f.col;g.fillText(f.txt,f.x,f.y);}
       g.globalAlpha=1;g.textAlign="left";floats=floats.filter(f=>f.life>0);
 

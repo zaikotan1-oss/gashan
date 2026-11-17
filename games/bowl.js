@@ -6,6 +6,7 @@ function buildBowl(api){
   let pins=[],ball,sparks=[],floats=[],trail=[],glints=[];
   let topY,botY,laneTopW,laneBotW,pinN,round,count,combo,sx,sy,lx,ly,aiming,resetT,tms=0,flash=0,wash=0;
   // stage progression
+  let missStreak=1,throwStartCount=0;
   let stage,stageGoal,stageDown,clearT,bigT,shocks=[];
   const MAXSTAGE=5;
   // ---- 隠し発見レイヤー(crane/punch/hammer/truck と同じ思想) ----
@@ -50,17 +51,17 @@ function buildBowl(api){
     topY=api.H*0.2;botY=api.H*0.92;
     laneTopW=clamp(api.W*0.16,80,150);laneBotW=clamp(api.W*0.62,300,640);
   }
-  function sc(y){return lerp(0.4,1.18,clamp((y-topY)/(botY-topY),0,1));}
+  function sc(y){return lerp(0.7,1.3,clamp((y-topY)/(botY-topY),0,1));}
   function laneHalf(y){return lerp(laneTopW,laneBotW,clamp((y-topY)/(botY-topY),0,1))/2;}
   function rack(){
     pins=[];
     const def=stageDef();
     const rows=clamp(3+Math.floor(round/2),3,6);
-    const cy=topY+api.H*0.06, gap=api.W*0.06; // 【軸3(a)対策】三角形の横幅を少し広げ、狙わないタップでは端まで届きにくくする
+    const cy=topY+api.H*0.12, gap=api.W*0.06; // 【軸3(a)対策】三角形の横幅を少し広げ、狙わないタップでは端まで届きにくくする
     let id=0;
     const cells=[];
     for(let r=0;r<rows;r++){
-      const y=cy+r*api.H*0.045;
+      const y=cy+r*api.H*0.055;
       const cnt=r+1;
       for(let c=0;c<cnt;c++){
         const x=api.W/2+(c-(cnt-1)/2)*gap;
@@ -217,14 +218,17 @@ function buildBowl(api){
       else if(type==="up"){
         if(aiming&&ball.state==="idle"){
           aiming=false;
-          let dx=lx-sx, dy=ly-sy;
-          if(dy>-20){dy=-200;dx=rnd(-170,170);} // 【軸3対策】上まで指を動かしていない=狙いを付けていないタップなので、さらに大きく左右にブレさせてラックを外しやすくする(130→170)
-          else dx*=0.55; // 【軸3対策】しっかり上へスワイプした本筋の操作は、横ブレの影響を弱めて中央のレーンへ通りやすくする(狙う努力がちゃんと報われるように)
+          let dx=lx-sx, dy=ly-sy, unaimed=false;
+          // 外した直後(や最初の一投)は横ブレを小さくする=失敗しても叱られず、すぐ次で当たる(得点が止まりにくい)
+          const sc2=missStreak>0?230:520;
+          if(dy>-20){unaimed=true;dy=-200;dx=rnd(-sc2,sc2);} // 【軸3(a)】横ブレを170→420に広げ、狙わない連打はラック端を外す投が増えるように。// 【軸3対策】上まで指を動かしていない=狙いを付けていないタップなので、さらに大きく左右にブレさせてラックを外しやすくする(130→170)
+          else dx*=0.35; // 【軸3対策】しっかり上へスワイプした本筋の操作は、横ブレの影響を弱めて中央のレーンへ通りやすくする(狙う努力がちゃんと報われるように)
           const power=clamp(Math.hypot(dx,dy)*0.06,9,26);
           const ang=Math.atan2(dy,dx);
-          ball.vx=Math.cos(ang)*power*0.5;ball.vy=-Math.abs(Math.sin(ang)*power)-6;
-          ball.vx=clamp(ball.vx,-12,12);
-          ball.state="roll";combo=0;gutterThisBall=false;
+          ball.vx=Math.cos(ang)*power*0.5;ball.vy=-Math.max(14,Math.abs(Math.sin(ang)*power)+6); // 浅い角度でも前へ進む(横へ流れてガターになりにくい)
+          if(!unaimed)ball.vx*=0.6; // ちゃんと上へスワイプした子は横流れを抑えて救う(狙う努力が報われる)
+          ball.vx=clamp(ball.vx,-14,14);
+          ball.state="roll";combo=0;gutterThisBall=false;throwStartCount=count;
           api.slide(120,90,0.3,0.3,"sine");
         }
       }
@@ -395,7 +399,7 @@ function buildBowl(api){
         for(const p of pins){if(p.state==="stand"){
           const rHit=p.kind==="barrel"?55*1.6:p.kind==="bean"?55*0.7:55; // 【軸3(a)対策】ボールの直撃判定を少し絞り、狙わない一投で全部倒れきらないようにする(樽は的が大きい分1.6倍、豆ピンは小さい的なので0.7倍)
           if(Math.hypot(p.x-ball.x,p.y-ball.y)<rHit){knock(p,ball.x,ball.y,Math.max(8,Math.abs(ball.vy)*1.0));}}}
-        if(ball.y<topY-20||Math.abs(ball.vy)<1){ball.state="done";resetT=40;}
+        if(ball.y<topY-20||Math.abs(ball.vy)<1){ball.state="done";resetT=40;missStreak=count>throwStartCount?0:missStreak+1;}
       }
       for(const t of trail)t.life-=0.09*dt;
       trail=trail.filter(t=>t.life>0);
@@ -561,7 +565,8 @@ function buildBowl(api){
         g.save();g.translate(f.x,f.y);g.scale(pop,pop);
         g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.shadowColor=f.col;g.shadowBlur=18;
-        g.lineWidth=7;g.strokeStyle="rgba(0,0,0,.55)";g.strokeText(f.txt,0,0);
+        if(f.txt==="ストライク！"){g.lineWidth=10;g.strokeStyle="rgba(90,40,0,.85)";}else{g.lineWidth=7;g.strokeStyle="rgba(0,0,0,.55)";}
+        g.strokeText(f.txt,0,0);
         g.fillStyle=f.col;g.fillText(f.txt,0,0);
         g.restore();}
       g.globalAlpha=1;g.shadowBlur=0;g.textAlign="left";floats=floats.filter(f=>f.life>0);
@@ -688,12 +693,14 @@ function buildBowl(api){
     if(frac>=1){g.fillStyle="#ffd23f";g.beginPath();g.arc(bx+bw/2,by-2,7,0,TAU);g.fill();
       g.strokeStyle="#b8821a";g.lineWidth=2;g.stroke();}
     // stage badge above bar
-    g.font="800 13px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";g.textBaseline="middle";
+    g.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="right";g.textBaseline="middle";
     g.shadowColor=def.accent;g.shadowBlur=6;g.fillStyle="#fff3cf";
-    g.fillText("STAGE "+stage,bx+bw/2,by-22);
+    g.lineWidth=4;g.strokeStyle="rgba(20,12,30,.7)";g.strokeText("ステージ "+stage,api.W-12,by-24);
+    g.fillText("ステージ "+stage,api.W-12,by-24);
     g.shadowBlur=0;
-    g.font="800 11px 'Hiragino Maru Gothic ProN',system-ui";g.fillStyle="rgba(255,243,207,0.85)";
-    g.fillText(stageDown+"/"+stageGoal,bx+bw/2,by+bh+14);
+    g.font="800 15px 'Hiragino Maru Gothic ProN',system-ui";g.fillStyle="#fff3cf";
+    g.lineWidth=4;g.strokeStyle="rgba(20,12,30,.7)";g.strokeText(stageDown+"/"+stageGoal,api.W-12,by+bh+18);
+    g.fillText(stageDown+"/"+stageGoal,api.W-12,by+bh+18);
     g.textBaseline="alphabetic";g.textAlign="left";
     g.restore();
   }

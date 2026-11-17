@@ -4,6 +4,7 @@ function build_blizzard(api){
   api.preload(["bg.jpg","gold.png"]);
   let snows=[],vortices=[],shards=[],sparks=[],rings=[],flakes=[],glints=[],floats=[];
   let R,tsec=0,count=0,combo=0,comboT=0,flash=0,spawnT=0;
+  let quietT=0,lastTap=null; // 無得点フレーム数(6秒たまったら最後に押した所の近くへ雪玉を出す保険)
   let fcount=0,lastHS=-999; // frame counter + last hitStop frame (throttle: milestone only)
   // stage progression: clear a quota of blocks -> "ステージ クリア!" -> harder, endless
   let stage=1,stageKill=0,stageGoal=15,clearT=0,clearStage=0,clearSub="";
@@ -52,9 +53,10 @@ function build_blizzard(api){
   const SHAPE_POOL_RARE=["icicle","block","snowman","round"]; // キン/にじは丸に偏らせない
   function pickShape(rare){return rare?pick(SHAPE_POOL_RARE):pick(SHAPE_POOL);}
   // spawn a snow block somewhere on the field (avoid the engine HUD corners)
-  function spawnSnow(){
-    if(snows.length>=46)return;
+  function spawnSnow(px,py){
+    if(snows.length>=24){ if(px===undefined)return; snows.shift(); } // 位置指定(保険の出現)のときは 古い雪玉をひとつ消して場所をあける
     let x=rnd(api.W*0.1,api.W*0.9), y=rnd(api.H*0.22,api.H*0.86);
+    if(px!==undefined){x=clamp(px,R*1.2,api.W-R*1.2);y=clamp(py,api.H*0.22,api.H*0.86);}
     // keep clear of top corners (engine chrome zone): y<70 near edges
     if(y<90){ x=clamp(x,140,api.W-140); }
     // ① にじいろブロック: 数%の激レア。虹色に脈打ち 一撃で大量得点＋ゲージが一気にたまる。
@@ -68,7 +70,7 @@ function build_blizzard(api){
     const r=szr<0.2?rnd(R*1.3,R*1.7):szr<0.4?rnd(R*0.45,R*0.65):rnd(R*0.7,R*1.05);
     // ぼんぼり(ラッキー色の手がかり)は 顔のある丸/だるまのときだけ意味を持つ
     const hasPom=type==="snow"&&(shape==="round"||shape==="snowman");
-    snows.push({x,y,vx:0,vy:0,r,type,shape,
+    snows.push({x,y,vx:0,vy:0,dir:rnd(0,TAU),r,type,shape,
       rot:rnd(0,TAU),vr:rnd(-0.04,0.04),wob:rnd(0,TAU),flung:false,
       face:Math.random()<0.5,col:pick(SNOWCOL),pom:hasPom?pick(POM):null});
     if(type==="gold"){ // announce the rare one: chime + gold ring + glints
@@ -85,7 +87,9 @@ function build_blizzard(api){
     }
   }
   // pre-seed a field
-  for(let i=0;i<14;i++)spawnSnow();
+  // 最初の得点が遅れないよう 3個は中央の帯に置く(あとの7個は画面全体)
+  for(let i=0;i<3;i++)spawnSnow(rnd(api.W*0.3,api.W*0.7),rnd(api.H*0.35,api.H*0.7));
+  for(let i=0;i<7;i++)spawnSnow();
   function shatter(b){
     const gold=b.type==="gold";
     const hx=b.x,hy=b.y,col=gold?"#ffd23f":b.type==="ice"?"#bfe8ff":"#ffffff";
@@ -148,7 +152,7 @@ function build_blizzard(api){
       shards.push({x:api.W/2,y:api.H*0.42,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,s:rnd(5,11),
         rot:rnd(0,TAU),vr:rnd(-0.3,0.3),life:1,decay:rnd(0.012,0.02),col:pick(["#bfe8ff","#ffffff","#dff0ff"])});}
     // ③ ノンストップ ボーナス: このステージを コンボを切らさず突破したら +5 & みどりの星シャワー。
-    if(stageNonstop){count+=5;api.setScore(count);
+    if(stageNonstop){count+=5;api.setScore(count);quietT=0;
       floats.push({x:api.W/2,y:api.H*0.6,txt:"ノンストップ! +5",life:1,vy:-0.6,col:"#7be08a",size:30});
       api.tone(1318,0.16,"triangle",0.1);api.tone(1976,0.18,"triangle",0.07);
       for(let i=0;i<16;i++){const a=rnd(0,TAU),s=rnd(3,8);
@@ -176,7 +180,7 @@ function build_blizzard(api){
   function catchStar(){
     if(!shootStar||shootStar.caught)return;
     shootStar.caught=true;shootStar.life=Math.min(shootStar.life,0.3);
-    count+=3;api.setScore(count);
+    count+=3;api.setScore(count);quietT=0;
     api.tone(1318,0.12,"triangle",0.1);api.tone(1760,0.14,"triangle",0.08);api.tone(2093,0.16,"triangle",0.06);
     for(let k=0;k<14;k++){const a=rnd(0,TAU);
       glints.push({x:shootStar.x,y:shootStar.y,vx:Math.cos(a)*rnd(4,9),vy:Math.sin(a)*rnd(4,9),life:1,r:rnd(2,4.5)});}
@@ -188,6 +192,7 @@ function build_blizzard(api){
       if(type!=="down")return;
       // ④ ながれ星が 近くにいたら キャッチ(タップは そのままトルネードも作る=操作は変わらない)
       if(shootStar&&!shootStar.caught&&Math.hypot(x-shootStar.x,y-shootStar.y)<R*2.4)catchStar();
+      lastTap={x,y};
       makeVortex(x,y);
     },
     frame(dt,now){
@@ -263,7 +268,16 @@ function build_blizzard(api){
       // ---- spawn snow blocks over time ----
       if(clearT<=0){
         spawnT-=dt;
-        if(spawnT<=0){spawnSnow();spawnT=fever>0?9:clamp(30-(stage-1)*2,14,30);}   // 7〜8歳向け: 出現を少し速く
+        if(spawnT<=0){spawnSnow();spawnT=fever>0?14:clamp(55-(stage-1)*4,30,55);}   // 7〜8歳向け: 出現を少し速く
+      }
+      // 無得点が6秒つづいたら 最後に押した所の近くに雪玉を2個(なにも起きない時間を作らない保険)
+      quietT+=dt;
+      if(quietT>(count===0?150:360)&&lastTap&&clearT<=0){ // 最初の1点だけは 2.5秒で助ける(ふつうは6秒)
+        const lx=lastTap.x,ly=lastTap.y;
+        // 押した所に小さなトルネードを もう一度出し、その中(到達半径の内側)に雪玉を2個おく=必ず当たりが来る
+        makeVortex(lx,ly);
+        for(let k=0;k<2;k++){const a=rnd(0,TAU),d=rnd(R*0.5,R*0.9);spawnSnow(lx+Math.cos(a)*d,ly+Math.sin(a)*d);}
+        quietT=count===0?60:240;
       }
       // keep field populated even if smoke spams clears
       if(snows.length<6&&clearT<=0)spawnSnow();
@@ -292,7 +306,7 @@ function build_blizzard(api){
         let nearest=null,nd=1e9;
         for(const v of vortices){
           const dx=v.x-b.x,dy=v.y-b.y,d=Math.hypot(dx,dy)||1;
-          const reach=R*(1.2+v.power*0.9);
+          const reach=R*(1.0+v.power*0.7);
           if(d<reach){
             const f=(1-d/reach)*(0.5+v.power*0.45);
             // swirl: pull inward + tangential spin
@@ -303,6 +317,8 @@ function build_blizzard(api){
             if(d<nd){nd=d;nearest=v;}
           }
         }
+        // ふらふら漂う(止まった的ではなく、少し先を見て押す的にする)
+        b.dir+=rnd(-0.03,0.03)*dt;b.vx+=Math.cos(b.dir)*0.04*dt;b.vy+=Math.sin(b.dir)*0.04*dt;
         // friction
         b.vx*=0.94;b.vy*=0.94;
         b.x+=b.vx*dt;b.y+=b.vy*dt;
@@ -322,7 +338,7 @@ function build_blizzard(api){
             const isLucky=b.type==="snow"&&b.pom===luckyColor;
             if(isLucky){gain+=1;if(!luckySeen){luckyMsgT=1.8;luckySeen=true;}}
             if(fever>0)gain*=2; // fever: double points
-            count+=gain;stageKill++;api.setScore(count);
+            count+=gain;stageKill++;api.setScore(count);quietT=0;
             if(b.type==="gold"){ // jackpot! fanfare + big flash
               flash=Math.min(1,flash+0.5);api.boom(0.6);api.shake(12);
               [0,4,7,12].forEach((s2,i2)=>setTimeout(()=>api.tone(784*Math.pow(2,s2/12),0.14,"triangle",0.12),i2*70));
@@ -564,7 +580,9 @@ function build_blizzard(api){
         g.lineWidth=2+ri.life*3;g.beginPath();g.arc(ri.x,ri.y,ri.r,0,TAU);g.stroke();g.restore();}
       rings=rings.filter(ri=>ri.life>0);
       // ---- combo floats ----
-      for(const f of floats){f.y+=f.vy*dt;f.life-=0.02*dt;g.globalAlpha=Math.max(0,f.life);
+      for(const f of floats){f.y+=f.vy*dt;f.life-=0.02*dt;
+        if(clearT>0&&f.y>api.H*0.3&&f.y<api.H*0.58)continue; // クリア帯の下で文字が半分隠れないよう、帯の間は描かない
+        g.globalAlpha=Math.max(0,f.life);
         g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.lineWidth=6;g.strokeStyle="rgba(40,70,110,.6)";g.strokeText(f.txt,f.x,f.y);
         g.fillStyle=f.col;g.fillText(f.txt,f.x,f.y);}

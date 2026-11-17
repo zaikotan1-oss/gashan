@@ -84,7 +84,7 @@ function buildSlash(api){
   function spawnBoss(){
     const r=clamp(api.W*0.12,60,96);
     boss={x:api.W/2,y:api.H+r,vx:0,vy:-Math.sqrt(2*grav*(api.H*0.62)),r,t:"boss",
-      skin:"#c0392b",flesh:"#ffcaa0",rot:0,vr:0.02,hp:8,maxhp:8,flash:0,settled:false};   // HP 6→8(7〜8歳向け)
+      skin:"#c0392b",flesh:"#ffcaa0",rot:0,vr:0.02,hp:8,maxhp:8,flash:0,settled:false,cd:0};   // HP 6→8(7〜8歳向け)
   }
   // 7. 的の大きさをばらつかせる共通ヘルパー: rBase(従来固定値)を核に毎回サイズをランダム化する。
   // 下限は16(狙いが難しくなりすぎない配慮)・上限は70(軸3/軸6向け: 90だと画面を占有しすぎ、的同士も重なって見づらかったため引き下げ)。
@@ -140,9 +140,9 @@ function buildSlash(api){
   }
   // forceBig: 軸1(さわって分かるか)/軸3(b)向け。開始直後の最初の1体だけは、樽/岩/箱/だんご等の抽選を通さず
   // 確実に大きい(big=true)フルーツを1つ出す。最初の的が大きく・当てやすくなり firstScoreSec を底上げする。
-  function spawn(forceBig,bigMul){
+  function spawn(forceBig,bigMul,fx){
     const gim=curStage().gim;
-    if(forceBig){pushFruit(rnd(api.W*0.18,api.W*0.82),undefined,true,bigMul);return;}
+    if(forceBig){pushFruit(fx!=null?fx:rnd(api.W*0.18,api.W*0.82),undefined,true,bigMul);return;}
     // ① 低確率でにじいろフルーツを予告(すぐには出さず、打ち上げ位置がきらめく=次くるかものドキドキ)
     // 軸4(飽きない変化)向け: ステージ1以降限定だったのを外し、ステージ0滞在中でもレア演出に当たるチャンスを残す
     // 軸3(歯ごたえ)向け: 予告演出が出た瞬間でも的の供給が途切れないよう、returnせず通常スポーンへ続ける
@@ -259,7 +259,7 @@ function buildSlash(api){
         sparks.push({x:o.x,y:o.y-o.r*0.5,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1,life:1,decay:rnd(0.03,0.05),len:rnd(6,12),col:luckyColor});}
       floats.push({x:o.x,y:o.y-40,txt:"ラッキー！",life:1,vy:-1.1,col:luckyColor,size:30,scl:0});
       // 軸6(見やすさ)向け: にじいろメッセージ(rbMsgT)表示中は同時発火させず、1テンポ遅らせて文字の重なりを防ぐ
-      if(!luckySeen&&rbMsgT<=0){luckyMsgT=1.9;luckySeen=true;}
+      if(!luckySeen&&rbMsgT<=0&&banner==null&&stageCut<stageQuota){luckyMsgT=1.9;luckySeen=true;}
     }
     // 3. 安全な樽 命中: 木の香りのする低めの心地よい音＋緑のごほうび表示(危険な樽との違いを音でも明示)
     if(isSafeBarrel){
@@ -311,8 +311,8 @@ function buildSlash(api){
   }
   // a cut object can also be a boss segment: route boss hits separately
   function hitBoss(ang){
-    if(!boss||!boss.settled)return;
-    boss.hp--;boss.flash=1;combo++;comboT=0.7;
+    if(!boss||!boss.settled||boss.cd>0)return;   // 軸6: 無敵時間(約0.37秒)。1回のスワイプで「のこり◯」が積み重なって読めなくなる/HP8が一瞬で消えるのを防ぐ
+    boss.hp--;boss.cd=22;boss.flash=1;combo++;comboT=0.7;
     feverGain(0.1);
     api.shake(10);api.boom&&api.boom(0.35);if(api.hitStop)api.hitStop(4);
     api.slide(700,260,0.16,0.2,"sawtooth");api.tone(300,0.12,"square",0.1);
@@ -322,6 +322,7 @@ function buildSlash(api){
       juice.push({x:boss.x,y:boss.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,r:rnd(3,7),life:1,decay:rnd(0.02,0.035),col:boss.flesh});}
     for(let k=rint(10,14);k>0;k--){const a=ang+rnd(-0.6,0.6)+(Math.random()<0.5?0:Math.PI),s=rnd(5,11);
       sparks.push({x:boss.x,y:boss.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,decay:rnd(0.05,0.09),len:rnd(8,16),col:"#fff0a0"});}
+    floats=floats.filter(f=>!/^のこり/.test(f.txt));   // 保険: 前回の「のこり」は外してから出す
     floats.push({x:boss.x,y:boss.y-boss.r,txt:boss.hp>0?"のこり"+boss.hp:"やった！",life:1,vy:-1.1,col:"#ffd23f",size:40,scl:0});
     if(boss.hp<=0){
       // boss defeated: huge celebration, count toward clear
@@ -495,7 +496,7 @@ function buildSlash(api){
             // 以前は3体目が60%抽選だったため運悪く2体しか出ない回があり、firstScoreSecの中央値が3.15秒と
             // 合格線(<=3秒)をわずかに超えていた。数を固定した上で、さらにbigMul=1.8で通常のbig(1.5倍)より
             // 一回り大きく・当てやすくして最初のタップの命中率を底上げする。
-            spawn(true,1.8);spawn(true,1.8);spawn(true,1.8);
+            spawn(true,1.8,api.W*(0.25+rnd(-0.05,0.05)));spawn(true,1.8,api.W*(0.5+rnd(-0.05,0.05)));spawn(true,1.8,api.W*(0.75+rnd(-0.05,0.05)));   // 3体を左・中・右に散らして最初の一太刀が必ずどれかに届くように
           }else{
             spawn();if(Math.random()<0.35+Math.min(stage*0.06,0.3))spawn();
           }
@@ -515,7 +516,7 @@ function buildSlash(api){
       if(stageCut>=stageQuota&&banner==null&&winT<=0&&boss==null){nextStage();}
       // update + draw boss
       if(boss){
-        boss.flash*=Math.pow(0.86,dt);
+        boss.flash*=Math.pow(0.86,dt);boss.cd=Math.max(0,(boss.cd||0)-dt);
         if(!boss.settled){
           boss.vy+=grav*f*0.6;boss.y+=boss.vy*f;
           if(boss.vy>=0&&boss.y>=api.H*0.34){boss.settled=true;boss.vy=0;spawnBanner("ボスを なんかい きろう！",0.9);}

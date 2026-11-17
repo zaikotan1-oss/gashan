@@ -243,6 +243,7 @@ function build_snowball(api){
   function checkStage(){
     if(stageKill<stageGoal||clearT>0)return;
     clearStage=stage; clearT=1.6; flash=Math.min(1,flash+0.6); flashCol="#dff4ff";
+    feverBannT=0;   // 軸6: 先に出ていたフィーバーのバナー(H*0.4)を消し、クリア見出し(H*0.45)と文字が重ならないようにする(状態はHUDの「フィーバー！」で伝わる)
     api.boom(0.5); api.shake(12);
     api.slide(523,784,0.3,0.2,"triangle"); api.tone(660,0.25,"triangle",0.14);
     api.tone(988,0.3,"triangle",0.1);

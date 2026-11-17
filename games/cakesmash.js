@@ -31,8 +31,7 @@ function build_cakesmash(api){
     {name:"ソーダ",  sponge:["#b0e0ff","#9ed6ff","#c4e8ff","#8accff"],  cream:["#eef8ff","#e0f2ff","#f4fbff","#d6ecff"]}
   ];
   function flavor(){return FLAVORS[(stage-1)%FLAVORS.length];}
-  function goalFor(s){return 4+Math.min(s,5);}      // 5,6,7,8,9, then 9（7〜8歳向けに手応えを増やした）
-  let stageGoal=goalFor(1),stageSmash=0;
+  let stageGoal=1,stageSmash=0;   // stageGoal は newCake() で「そのケーキの段数」に合わせる(HUD の あと N がうそを言わない)
 
   // ---- 隠し発見レイヤー(ハンマー/トラックと同じ思想) ----
   const FRUITNAME=["あか","オレンジ","きいろ","むらさき","みずいろ","ピンク"]; // FRUIT と同じ並び
@@ -49,7 +48,7 @@ function build_cakesmash(api){
     baseY=H*0.86;
     // reposition any existing tiers to the new geometry
     for(let i=0;i<tiers.length;i++){const t=tiers[i];
-      t.w=tierW*(0.55+0.5*(i/Math.max(tiers.length-1,1)))*(t.big?1.4:1);
+      t.w=tierW*(0.55+0.5*(1-i/Math.max(tiers.length-1,1)))*(t.big?1.4:1);
       t.x=baseX; t.y=baseY-(i+0.5)*tierH;}
     buildMotes();
   }
@@ -75,7 +74,7 @@ function build_cakesmash(api){
       if(gold)hasGold=true;
       tiers.push({
         i, x:baseX, y:baseY-(i+0.5)*tierH,
-        w:tierW*(0.55+0.5*frac),     // wider at bottom（軸7: レンジを広げて段差をはっきり）
+        w:tierW*(0.55+0.5*(1-frac)),     // wider at bottom（軸7: レンジを広げて段差をはっきり）
         sponge:rb?"#ff5da2":(gold?"#ffd23f":pick(fl.sponge)), cream:rb?"#ffffff":(gold?"#fff2b0":pick(fl.cream)),
         hp:(!gold&&!rb&&stage>=3&&i<n-1&&Math.random()<0.4)?2:1,  // some tiers need 2 taps later（7〜8歳向けに手応えを増やした）
         wob:0, hit:0, bob:rnd(0,TAU), dead:false, gold, rb, big:false, shape:"block",
@@ -112,7 +111,7 @@ function build_cakesmash(api){
       if(!cand.length)for(let i=0;i<n;i++)if(!tiers[i].gold&&!tiers[i].rb)cand.push(i);
       if(cand.length){const bi=pick(cand);tiers[bi].big=true;tiers[bi].w*=1.4;}
     }
-    stageGoal=goalFor(stage);
+    stageGoal=tiers.length;   // 目標=実際の段数。最後の1段でゲージが満タンになる
     stageSmash=0;
     stageMiss=0;   // ③ パーフェクト判定: 新しいステージの ミスタップ数をリセット
   }
@@ -188,6 +187,8 @@ function build_cakesmash(api){
       sparks.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,len:rnd(6,12),life:1,decay:rnd(0.06,0.1)});}
   }
 
+  // ドーナツ段の外半径(見た目も当たり判定もこれ1本。下の段を隠しすぎないよう上限 H*0.24)
+  function rOut(t){return Math.max(2,Math.min(t.w,H*0.24)*0.46);}
   function topTier(){
     for(let i=tiers.length-1;i>=0;i--) if(!tiers[i].dead) return tiers[i];
     return null;
@@ -253,7 +254,8 @@ function build_cakesmash(api){
       api.tone(1046,0.14,"triangle",0.1);api.tone(1568,0.16,"triangle",0.08);
       for(let i=0;i<7;i++){const a=rnd(-TAU*0.5,0),s=rnd(2,6);
         sparks.push({x,y:y-tierH*0.4,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,len:rnd(6,12),life:1,decay:rnd(0.04,0.07)});}
-      if(!luckySeen){luckyMsgT=1.8;luckySeen=true;}else luckyMsgT=Math.max(luckyMsgT,0.7);
+      if(fever>FEVER_LEN-1.5){/*フィーバー開始直後は中央の文言を出さない*/}
+      else if(!luckySeen){luckyMsgT=1.8;luckySeen=true;}else luckyMsgT=Math.max(luckyMsgT,0.7);
       floats.push({x,y:y-tierH*0.7,txt:"ラッキー！",life:1,vy:-1,col:FRUIT[luckyColor],size:22});
     }
     if(feverGauge>=1&&fever<=0)startFever();
@@ -280,6 +282,8 @@ function build_cakesmash(api){
   }
 
   function startFever(){
+    if(luckyMsgT>1.2)luckySeen=false;   // 初回の長いヒントを消す時は、あとでもう一度出せるように戻す
+    luckyMsgT=0;   // フィーバー文言(H*0.32)と ラッキー文言(H*0.30)を重ねない
     fever=FEVER_LEN;feverGauge=0;
     flash=1;flashCol="#ff9af0";shockT=1;
     api.boom(0.7);api.shake(18);hstop(6);
@@ -351,7 +355,9 @@ function build_cakesmash(api){
       const t=topTier();
       if(t){
         // 軸3(歯ごたえ): 連打で当たり続けないよう吸着範囲を絞る(縦方向の余白が特に広かった)
-        const within=Math.abs(x-t.x)<t.w*0.5 && Math.abs(y-t.y)<tierH*0.9+H*0.04;
+        const within=(t.shape==="donut")
+          ? (Math.abs(x-t.x)<rOut(t)*1.05 && Math.abs(y-t.y)<rOut(t)+H*0.02)   // 見た目の輪っかどおりに当たる
+          : (Math.abs(x-t.x)<Math.max(t.w,tierW*0.8)*0.5 && Math.abs(y-t.y)<tierH*0.9+H*0.04);
         if(within){ smashTier(t,false); return; }
       }
       // ④ ひみつ発見: ケーキに当たらなかったタップが 空にただよう おかし に届いたら、
@@ -460,7 +466,7 @@ function build_cakesmash(api){
       // ① にじいろ接近の予告: このケーキに にじいろ段 が残っていたら、上に虹の予告マーク(=次くるかもの ドキドキ)
       const rbTier=tiers.find(t=>!t.dead&&t.rb);
       if(rbTier&&clearT<=0&&finaleT<=0){
-        const mx=baseX, my=(tt?tt.y:baseY)-tierH*1.5, pulse=0.5+0.5*Math.sin(tsec*6);
+        const mx=baseX, my=(tt?tt.y-(tt.shape==="donut"?rOut(tt)-tierH*0.5:0):baseY)-tierH*1.5, pulse=0.5+0.5*Math.sin(tsec*6);
         const RBC=["#ff5da2","#ff8a3a","#ffd23f","#7be08a","#36c9ff","#b066ff"];
         g.save();g.lineCap="round";g.lineJoin="round";
         g.globalAlpha=0.4+0.35*pulse;g.lineWidth=3;
@@ -782,7 +788,7 @@ function build_cakesmash(api){
   // 軸7(壊す物のバラエティ): 丸いドーナツ形の段。台形の箱ではなく輪っか状=シルエットからして別物。
   function drawDonutTier(t){
     const x=t.x,y=t.y,h=tierH;
-    const rOuter=Math.max(2,Math.min(t.w,H*0.34)*0.46);
+    const rOuter=rOut(t);
     const rInner=Math.max(0,rOuter*0.4);
     const wob=Math.sin(tsec*8)*t.wob*0.14;
     const sx=1+t.wob*0.12, sy=1-t.wob*0.1;
@@ -869,7 +875,7 @@ function build_cakesmash(api){
   }
 
   function drawCherry(t){
-    const x=t.x,y=t.y-tierH*0.5,bob=Math.sin(tsec*3+t.i)*tierH*0.04;
+    const x=t.x,y=t.y-(t.shape==="donut"?rOut(t):tierH*0.5),bob=Math.sin(tsec*3+t.i)*tierH*0.04;
     g.save();g.translate(x,y+bob);
     // cherry.png は生成2回とも不良(茎の付け根に台座/二重出力)のため手描き固定
     // stem
@@ -952,9 +958,9 @@ function build_cakesmash(api){
       g.fillStyle=cg;roundRect(gx,gy,Math.max(gh,gw*gf),gh,gh/2);g.fill();g.restore();
     }
     g.strokeStyle="rgba(255,255,255,.6)";g.lineWidth=1.5;roundRect(gx,gy,gw,gh,gh/2);g.stroke();
-    g.font="800 12px 'Hiragino Maru Gothic ProN',system-ui";
+    g.font="800 15px 'Hiragino Maru Gothic ProN',system-ui";
     g.fillStyle=fever>0?"#ff2bff":"#a8447a";
-    g.fillText(fever>0?"フィーバーちゅう！":"フィーバー",W/2,gy+gh+13);
+    g.fillText(fever>0?"フィーバーちゅう！":"フィーバー",W/2,gy+gh+16);
     g.restore();g.textAlign="left";
   }
 

@@ -21,6 +21,7 @@ function build_fireball(api){
   let stageMiss=0,perfectT=0;   // ③ パーフェクト判定(いわを 1つも にがさない)
   let shootStar=null;           // ④ ながれ星ひみつ (撃つとごほうび)
   let firstSpawnDone=false;     // 軸3: 開始直後の1個目だけ近く速く出して最初の成功を早める
+  let lastGainT=0,lastCountSeen=0;   // 軸3: 6秒以上 得点が止まったら、次の岩をゆっくり画面中央に出して助ける(失敗しても叱らない)
   let lastFireT=-999;           // 軸3: 直前の発射時刻(間を置かないマッシュ連打の検出用)
   // hexカラー -> rgba文字列 (虹グラデの addColorStop 用: 非有限/負を出さない)
   function hexA(h,a){const n=parseInt(h.slice(1),16);const r=(n>>16)&255,gg=(n>>8)&255,b=n&255;
@@ -46,10 +47,11 @@ function build_fireball(api){
   function rockType(){
     // ⑦(壊す物のバラエティ): 丸い隕石(orb)と小さい生き物(imp)を追加し、全部ジグザグ岩の色違いで
     // 終わらないようにする(orbは形が違う/impは生き物枠。詳細はdrawRock参照)。
-    const bag=["rock","rock","orb"];
-    if(stage>=2){bag.push("big");bag.push("imp");}
+    // 1面から 岩・まる・いきもの(imp) の3つの形を混ぜる。2面からでかい岩とUFO、4面から3段の giant
+    const bag=["rock","orb","imp"];
+    if(stage>=2){bag.push("big");bag.push("ufo");}
     if(stage>=3)bag.push("fast");
-    if(stage>=4){bag.push("big");bag.push("fast");}
+    if(stage>=4){bag.push("big");bag.push("fast");bag.push("giant");}
     return pick(bag);
   }
   function spawnRock(){
@@ -57,10 +59,14 @@ function build_fireball(api){
     // 抽選ロジック自体(乱数を消費する順序)は変えず、生成された岩を最後に上書きするだけにして、
     // このフラグの有無でその後のプレイ全体の乱数列がずれてしまわないようにする。
     const isFirst=!firstSpawnDone;firstSpawnDone=true;
+    const pity=!isFirst&&!boss&&bossWarnT<=0&&(tsec-lastGainT)>6;
+    if(pity)lastGainT=tsec;   // 助けの岩は 6秒おきまで
     function boostFirst(rk,fromLeft){
-      if(!isFirst)return rk;
-      rk.x=fromLeft?-baseR*0.3:api.W+baseR*0.3;
-      rk.vx*=1.3;
+      if(!isFirst&&!pity)return rk;
+      // 画面の中に最初から見える場所で、ゆっくり漂う(迷わず狙える・最初の成功を早める)
+      rk.x=fromLeft?api.W*0.32:api.W*0.68;
+      rk.y=api.H*0.5;
+      rk.vx*=pity?0.6:0.55;rk.vy=0.05;if(pity)rk.y=api.H*rnd(0.35,0.5);
       return rk;
     }
     // ① にじいろいんせき (約3.5%): 激レア。ゆっくり漂い虹色に光る。倒すと +8 と虹の大盤振る舞い。
@@ -81,7 +87,7 @@ function build_fireball(api){
         vx:(fl?1:-1)*rnd(0.8,1.3),vy:rnd(0.05,0.2),r:baseR*0.95,hp:1,type:"gold",
         rot:rnd(0,TAU),vr:rnd(-0.03,0.03),wob:rnd(0,TAU),hit:0},fl));
       api.tone(1318,0.1,"triangle",0.12);api.tone(1760,0.16,"triangle",0.1); // spawn glint chime
-      floats.push({x:api.W/2,y:api.H*0.3,txt:"ゴールドいんせき！",life:1,vy:-0.6,col:"#ffd23f",size:26});
+      floats.push({x:api.W/2,y:api.H*0.26,txt:"ゴールドいんせき！",life:1,vy:-0.6,col:"#ffd23f",size:26});
       return;
     }
     const type=rockType();
@@ -92,12 +98,16 @@ function build_fireball(api){
     if(type==="big"){hp=2;r=baseR*1.25;spd*=0.7;}
     else if(type==="fast"){r=baseR*0.66;spd*=1.7;}
     else if(type==="orb"){r=baseR*0.8;spd*=1.1;}          // ⑦ まん丸い隕石(ジグザグ多角形とは違う形の枠)
-    else if(type==="imp"){hp=1;r=baseR*0.62;spd*=0.85;}   // ⑦ 小さい生き物(顔つき・ジグザグ移動で岩と区別)
+    else if(type==="imp"){hp=1;r=baseR*0.72;spd*=0.85;}   // ⑦ 小さい生き物(顔つき・ジグザグ移動で岩と区別)
+    else if(type==="ufo"){hp=1;r=baseR*0.9;spd=rnd(0.8,1.3);}   // 円盤: 横にゆっくり・上下にゆれる(隕石以外)
+    else if(type==="giant"){hp=3;r=baseR*1.7;spd*=0.5;}          // 3段重ねの特大: 1発ごとに上の段から崩れる
     // gentle arc toward cannon side, drifting downward
     const dir=fromLeft?1:-1;
     // ② いわには宝石のコアが埋まっている。色は毎回ランダム(そのうち1色が今日のラッキー)。impは生き物なので宝石なし。
-    rocks.push(boostFirst({x,y,vx:dir*spd,vy:rnd(0.1,0.4),r,hp,type,gem:type==="imp"?null:pick(GEMS),
-      rot:rnd(0,TAU),vr:type==="imp"?0:rnd(-0.04,0.04),wob:rnd(0,TAU),hit:0},fromLeft));
+    const still=type==="imp"||type==="ufo"||type==="giant";   // 回転しない物
+    rocks.push(boostFirst({x,y:type==="giant"?clamp(y,api.H*0.3,api.H*0.55):y,vx:dir*spd,vy:type==="ufo"?rnd(0.02,0.12):rnd(0.1,0.4),r,hp,type,
+      gem:(type==="imp"||type==="ufo")?null:pick(GEMS),
+      rot:still?0:rnd(0,TAU),vr:still?0:rnd(-0.04,0.04),wob:rnd(0,TAU),hit:0},fromLeft));
   }
   function fire(tx,ty,power){
     aimX=tx;aimY=ty;
@@ -110,11 +120,14 @@ function build_fireball(api){
     // 軸3(狙わない連打を弱める): 「直前の弾からほとんど間を置かず・ろくに溜めもせず」撃った
     // 弾だけ当たり判定を絞る(狙わないマッシュ連打を狙い撃ち)。ゲーム開始いちばん最初の1発や、
     // 間隔をあけて撃つ・しっかり溜めて撃つ弾はこれまで通り当てやすいまま(最初の成功を遅らせない)。
-    const spamTap=(tsec-lastFireT)<0.5&&power<0.45;
+    // 最初の成功が決まるまでは(count<2)絞らない。間隔0.7秒以内・溜めなしの連打だけ当たり判定を絞る
+    const rescue=(tsec-lastGainT)>4.5;   // 4.5秒以上 得点が止まっている間は、判定を広げて あと少しを助ける
+    const spamTap=(tsec-lastFireT)<0.7&&power<0.45&&count>=2&&!rescue;
+    const firstShot=(count===0&&stageKill===0)?1.15:(rescue?1.0:0);   // 最初の成功だけは判定を広げる
     lastFireT=tsec;
     balls.push({x:cannonX,y:cannonY-baseR*0.7,
       vx:Math.cos(ang)*speed,vy:Math.sin(ang)*speed,
-      r,life:0.8,big,tightHit:spamTap,trail:[]});
+      r,life:0.8,big,tightHit:spamTap,firstShot,trail:[]});
     api.slide(big?260:420,90,0.18+power*0.12,0.28,"sawtooth");
     api.noise(0.12,0.12,big?700:1400,"bandpass",0.7);
     if(big){api.boom(0.4);api.shake(5);}else api.shake(2);
@@ -162,7 +175,19 @@ function build_fireball(api){
       if(hsCd<=0){api.hitStop(5);hsCd=30;}
       rk._dead=true;checkStage();return;
     }
-    if(rk.type==="big"){
+    if(rk.type==="ufo"){
+      // 円盤: ドームと本体で2回ガシャン + 金属色の破片
+      burst(rk.x,rk.y-rk.r*0.3,rk.r*0.6,"#9ad0ff",false);
+      burst(rk.x,rk.y+rk.r*0.1,rk.r*0.9,"#ff9a3a",false);
+      for(let i=0;i<14;i++){const a=rnd(0,TAU),s=rnd(3,10);
+        shards.push({x:rk.x,y:rk.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,r:rnd(3,6),
+          rot:rnd(0,TAU),vr:rnd(-0.5,0.5),life:1,decay:rnd(0.012,0.022),col:i%2?"#9ad0ff":"#ffffff"});}
+    }else if(rk.type==="giant"){
+      // 最後に残った一番下の段が くずれる(上の段は hitRock で崩し済み)
+      burst(rk.x,rk.y+rk.r*0.5,rk.r*0.5,"#ff5a2a",true);
+      burst(rk.x-rk.r*0.25,rk.y+rk.r*0.4,rk.r*0.35,"#cfa080",false);
+      burst(rk.x+rk.r*0.25,rk.y+rk.r*0.4,rk.r*0.35,"#cfa080",false);
+    }else if(rk.type==="big"){
       // ⑤「つみきが くずれる」演出: 上段/下段を別々にburst()して段ごとに壊れる見せ方にする(座標は
       // drawRockの積み重ね描画オフセットに合わせる)。fastの吹っ飛ぶ・normalの砕けるとは違う3つ目の壊れ方。
       burst(rk.x-rk.r*0.14,rk.y-rk.r*0.52,rk.r*0.7,"#ff5a2a",true);
@@ -177,7 +202,7 @@ function build_fireball(api){
         shards.push({x:rk.x,y:rk.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,r:rnd(3,7),
           rot:rnd(0,TAU),vr:rnd(-0.5,0.5),life:1,decay:rnd(0.014,0.022),col:"#ffb060"});}
     }
-    let gain=rk.type==="big"?3:rk.type==="fast"?2:rk.type==="imp"?2:1;
+    let gain=rk.type==="giant"?5:rk.type==="big"?3:(rk.type==="fast"||rk.type==="imp"||rk.type==="ufo")?2:1;
     // ② きょうのラッキーいろ: いわの宝石が今日の秘密の色なら +1 のかくれボーナス。気づくと得する。
     const isLucky=rk.gem===luckyColor;
     if(isLucky)gain+=1;
@@ -271,6 +296,14 @@ function build_fireball(api){
       burst(bx,by,rk.r*0.6,"#cfa080",false);
       return false;
     }
+    if(rk.type==="giant"&&rk.hp>1){
+      // 3段積み: 1発ごとに一番上の段だけが崩れて散る
+      const ty=rk.y+rk.r*(0.5-(rk.hp-1)*0.5);
+      rk.hp--;
+      api.slide(300,160,0.1,0.2,"square");api.noise(0.08,0.14,1200);api.shake(6);
+      burst(rk.x,ty,rk.r*0.5,"#ff5a2a",true);
+      return false;
+    }
     destroyRock(rk);
     return true;
   }
@@ -288,6 +321,7 @@ function build_fireball(api){
     },
     frame(dt,now){
       tsec+=0.016*dt;
+      if(count!==lastCountSeen){lastCountSeen=count;lastGainT=tsec;}
       if(hsCd>0)hsCd-=dt;
       const paused=clearT>0||endingT>0;
       // ---- background: volcano sky gradient ----
@@ -367,12 +401,14 @@ function build_fireball(api){
         if(boss.hit>0)boss.hit=Math.max(0,boss.hit-0.07*dt);
       }
       // ---- spawn rocks ----
-      if(!paused){spawnT-=dt;if(spawnT<=0){spawnRock();spawnT=clamp(76-(stage-1)*9,34,76);}}   // 出現間隔 約2割短縮
+      if(!paused){spawnT-=dt;if(spawnT<=0){const wasFirst=!firstSpawnDone;spawnRock();   // 最初の1個の直後は2個目も早く出す
+        spawnT=wasFirst?18:clamp(76-(stage-1)*9,34,76);}}   // 出現間隔 約2割短縮
       // ---- update & draw rocks ----
       for(const rk of rocks){
         if(!paused){
           rk.x+=rk.vx*dt;rk.y+=rk.vy*dt;
           if(rk.type==="imp")rk.y+=Math.sin(tsec*5+rk.wob)*0.9*dt; // ⑦ imp: vyにsin波を足してジグザグに飛ばす(いわと区別)
+          if(rk.type==="ufo")rk.y+=Math.sin(tsec*3+rk.wob)*0.7*dt;   // ufo: 上下にふわふわ
           rk.rot+=rk.vr*dt;rk.wob+=0.08*dt;
         }
         if(rk.hit>0)rk.hit-=0.1*dt;
@@ -406,10 +442,10 @@ function build_fireball(api){
           // collide with rocks
           for(const rk of rocks){
             if(rk._dead)continue;
-            if(Math.hypot(ba.x-rk.x,ba.y-rk.y)<ba.r+rk.r*(ba.tightHit?0.5:0.7)){
+            if(Math.hypot(ba.x-rk.x,ba.y-rk.y)<ba.r+rk.r*(ba.tightHit?0.45:(ba.firstShot||0.7))){
               const killed=hitRock(rk,ba.x,ba.y);
-              if(!ba.big||killed){ba._dead=true;}
-              if(!ba.big)break;
+              if(!ba.big||killed||rk.type==="giant"){ba._dead=true;}
+              if(!ba.big||rk.type==="giant")break;
             }
           }
           // collide with boss (big charged shots deal double damage)
@@ -692,6 +728,53 @@ function build_fireball(api){
       // rim light(輪郭で背景から浮かせる。軸6対応)
       g.strokeStyle="rgba(255,220,140,.4)";g.lineWidth=2;
       g.beginPath();g.arc(0,bob,Math.max(0,r*0.81),Math.PI*1.1,Math.PI*1.8);g.stroke();
+      g.restore();return;
+    }
+    // ufo: そらとぶ円盤。橙の楕円2枚(本体と縁)+ガラスのドーム+窓の光点。いんせきとは別カテゴリ
+    if(rk.type==="ufo"){
+      const bw=Math.max(0,r*1.0),bh=Math.max(0,r*0.36);
+      const bgU=g.createLinearGradient(0,bob-bh,0,bob+bh*1.2);
+      bgU.addColorStop(0,"#ffc070");bgU.addColorStop(0.5,"#ff8a2a");bgU.addColorStop(1,"#a8400f");
+      // dome (本体の後ろに半分見える)
+      const dg=g.createRadialGradient(-r*0.12,bob-r*0.42,r*0.05,0,bob-r*0.3,Math.max(0,r*0.5));
+      dg.addColorStop(0,"rgba(235,248,255,.95)");dg.addColorStop(1,"rgba(110,180,240,.8)");
+      g.fillStyle=dg;g.beginPath();g.ellipse(0,bob-r*0.18,Math.max(0,r*0.45),Math.max(0,r*0.42),0,Math.PI,TAU);g.fill();
+      // body 2枚
+      g.fillStyle="#7a3208";g.beginPath();g.ellipse(0,bob+bh*0.45,bw*0.8,bh*0.7,0,0,TAU);g.fill();
+      g.fillStyle=bgU;g.beginPath();g.ellipse(0,bob,bw,bh,0,0,TAU);g.fill();
+      // 窓の光点(ちかちか)
+      g.save();g.globalCompositeOperation="lighter";
+      for(let i=-1;i<=1;i++){g.globalAlpha=0.55+0.45*Math.sin(tsec*7+i*2+rk.wob);
+        g.fillStyle="#fff6c8";g.beginPath();g.arc(i*bw*0.5,bob+bh*0.05,Math.max(0,r*0.08),0,TAU);g.fill();}
+      g.restore();g.globalAlpha=1;
+      if(rk.hit>0){g.save();g.globalAlpha=rk.hit*0.7;g.globalCompositeOperation="lighter";
+        g.fillStyle="#fff";g.beginPath();g.ellipse(0,bob,bw,bh*1.4,0,0,TAU);g.fill();g.restore();}
+      g.strokeStyle="rgba(255,235,170,.55)";g.lineWidth=2;
+      g.beginPath();g.ellipse(0,bob,bw*0.96,bh*0.94,0,Math.PI*1.05,Math.PI*1.85);g.stroke();
+      g.restore();return;
+    }
+    // giant: 3段に積み重なった特大の岩塊。1発ごとに上の段から崩れて減る
+    if(rk.type==="giant"){
+      for(let i=0;i<rk.hp;i++){
+        const ty=r*(0.5-i*0.5),tr=r*(0.52-i*0.04);
+        const gg=g.createRadialGradient(-tr*0.3,ty-tr*0.3,tr*0.1,0,ty,Math.max(0,tr*1.2));
+        gg.addColorStop(0,"#8a6a58");gg.addColorStop(0.6,"#4e3a2e");gg.addColorStop(1,"#241612");
+        g.fillStyle=gg;g.beginPath();
+        for(let k=0;k<=7;k++){const a=k/7*TAU,rr=tr*(0.84+((k*37+i*11)%10)/10*0.2);
+          const px=Math.cos(a)*rr*1.15,py=ty+Math.sin(a)*rr*0.9+bob;
+          if(k===0)g.moveTo(px,py);else g.lineTo(px,py);}
+        g.closePath();g.fill();
+        g.save();g.globalCompositeOperation="lighter";
+        g.strokeStyle="rgba(255,120,40,"+(0.5+0.3*Math.sin(tsec*4+rk.wob+i))+")";g.lineWidth=Math.max(2,tr*0.08);g.lineCap="round";
+        g.beginPath();g.moveTo(-tr*0.5,ty-tr*0.2);g.lineTo(0,ty+tr*0.05);g.lineTo(tr*0.4,ty-tr*0.25);g.stroke();g.restore();
+        g.strokeStyle="rgba(255,180,90,.3)";g.lineWidth=2;
+        g.beginPath();g.arc(0,ty,Math.max(0,tr*0.95),Math.PI*1.1,Math.PI*1.8);g.stroke();
+      }
+      if(rk.gem){const gr=Math.max(0,r*0.2),gy=r*0.5+bob;
+        g.save();g.shadowColor=rk.gem;g.shadowBlur=8;g.fillStyle=rk.gem;
+        g.beginPath();g.moveTo(0,gy-gr);g.lineTo(gr*0.7,gy);g.lineTo(0,gy+gr);g.lineTo(-gr*0.7,gy);g.closePath();g.fill();g.restore();}
+      if(rk.hit>0){g.save();g.globalAlpha=rk.hit*0.6;g.globalCompositeOperation="lighter";
+        g.fillStyle="#fff";g.beginPath();g.ellipse(0,0,r*0.65,r*1.05,0,0,TAU);g.fill();g.restore();}
       g.restore();return;
     }
     // gold / rainbow: pulsing halo + orbiting sparkles so it instantly reads as special

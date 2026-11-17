@@ -8,6 +8,9 @@ function build_gumball(api){
   let count=0,combo=0,comboT=0,flash=0,flashHue="#fff";
   // フィーバー/レア演出用
   let fever=0,feverGauge=0,feverBann=0,hsCd=0;
+  let hintPulse=0;                 // 止まったボールの「ここをタップ」リングを強く光らせる(はずしたとき)
+  const AUTO_ROLL_SEC=4.0;         // 止まってからこの秒数さわられなければ自動で転がる
+  const RELAUNCH_R=4.0;            // 止まったボールの打ち直しが効く半径(unit倍)
   // ---- 隠し発見レイヤー(クレーン/ハンマー/トラックと同じ思想) ----
   const COLNAME={"#ff7bb5":"ピンク","#5ad0ff":"みずいろ","#ffd23f":"きいろ","#7be08a":"みどり","#ff8c42":"オレンジ","#b58bff":"むらさき","#ff5b8a":"あか","#5be0c0":"みずみどり"};
   let luckyColor=null,luckySeen=false,luckyMsgT=0;          // ② きょうのラッキー色: 秘密の1色(CANDY定義後にlayout付近で確定)
@@ -53,7 +56,7 @@ function build_gumball(api){
       col:pick(["#ffffff","#fff0f6","#eef6ff","#fff6e0"])});
     motes=[];for(let i=0;i<22;i++)motes.push({x:rnd(0,W),y:rnd(0,H),r:rnd(1,3),sp:rnd(0.08,0.4),tw:rnd(0,TAU),col:pick(CANDY)});
     drops=[];for(let i=0;i<6;i++)drops.push({x:rnd(0,W),y:rnd(H*0.06,H*0.36),s:rnd(0.7,1.3),ph:rnd(0,TAU),
-      kind:pick(SWEET_KINDS),col:pick(CANDY),sp:rnd(0.01,0.03),amp:rnd(8,22)});
+      kind:pick(["candy","donut","gummy"]),col:pick(CANDY),sp:rnd(0.01,0.03),amp:rnd(8,22)});
   }
   layout();
 
@@ -96,7 +99,7 @@ function build_gumball(api){
     n=Math.min(n,Math.max(0,110-shards.length)); // 上限管理(60fps維持)
     for(let i=0;i<n;i++){const a=baseA+aMin+rnd(0,aRange),sp=rnd(2,7);
       const useCol=(opts.mixCol&&Math.random()<0.4)?opts.mixCol:col;
-      shards.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-rnd(1,4),s:rnd(sMin,sMax),
+      shards.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-rnd(1,4),s:rnd(sMin,sMax),shape:opts.shape||0,
         col:useCol,rot:rnd(0,TAU),vr:rnd(-0.4,0.4),life:1,decay:rnd(decMin,decMax)});}
   }
   function spawnSparks(x,y,col,n){
@@ -104,6 +107,7 @@ function build_gumball(api){
     for(let i=0;i<n;i++){const a=rnd(0,TAU),sp=rnd(2,8);
       sparks.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:1,decay:rnd(0.03,0.06),s:rnd(1.5,3.5),col});}
   }
+  function addFloat(f){ if(floats.length>=6) floats.shift(); floats.push(f); }  // 同時表示数に上限
   function ringAt(x,y,col){ rings.push({x,y,r:unit*0.5,vr:unit*0.6,life:1,decay:0.05,col}); }
 
   function eatSweet(s){
@@ -127,10 +131,10 @@ function build_gumball(api){
     const hx=s.x,hy=s.y;
     // 軸7: 壊れ方を種類ごとに変える(砕ける/ぷにっと伸びる/弧状に飛ぶ/クリームが混ざる)
     if(s.kind==="choco"){
-      spawnShards(hx,hy,s.col,rint(3,5),{sMin:unit*0.32,sMax:unit*0.55,decMin:0.012,decMax:0.02}); // バキッ: 大きめ少数
+      spawnShards(hx,hy,s.col,rint(3,5),{sMin:unit*0.32,sMax:unit*0.55,decMin:0.012,decMax:0.02,shape:1}); // バキッ: 大きめ少数
       spawnSparks(hx,hy,s.col,rint(3,5));
     }else if(s.kind==="gummy"){
-      spawnShards(hx,hy,s.col,rint(7,10),{sMin:unit*0.12,sMax:unit*0.26,decMin:0.006,decMax:0.011}); // ぷにっと伸びてゆっくり消える
+      spawnShards(hx,hy,s.col,rint(7,10),{sMin:unit*0.12,sMax:unit*0.26,decMin:0.006,decMax:0.011,shape:2}); // ぷにっと伸びてゆっくり消える
       spawnSparks(hx,hy,s.col,rint(4,6));
     }else if(s.kind==="donut"){
       spawnShards(hx,hy,s.col,rint(6,9),{aMin:-Math.PI*0.15,aRange:Math.PI*1.3,baseAngle:Math.PI*0.5}); // 輪の弧状に飛ぶ
@@ -156,16 +160,17 @@ function build_gumball(api){
     // ② ラッキー色命中: 小さめの祝福 + 頭上に小さな星のキラッ(気づけるヒント)
     if(isLucky){
       luckStars.push({x:hx,y:hy-s.r*0.9,vy:-1.2,life:1,r:unit*0.3,rot:0});
-      floats.push({x:hx,y:hy-unit*0.9,txt:"ラッキー！",life:1,vy:-0.9,col:luckyColor,size:22});
+      addFloat({x:hx,y:hy-unit*0.9,txt:"ラッキー！",life:1,vy:-0.9,col:luckyColor,size:22});
       api.tone(1046,0.09,"triangle",0.11);api.tone(1568,0.11,"triangle",0.07);
       luckySeen=true;
     }
-    if(gain>1) floats.push({x:hx,y:hy-unit*0.2,txt:"+"+gain,life:1,vy:-1,
+    // 軸6: 文字は節目だけ(フィーバー中の毎個+2や毎個のxコンボは出さない。コンボはHUDが見せる)
+    if(gain>=3||isLucky) addFloat({x:hx,y:hy-unit*0.2,txt:"+"+gain,life:1,vy:-1,
       col:s.rainbow?"#ff5b8a":s.gold?"#ffd23f":"#ff2bff",size:s.rainbow?36:s.gold?34:26});
-    if(combo>1) floats.push({x:hx,y:hy-unit*0.6,txt:"x"+combo,life:1,vy:-1,
+    if(combo>1&&(combo<=3||combo%5===0)) addFloat({x:hx,y:hy-unit*0.6,txt:"x"+combo,life:1,vy:-1,
       col:combo>=8?"#ff2bff":combo>=5?"#ff5b8a":"#ffd23f",size:combo>=4?38:28});
-    if(ball.eaten===4) floats.push({x:hx,y:hy-unit*1.3,txt:"おおきく なった！",life:1,vy:-0.7,col:"#ffe14a",size:22});
-    if(ball.eaten===8) floats.push({x:hx,y:hy-unit*1.3,txt:"きょだいガムボール！",life:1,vy:-0.7,col:"#ff2bff",size:22});
+    if(ball.eaten===4) addFloat({x:hx,y:hy-unit*1.3,txt:"おおきく なった！",life:1,vy:-0.7,col:"#ffe14a",size:22});
+    if(ball.eaten===8) addFloat({x:hx,y:hy-unit*1.3,txt:"きょだいガムボール！",life:1,vy:-0.7,col:"#ff2bff",size:22});
     checkStage();
   }
 
@@ -219,11 +224,12 @@ function build_gumball(api){
   function checkStage(){
     if(stageEat<stageGoal||clearT>0||endingT>0) return;
     if(stage>=STAGES){
-      endingT=2.6;celebrate=2.4;flash=1;flashHue="#ffd23f";
+      endingT=2.6;celebrate=2.4;flash=1;flashHue="#ffd23f";floats.length=0;
       api.boom(0.7);api.shake(20);
       api.slide(523,1046,0.5,0.22,"triangle");
     }else{
       clearStage=stage;clearT=1.7;celebrate=1.6;flash=0.8;flashHue=sky().c;
+      floats.length=0;   // 軸6: クリア帯の上に文字が重ならないよう消す
       api.boom(0.5);api.shake(12);
       api.slide(523,784,0.3,0.2,"triangle");api.tone(988,0.3,"triangle",0.1);
       for(let i=0;i<22;i++){const a=rnd(0,TAU),sp=rnd(3,9);
@@ -236,7 +242,7 @@ function build_gumball(api){
   function launchBall(){
     // タップでガムボールを坂の下へ転がす
     if(!ball||ball.rolling||ball.done) return;
-    ball.rolling=true;
+    ball.rolling=true;ball.idle=0;
     ball.vx=rnd(2.6,3.6);ball.vy=0.6;
     api.slide(180,320,0.18,0.18,"sine");
     api.tone(520,0.08,"triangle",0.1);
@@ -259,7 +265,17 @@ function build_gumball(api){
         return;
       }
       // タップで転がす。すでに転がり中は「ボールの近くをタップした時だけ」加速が乗る(座標無関係の連打を無効化)
-      if(ball&&!ball.rolling&&!ball.done){ launchBall(); return; }
+      // 軸3: 止まったボールは「ボールをさわって」打ち直す(最初の1発だけは画面のどこでもOK=最初の成功は必ず来る)
+      if(ball&&!ball.rolling&&!ball.done){
+        const nearB=Math.hypot(x-ball.x,y-ball.y)<unit*RELAUNCH_R;
+        if(ball.eaten===0||nearB){ launchBall(); }
+        else{ // はずれても叱らない: ボールがぴかっと光って「ここだよ」と教える
+          hintPulse=1;
+          spawnSparks(x,y,"#ffffff",3);
+          api.tone(380,0.05,"sine",0.05);
+        }
+        return;
+      }
       if(ball&&ball.rolling&&!ball.done){
         const near=Math.hypot(x-ball.x,y-ball.y)<unit*2.0;
         if(near){
@@ -333,7 +349,7 @@ function build_gumball(api){
       for(const d of drops){
         d.ph+=d.sp*dt;d.x+=0.12*d.sp*dt*60;if(d.x>W+30)d.x=-30;
         const dy=d.y+Math.sin(d.ph)*d.amp;
-        g.save();g.globalAlpha=0.5;g.translate(d.x,dy);g.scale(d.s,d.s);
+        g.save();g.globalAlpha=0.35;g.translate(d.x,dy);g.scale(d.s,d.s);
         drawSweet(d.kind,d.col,unit*0.55,tsec);
         g.restore();
       }
@@ -425,6 +441,11 @@ function build_gumball(api){
 
       // ---- ガムボール 更新 ----
       if(ball){
+        // 軸3: 止まったボールを見失っても大丈夫。しばらく放っておくと、ボールが自分でころころ動き出す(無反応の時間を長くしない)
+        if(!ball.rolling&&!ball.done&&ball.eaten>0&&!paused){
+          ball.idle=(ball.idle||0)+0.016*dt;
+          if(ball.idle>AUTO_ROLL_SEC){ ball.idle=0; launchBall(); addFloat({x:ball.x,y:ball.y-ball.r-unit*0.8,txt:"ころころ〜",life:0.9,vy:-0.6,col:"#fff",size:22}); }
+        }
         if(ball.rolling&&!paused){
           // 坂に沿って加速
           ball.vy+=0.32*dt;
@@ -477,7 +498,9 @@ function build_gumball(api){
       for(const p of shards){p.vy+=0.4*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.rot+=p.vr*dt;p.life-=p.decay*dt;
         g.save();g.globalAlpha=Math.max(0,p.life);g.translate(p.x,p.y);g.rotate(p.rot);
         g.fillStyle=p.col;
-        g.beginPath();g.moveTo(0,-p.s*0.5);g.lineTo(p.s*0.5,0);g.lineTo(0,p.s*0.5);g.lineTo(-p.s*0.5,0);g.closePath();g.fill();
+        if(p.shape===1){ g.fillRect(-p.s*0.42,-p.s*0.42,p.s*0.84,p.s*0.84); }                          // チョコ: 四角いかけら
+        else if(p.shape===2){ g.beginPath();g.arc(0,0,Math.max(0,p.s*0.45),0,TAU);g.fill(); }              // グミ: 丸いぷにぷに
+        else{ g.beginPath();g.moveTo(0,-p.s*0.5);g.lineTo(p.s*0.5,0);g.lineTo(0,p.s*0.5);g.lineTo(-p.s*0.5,0);g.closePath();g.fill(); }
         g.fillStyle="rgba(255,255,255,.4)";g.beginPath();g.arc(-p.s*0.12,-p.s*0.12,p.s*0.14,0,TAU);g.fill();
         g.restore();}
       shards=shards.filter(p=>p.life>0);
@@ -534,9 +557,20 @@ function build_gumball(api){
         g.save();g.globalAlpha=0.5+0.4*a;g.textAlign="center";
         g.font="800 20px 'Hiragino Maru Gothic ProN',system-ui";
         g.fillStyle="#fff";g.strokeStyle="rgba(0,0,0,.4)";g.lineWidth=4;
-        g.strokeText("タップで ころがそう！",W/2,H*0.94);
-        g.fillText("タップで ころがそう！",W/2,H*0.94);
+        const hintTxt=ball.eaten>0?"ボールを タップ！":"タップで ころがそう！";
+        g.strokeText(hintTxt,W/2,H*0.94);
+        g.fillText(hintTxt,W/2,H*0.94);
         g.restore();g.globalAlpha=1;g.textAlign="left";
+        // 止まったボールの外側に点滅リング(さわる場所を教える)
+        if(ball.eaten>0){
+          if(hintPulse>0) hintPulse=Math.max(0,hintPulse-0.03*dt);
+          const rr=Math.max(0,ball.r+unit*0.8+unit*0.15*Math.sin(tsec*6));
+          g.save();g.globalAlpha=clamp(0.4+0.3*Math.sin(tsec*6)+hintPulse*0.4,0,1);
+          g.strokeStyle="#ffffff";g.lineWidth=Math.max(3,unit*0.12)+hintPulse*3;
+          g.setLineDash([unit*0.4,unit*0.3]);g.lineDashOffset=-tsec*30;
+          g.beginPath();g.arc(ball.x,ball.y,rr,0,TAU);g.stroke();
+          g.restore();g.globalAlpha=1;
+        }
       }
 
       // ---- HUD(上部中央) ----

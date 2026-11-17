@@ -8,6 +8,9 @@ function buildPenguin(api){
   let pins=[],shards=[],sparks=[],rings=[],puffs=[],snow=[],motes=[],floats=[];
   let count=0,combo=0,comboT=0,tsec=0;
   let strikeT=0,strikeTxt="",flash=0,settleT=0;
+  let strikeY=0;                                  // ストライク文字の高さ(ステージクリアと同時なら上へ逃がす)
+  let held=false,heldX=0,heldY=0,pendingFire=null; // 滑走中・再配置中に置いた指を捨てずに覚える
+  let throwNo=0;                                  // 最初の1投だけ必ず先頭のピンへ向かう
   // stage progression: clear a number of throws-with-hits to advance; endless
   let stage=1,stageDown=0,stageGoal=15,clearT=0,clearStage=0,clearSub="";   // 7〜8歳向け: 目標本数を約2割増
   function stageGoalFor(s){return 15+(s-1)*4;}     // 15,19,23,27...
@@ -108,6 +111,7 @@ function buildPenguin(api){
     aim.active=false;
   }
   resetThrow();
+  strikeY=api.H*0.42;
 
   function fxBurst(x,y,col,big,mode){
     // 軸7(壊す物のバラエティ): kindごとに壊れ方の演出を変える
@@ -212,6 +216,25 @@ function buildPenguin(api){
     fever=0; feverEndT=1.5; flash=Math.min(1,flash+0.4);
     api.slide(1046,392,0.5,0.2,"triangle");
   }
+  function fireAt(tx,ty){
+    // direction from penguin toward where finger lifted; if tiny drag, shoot straight up
+    let dx=tx-peng.x, dy=ty-peng.y;
+    let d=Math.hypot(dx,dy);
+    if(d<14){ dx=0; dy=-1; d=1; }
+    throwNo++;
+    if(throwNo===1){   // 最初の1投だけは先頭のピンへ(最初の成功をかならず来させる)
+      const tp=pins.find(q=>!q.down);
+      if(tp){ dx=tp.x-peng.x; dy=tp.y-peng.y; d=Math.max(Math.hypot(dx,dy),api.H*0.4); }
+    }
+    // clamp to mostly-forward (upward) so the penguin always heads to the pins
+    const nx=dx/d; let ny=dy/d; if(ny>-0.25) ny=-0.25;
+    const re=Math.hypot(nx,ny)||1;
+    const power=clamp(d/(api.H*0.4),0.45,1)*18;
+    peng.vx=(nx/re)*power; peng.vy=(ny/re)*power;
+    peng.sliding=true; peng.roll=0;
+    api.slide(180,420,0.18,0.2,"sine"); api.noise(0.18,0.12,900,"lowpass",0.7);
+    api.shake(3);
+  }
   function standing(){ let n=0; for(const p of pins) if(!p.down) n++; return n; }
 
   function endThrow(){
@@ -220,6 +243,7 @@ function buildPenguin(api){
     const allDown=standing()===0;
     if(allDown && pins.length>0){
       // STRIKE
+      strikeY=(stageDown>=stageGoal&&clearT<=0)?api.H*0.27:api.H*0.42;   // クリアと同時なら重ならない上側へ
       strikeT=1.8; strikeTxt=pick(["ストライク！","パーフェクト！","ぜんぶ たおした！"]);
       flash=1; api.boom(0.6); api.shake(18);
       if(hsCd<=0){ api.hitStop(5); hsCd=30; }
@@ -232,10 +256,11 @@ function buildPenguin(api){
           rot:rnd(0,TAU),vr:rnd(-0.35,0.35),life:1,decay:rnd(0.01,0.018),col:pick(PINCOLS.concat(["#ffd23f","#ff8fb3"]))}); }
     }
     checkStage();
-    settleT=fever>0?0.45:0.9;   // brief pause then re-rack (fever = fast re-rack!)
+    settleT=fever>0?0.35:0.6;   // brief pause then re-rack (fever = fast re-rack!)
   }
   function checkStage(){
     if(stageDown<stageGoal || clearT>0) return;
+    if(strikeT>0) strikeY=api.H*0.27;   // 出ている最中のストライク文字はクリア帯の上へ
     clearStage=stage; clearT=2.0; flash=Math.min(1,flash+0.6);
     api.boom(0.5); api.shake(14);
     api.slide(523,784,0.3,0.2,"triangle"); api.tone(988,0.3,"triangle",0.12);
@@ -257,31 +282,29 @@ function buildPenguin(api){
     input(px,py,type){
       // tap-and-release aim OR simple tap to fire toward the pins.
       if(type==="down"){
-        if(peng.sliding||settleT>0) return;
+        if(peng.sliding||settleT>0){ held=true; heldX=px; heldY=py; aimDX=px; aimDY=py; return; }   // 待ち中の指は捨てず覚える
         aim.active=true; aim.x=px; aim.y=py; aimDX=px; aimDY=py;
         return;
       }
       if(type==="move"){
         if(aim.active){ aim.x=px; aim.y=py; }
+        if(held){ heldX=px; heldY=py; }
         return;
       }
       if(type==="up"){
-        if(!aim.active || peng.sliding || settleT>0){ aim.active=false; return; }
+        if(!aim.active || peng.sliding || settleT>0){
+          aim.active=false;
+          if(held||peng.sliding||settleT>0){   // 待ち中に離した指: 太陽ならごほうび、そうでなければ再配置後に自動で投げる
+            held=false;
+            if(Math.hypot(px-aimDX,py-aimDY)<14 && Math.hypot(px-sunPos.x,py-sunPos.y)<sunPos.r){ sunSecret(); return; }
+            pendingFire={x:px,y:py};
+          }
+          return;
+        }
         aim.active=false;
         // ④ 太陽ひみつタップ: ほぼ動かないタップが太陽に届いたら ごほうび(発射しない/減点なし)
         if(Math.hypot(px-aimDX,py-aimDY)<14 && Math.hypot(px-sunPos.x,py-sunPos.y)<sunPos.r){ sunSecret(); return; }
-        // direction from penguin toward where finger lifted; if tiny drag, shoot straight up
-        let dx=aim.x-peng.x, dy=aim.y-peng.y;
-        let d=Math.hypot(dx,dy);
-        if(d<14){ dx=0; dy=-1; d=1; }
-        // clamp to mostly-forward (upward) so the penguin always heads to the pins
-        const nx=dx/d; let ny=dy/d; if(ny>-0.25) ny=-0.25;
-        const re=Math.hypot(nx,ny)||1;
-        const power=clamp(d/(api.H*0.4),0.45,1)*18;
-        peng.vx=(nx/re)*power; peng.vy=(ny/re)*power;
-        peng.sliding=true; peng.roll=0;
-        api.slide(180,420,0.18,0.2,"sine"); api.noise(0.18,0.12,900,"lowpass",0.7);
-        api.shake(3);
+        fireAt(aim.x,aim.y);
         return;
       }
     },
@@ -395,7 +418,10 @@ function buildPenguin(api){
         drawPin(p);
       }
       // pin re-rack handling after settle
-      if(settleT>0){ settleT-=0.016*dt; if(settleT<=0){ setupRack(); positionRack(); resetThrow(); } }
+      if(settleT>0){ settleT-=0.016*dt; if(settleT<=0){ setupRack(); positionRack(); resetThrow();
+          // 待っている間に置かれた指を引き継ぐ(押しっぱなしなら矢印、離していたら自動で発射)
+          if(pendingFire){ const pf=pendingFire; pendingFire=null; held=false; fireAt(pf.x,pf.y); }
+          else if(held){ aim.active=true; aim.x=heldX; aim.y=heldY; } } }
 
       // ---------- penguin physics ----------
       if(peng.sliding){
@@ -533,7 +559,7 @@ function buildPenguin(api){
       // strike banner
       if(strikeT>0){ strikeT-=0.016*dt;
         const a=clamp(strikeT*1.4,0,1), pop=1+Math.max(0,strikeT-1.4)*2;
-        g.save(); g.translate(api.W/2,api.H*0.42); g.scale(pop,pop); g.globalAlpha=a; g.textAlign="center";
+        g.save(); g.translate(api.W/2,strikeY); g.scale(pop,pop); g.globalAlpha=a; g.textAlign="center";
         g.font="900 50px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor="rgba(80,180,240,.9)"; g.shadowBlur=22; g.fillStyle="#ffd23f";
         g.fillText(strikeTxt,0,0);
@@ -550,7 +576,11 @@ function buildPenguin(api){
         g.fillText("ステージ"+clearStage+" クリア！",0,0);
         g.shadowBlur=0; g.lineWidth=2; g.strokeStyle="#fff"; g.strokeText("ステージ"+clearStage+" クリア！",0,0);
         g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui"; g.fillStyle="#fff";
-        g.fillText("つぎは ステージ"+(clearStage+1)+"！",0,40);
+        g.fillText("つぎは ステージ"+(clearStage+1)+"！",0,36);
+        if(clearSub){ let fs=18; g.font="800 "+fs+"px 'Hiragino Maru Gothic ProN',system-ui";
+          const mw=g.measureText(clearSub).width, lim=api.W*0.9/Math.max(pop,1);
+          if(mw>lim){ fs=Math.max(11,Math.floor(fs*lim/mw)); g.font="800 "+fs+"px 'Hiragino Maru Gothic ProN',system-ui"; }
+          g.fillStyle="#d8f4ff"; g.fillText(clearSub,0,Math.min(62,api.H*0.07)); }
         g.restore(); g.globalAlpha=1; g.textAlign="left";
       }
       // ① にじいろピン！ 発見バナー(虹色に色替わり)

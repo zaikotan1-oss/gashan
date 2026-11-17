@@ -6,6 +6,7 @@ function build_cookiebreak(api){
   // stage progression: clear all blocks -> "ステージ クリア!" -> harder endless
   let stage=1,clearBanner=0,clearing=false,clearScale=0;
   let clearTease=""; // F) 次ステージ予告のひとこと
+  let clearNext=2;   // バナーに出す次ステージ番号(doClear時に固定。stage++後も読み替わらない)
   let fcount=0,lastHitStop=-999; // hitStop throttle (big hits only)
   // B) FEVER TIME: gauge fills as you smash; full gauge -> 12s rainbow rampage
   let fever=0,feverGauge=0,feverBanner=0;
@@ -28,7 +29,7 @@ function build_cookiebreak(api){
   const RAINBOW=["#ff5b8a","#ff8c42","#ffd23f","#7be08a","#4db8ff","#b58bff","#ff7bd0"];
   // ---- 隠し発見レイヤー(ハンマー/トラックと同じ思想) ----
   // ② きょうのラッキーおかし: build時に1種を秘密に選ぶ。その味を割ると小ボーナス＋頭上に星のヒント
-  const FLAVNAME={cookie:"クッキー",choco:"チョコ",gummy:"ピンクグミ",gummyb:"みずいろグミ",cake:"きいろケーキ",mint:"ミント"};
+  const FLAVNAME={cookie:"クッキー",choco:"チョコ",gummy:"ピンクグミ",gummyb:"みずいろグミ",cake:"きいろケーキ",mint:"ミント",stick:"スティック"};
   let luckyKey=pick(TYPES).key, luckySeen=false, luckyMsgT=0;
   let rbMsgT=0;                    // ① にじいろクッキー 発見バナー
   let comboKept=true, nonstopT=0;  // ③ ノンストップ クリア判定
@@ -86,7 +87,7 @@ function build_cookiebreak(api){
   // 別の列で新規生成し直すのではなく既存ブロックの合体にすることで、列ごとに独立した重力ロジックを壊さない。
   function maybeAddBig(){
     for(let c=0;c<cols;c++){
-      if(Math.random()>=0.05) continue;
+      if(Math.random()>=0.12) continue;
       const colBlocks=blocks.filter(b=>b.col===c && !b.hard && !b.gold && !b.rb && (b.h||1)===1).sort((a,z)=>a.row-z.row);
       for(let i=0;i<colBlocks.length-1;i++){
         if(colBlocks[i+1].row===colBlocks[i].row+1){
@@ -237,7 +238,7 @@ function build_cookiebreak(api){
     if(goldN>0){
       // gold fanfare: rising arpeggio + big float
       [0,4,7,12].forEach((semi,i)=>setTimeout(()=>{try{api.tone(659*Math.pow(2,semi/12),0.14,"triangle",0.13);}catch(e){}},i*60));
-      floats.push({x:cx,y:cy-34,txt:"ゴールド！ +"+(goldN*5),life:1,vy:-0.9,col:"#ffd23f",size:34});
+      floats.push({x:cx,y:cy-70,txt:"ゴールド！ +"+(goldN*5),life:1,vy:-0.9,col:"#ffd23f",size:34});
       flash=Math.min(1,flash+0.4); flashHue="#ffd23f";
     }
     // ① にじいろクッキー撃破: 虹の輪＋虹きらめき＋ファンファーレ＋大量得点
@@ -254,7 +255,7 @@ function build_cookiebreak(api){
     if(isLucky){
       luckyMsgT=luckySeen?Math.max(luckyMsgT,0.7):1.6; luckySeen=true;
       api.tone(1046,0.14,"triangle",0.1); api.tone(1568,0.16,"triangle",0.08);
-      floats.push({x:offsetFloatX(cx),y:cy-40,txt:"ラッキー！",life:1,vy:-0.9,col:b.type.chip,size:26});
+      floats.push({x:offsetFloatX(cx),y:cy-84,txt:"ラッキー！",life:1,vy:-0.9,col:b.type.chip,size:26});
       for(let i=0;i<7;i++){const a=rnd(-TAU*0.5,0),v=rnd(2,5);
         sparks.push({x:cx,y:cy,vx:Math.cos(a)*v,vy:Math.sin(a)*v-1.5,life:1,decay:0.03,s:rnd(2,3.5),col:"#fff7c2"});}
     }
@@ -271,9 +272,9 @@ function build_cookiebreak(api){
       api.hitStop(3); lastHitStop=fcount;
     }
     // 軸6対策②: combo2〜4の色はラッキー/ケーキ祝福と同じ黄(#ffd23f)を避け、桃系にして衝突を減らす
-    if(combo>1)floats.push({x:offsetFloatX(cx),y:cy-18,txt:"x"+combo,life:1,vy:-1.1,
+    if(combo>1)floats.push({x:offsetFloatX(Math.min(cx+S*0.9,api.W-40)),y:cy-18,txt:"x"+combo,life:1,vy:-1.1,
       col:combo>=8?"#ff5bd0":combo>=5?"#ff8c42":"#ffb0e0",size:combo>=5?40:30});
-    if(gained>=3)floats.push({x:cx,y:cy-50,txt:"バキバキ！",life:1,vy:-0.7,col:"#ff7bd0",size:24});
+    if(gained>=3&&!goldN&&!rbN&&!isLucky)floats.push({x:cx,y:cy-50,txt:"バキバキ！",life:1,vy:-0.7,col:"#ff7bd0",size:24});
     if(blocks.length===0)doClear();
   }
   function startFever(){
@@ -289,6 +290,7 @@ function build_cookiebreak(api){
   }
   function doClear(){
     if(clearing)return; clearing=true;
+    clearNext=stage+1;
     // ③ ノンストップ クリア: コンボを一度も切らさず塔を割り切ったら +5 & 祝福(考えどころ=手を止めず一気に)
     if(comboKept){ count+=5; api.setScore(count); nonstopT=1.9;
       floats.push({x:api.W/2,y:api.H*0.3,txt:"ノンストップ！ ＋5",life:1,vy:-0.6,col:"#7be08a",size:34});
@@ -458,17 +460,22 @@ function build_cookiebreak(api){
         g.globalAlpha=fa*0.16; g.fillStyle="#fff"; g.fillRect(0,0,api.W,api.H);
         g.restore(); g.globalAlpha=1; }
       // ---- HUD: stage + remaining (top center) ----
-      g.save(); g.textAlign="center";
-      g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
-      g.lineWidth=5; g.lineJoin="round"; g.strokeStyle="rgba(120,60,90,.45)";
-      const hud="ステージ "+stage+"      のこり "+blocks.length;
-      g.strokeText(hud,api.W/2,api.H*0.06);
-      g.fillStyle="#fff"; g.fillText(hud,api.W/2,api.H*0.06);
-      g.restore(); g.textAlign="left"; g.lineJoin="miter";
+      const hudY=Math.max(api.H*0.06,30);
+      {
+        const hud="ステージ "+stage+"      のこり "+blocks.length;
+        g.save(); g.textAlign="center";
+        g.font="800 24px 'Hiragino Maru Gothic ProN',system-ui";
+        const hw=Math.min(api.W-24,g.measureText(hud).width+36);
+        g.fillStyle="rgba(90,42,68,.35)"; roundRect(api.W/2-hw/2,hudY-26,hw,36,18); g.fill();
+        g.lineWidth=7; g.lineJoin="round"; g.strokeStyle="rgba(90,30,60,.75)";
+        g.strokeText(hud,api.W/2,hudY);
+        g.fillStyle="#fff"; g.fillText(hud,api.W/2,hudY);
+        g.restore(); g.textAlign="left"; g.lineJoin="miter";
+      }
       // ---- combo big text (top center band) ----
       if(combo>1){
         const pop=1+Math.max(0,comboT-0.7)*1.2;
-        g.save(); g.translate(api.W/2,api.H*0.115); g.scale(pop,pop);
+        g.save(); g.translate(api.W/2,Math.max(api.H*0.115,hudY+42)); g.scale(pop,pop);
         g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
         g.globalAlpha=clamp(comboT,0,1);
         g.shadowColor="rgba(255,140,200,.8)"; g.shadowBlur=14;
@@ -478,7 +485,7 @@ function build_cookiebreak(api){
       }
       // ---- FEVER gauge bar (bottom center) ----
       {
-        const bw=Math.min(api.W*0.5,220),bxg=(api.W-bw)/2,byg=api.H-26,bh=13;
+        const bw=Math.min(api.W*0.5,220),bxg=(api.W-bw)/2,byg=api.H-30,bh=13;
         g.save();
         g.fillStyle="rgba(90,42,68,.5)"; roundRect(bxg-4,byg-3,bw+8,bh+6,(bh+6)/2); g.fill();
         g.lineWidth=2; g.strokeStyle="rgba(255,255,255,.4)"; roundRect(bxg-4,byg-3,bw+8,bh+6,(bh+6)/2); g.stroke();
@@ -490,11 +497,11 @@ function build_cookiebreak(api){
           if(fever>0||feverGauge>0.8){ g.shadowBlur=12+6*Math.sin(tsec*8); g.shadowColor="#ff5bd0"; }
           g.fillStyle=pg; roundRect(bxg,byg,bw*fr,bh,bh/2); g.fill(); g.shadowBlur=0;
         }
-        g.font="800 13px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
-        g.lineWidth=4; g.lineJoin="round"; g.strokeStyle="rgba(90,42,68,.55)";
+        g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
+        g.lineWidth=5; g.lineJoin="round"; g.strokeStyle="rgba(90,42,68,.75)";
         const lbl=fever>0?"フィーバー ちゅう！！":feverGauge>0.8?"もうすこしで フィーバー！":"フィーバー";
-        g.strokeText(lbl,api.W/2,byg-6);
-        g.fillStyle=fever>0?"#fff":"#fff0f8"; g.fillText(lbl,api.W/2,byg-6);
+        g.strokeText(lbl,api.W/2,byg-8);
+        g.fillStyle=fever>0?"#fff":"#fff0f8"; g.fillText(lbl,api.W/2,byg-8);
         g.restore(); g.textAlign="left"; g.lineJoin="miter";
       }
       // ---- FEVER start banner ----
@@ -524,7 +531,7 @@ function build_cookiebreak(api){
         bg.addColorStop(0,"#fff2a0"); bg.addColorStop(0.5,"#ffd23f"); bg.addColorStop(1,"#ff8fb3");
         g.fillStyle=bg; g.fillText("ステージ クリア！",0,0);
         g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui"; g.fillStyle="#fff";
-        g.fillText("つぎは ステージ "+(stage+1),0,40);
+        g.fillText("つぎは ステージ "+clearNext,0,40);
         if(clearTease){
           g.font="800 17px 'Hiragino Maru Gothic ProN',system-ui";
           g.lineWidth=5; g.strokeStyle="rgba(120,50,80,.6)";

@@ -3,6 +3,7 @@ function buildJet(api){
   api.preload(["bg.jpg","planet.png"]);   // 画像アセット(無ければ従来の手描きにフォールバック)。ロケット/いんせきは生成不良(傾き・床)のため手描きのまま
   let obs=[],puffs=[],sparks=[],floats=[],stars=[],rings=[],glints=[],trail=[],motes=[],shards=[],feathers=[],chunks=[];
   let playerY,px,aimX,vy,alt,maxGenAlt,thrusting,thrustViz,grav,count,combo,comboT,bestAlt,tk,flash,jetTilt,wash,boost,lastHS;
+  let slow=0;
   let stage,nextGate,banner,bannerT,clearBurst,clearBurstT,meteors;
   // ---- 隠し発見レイヤー(クレーン/パンチ/ハンマー/トラックと同じ思想) ----
   let luckyColor,luckySeen,luckyMsgT,rbMsgT,clusterId,clusters;
@@ -10,33 +11,36 @@ function buildJet(api){
   // stage checkpoints (altitude in alt-units = meters*10): 1200m,3100m,7400m,10000m(final)
   // 7〜8歳向けに各ゲートを2割ほど遠くした(操作はそのまま・道のりだけ少し長い)
   // 【軸4改善】最初の2ゲートを近くして、連打/ホールドどちらでも90秒前後で最初のステージクリアが体験できるようにする
-  const GATES=[{alt:6000,name:"くもの うみ とっぱ！",col:"#7be08a"},{alt:16000,name:"せいそうけん とうたつ！",col:"#4cc6e8"},{alt:74000,name:"うちゅう とうたつ！",col:"#b58bff"},{alt:100000,name:"ぎんが クリア！",col:"#ffd23f",final:true}];
+  const GATES=[{alt:6000,name:"くもの うみ とっぱ！",col:"#7be08a"},{alt:16000,name:"せいそうけん とうたつ！",col:"#4cc6e8"},{alt:32000,name:"うちゅう とうたつ！",col:"#b58bff"},{alt:52000,name:"ぎんが クリア！",col:"#ffd23f",final:true}];
   const BCOL=["#ff6b8b","#4cc6e8","#7be08a","#ffd23f","#b58bff","#ff7bd0"];
   const BHI={"#ff6b8b":"#ffd0db","#4cc6e8":"#cdf2ff","#7be08a":"#d6ffdc","#ffd23f":"#fff3c2","#b58bff":"#e7d6ff","#ff7bd0":"#ffd6ef"};
   // ⑦ とり用の色(バルーンのBCOLとは別パレット=同じ色違いの丸に見せないため)
   const BIRDCOL=["#8a5a3a","#6b7a8f","#c9995a","#4a90d9"];
   // ② きょうのラッキー色: バルーンの色から毎プレイ1色を秘密に選ぶ(色名で一度だけ教える)
   const CNAME={"#ff6b8b":"ピンク","#4cc6e8":"みずいろ","#7be08a":"みどり","#ffd23f":"きいろ","#b58bff":"むらさき","#ff7bd0":"ももいろ"};
+  const SLOWV=3,SLOWF=40;   // ふつうの雲に つっこむと SLOWF フレームだけ 上昇が SLOWV まで おそくなる
   function layout(){playerY=api.H*0.46;if(px==null)px=api.W/2;aimX=px;grav=clamp(api.H*0.0004,0.22,0.36);}
   function reset(){obs=[];puffs=[];sparks=[];floats=[];rings=[];glints=[];trail=[];meteors=[];shards=[];feathers=[];chunks=[];px=null;vy=0;alt=0;maxGenAlt=0;thrusting=false;thrustViz=0;count=0;combo=0;comboT=0;bestAlt=0;tk=0;flash=0;jetTilt=0;wash=0;boost=0;lastHS=-99;
     stage=0;nextGate=0;banner="";bannerT=0;clearBurst=[];clearBurstT=0;
     luckyColor=pick(BCOL);luckySeen=false;luckyMsgT=0;rbMsgT=0;clusterId=0;clusters={};
     moonX=0;moonY=0;moonR=0;moonOn=false;moonWink=0;
     motes=[];for(let i=0;i<16;i++)motes.push({x:rnd(0,api.W),y:rnd(0,api.H),r:rnd(1.2,3.4),sp:rnd(0.15,0.55),ph:rnd(0,TAU),drift:rnd(0.2,0.6)});
-    layout();ensure();}
+    slow=0;layout();ensure();
+    // さいしょの1こ: まん中あたりに ふうせんを3こ(さわってすぐ最初の成功が来る)
+    [[0.22,0.5],[0.4,0.38],[0.56,0.62]].forEach(a=>obs.push({alt:api.H*a[0],x:api.W*a[1]+rnd(-api.W*0.05,api.W*0.05),r:api.W*0.055,type:"balloon",color:pick(BCOL),dead:false}));}
   function ensure(){
     while(maxGenAlt<alt+api.H*1.4){
       maxGenAlt+=rnd(60,120);
       // ZONE depends on current generation altitude (alt-units = meters*10)
-      // use raw maxGenAlt: 0-6000 low, 6000-16000 mid, 16000-68000 high, 68000+ space (GATES[0]/[1]短縮に合わせてゾーン境界も同じ値に更新。ズレるとゲート通過後もzone0の敵しか出ない)
-      const z=maxGenAlt<GATES[0].alt?0:maxGenAlt<GATES[1].alt?1:maxGenAlt<68000?2:3;
+      // use raw maxGenAlt: 0-6000 low, 6000-16000 mid, 16000-32000 high, 32000+ space (GATES[0]/[1]短縮に合わせてゾーン境界も同じ値に更新。ズレるとゲート通過後もzone0の敵しか出ない)
+      const z=maxGenAlt<GATES[0].alt?0:maxGenAlt<GATES[1].alt?1:maxGenAlt<GATES[2].alt?2:3;
       // ① にじいろバルーン: 約4%の激レア。虹色に光り、つらぬくと大量得点＋虹の大盤振る舞い。
       if(Math.random()<0.04){
         obs.push({alt:maxGenAlt,x:rnd(api.W*0.2,api.W*0.8),r:rnd(api.W*0.062,api.W*0.078),type:"balloon",color:pick(BCOL),rainbow:true,dead:false});
         continue;
       }
       // every so often drop a BONUS cluster (dense balloon house) as a combo-reward target
-      if(Math.random()<0.14){
+      if(Math.random()<0.18){
         const cx=rnd(api.W*0.25,api.W*0.75),col=pick(BCOL),cid=++clusterId,n=rint(4,6);
         clusters[cid]=n;   // ③ パーフェクト判定: このかたまりを1つも逃さず全部つぶすとボーナス
         for(let i=0;i<n;i++)obs.push({alt:maxGenAlt+rnd(-26,26),x:cx+rnd(-api.W*0.12,api.W*0.12),r:rnd(api.W*0.035,api.W*0.05),type:"balloon",color:Math.random()<0.5?col:pick(BCOL),bonus:true,cid,dead:false});
@@ -65,22 +69,26 @@ function buildJet(api){
         }else for(let i=0;i<rint(1,2);i++)obs.push({alt:maxGenAlt+rnd(-20,20),x:rnd(api.W*0.12,api.W*0.88),r:rnd(api.W*0.045,api.W*0.06),type:"balloon",color:pick(BCOL),dead:false});
       }else if(z===2){ // HIGH: side-drifting balloons + clouds + とり + まれにひこうせん(大きい物)
         const r2=Math.random();
-        if(r2<0.05){ // ⑧ ひこうせん/UFO: 横長・大きい・矩形寄りの当たり判定(丸系・ひし形とは違う『大きい乗り物』)
+        if(r2<0.07){ // ⑤ たこ(凧): 最初の空だけで終わらせず、高いところにも少し混ぜる
+          obs.push({alt:maxGenAlt,x:rnd(api.W*0.15,api.W*0.85),r:rnd(api.W*0.06,api.W*0.085),type:"kite",color:pick(BCOL),vx:rnd(-0.6,0.6),dead:false});
+        }else if(r2<0.07+0.05){ // ⑧ ひこうせん/UFO: 横長・大きい・矩形寄りの当たり判定(丸系・ひし形とは違う『大きい乗り物』)
           const dir=Math.random()<0.5?-1:1,bw2=api.W*0.15;
           obs.push({alt:maxGenAlt,x:dir<0?api.W*0.8:api.W*0.2,r:bw2,hw:bw2,hh:bw2*0.42,type:"blimp",color:pick(BCOL),vx:dir*rnd(0.5,0.9),dead:false});
-        }else if(r2<0.05+0.18){const n=rint(1,2);for(let i=0;i<n;i++){const bw=rnd(api.W*0.05,api.W*0.065);
+        }else if(r2<0.07+0.05+0.18){const n=rint(1,2);for(let i=0;i<n;i++){const bw=rnd(api.W*0.05,api.W*0.065);
             obs.push({alt:maxGenAlt+rnd(-18,18),x:rnd(api.W*0.15,api.W*0.85),r:bw,hw:bw*1.5,hh:bw*0.55,type:"bird",color:pick(BIRDCOL),vx:rnd(-0.8,0.8),ph:rnd(0,TAU),dead:false});}
-        }else if(r2<0.05+0.18+0.4){const dir=Math.random()<0.5?-1:1;obs.push({alt:maxGenAlt,x:dir<0?api.W*0.85:api.W*0.15,r:rnd(api.W*0.045,api.W*0.06),type:"balloon",color:pick(BCOL),vx:dir*rnd(0.8,1.6),dead:false});}
+        }else if(r2<0.07+0.05+0.18+0.4){const dir=Math.random()<0.5?-1:1;obs.push({alt:maxGenAlt,x:dir<0?api.W*0.85:api.W*0.15,r:rnd(api.W*0.045,api.W*0.06),type:"balloon",color:pick(BCOL),vx:dir*rnd(0.8,1.6),dead:false});}
         else{const n=rint(1,3);for(let i=0;i<n;i++)obs.push({alt:maxGenAlt+rnd(-18,18),x:rnd(api.W*0.1,api.W*0.9),r:rnd(api.W*0.05,api.W*0.09),type:"cloud",dead:false});}
       }else{ // SPACE: drifting balloons + meteors to dodge + まれにひこうせん + 終盤の隕石シャワー
-        if(maxGenAlt>85000&&Math.random()<0.3){ // 【軸4】最終ゲート(100000)直前でもう一段の盛り上がり: 隕石を1個ではなく3〜4個まとめて出す
+        if(maxGenAlt>46000&&Math.random()<0.3){ // 【軸4】最終ゲート(52000)直前でもう一段の盛り上がり: 隕石を1個ではなく3〜4個まとめて出す
           const n=rint(3,4);for(let i=0;i<n;i++)meteors.push({alt:maxGenAlt+rnd(-40,40)+i*16,x:rnd(api.W*0.12,api.W*0.88),r:rnd(api.W*0.028,api.W*0.042),vx:rnd(-2.8,2.8)*(Math.random()<0.5?1:-1),sp:rnd(0.2,0.5),ph:rnd(0,TAU),dead:false});
         }else{
           const r3=Math.random();
-          if(r3<0.06){ // ⑧ ひこうせん/UFO: 宇宙ゾーンにも大きい物を混ぜる
+          if(r3<0.07){ // ⑥ 大きな入道雲: 宇宙にも「ふわふわ岩雲」として混ぜる(3回ヒット)
+            obs.push({alt:maxGenAlt,x:rnd(api.W*0.25,api.W*0.75),r:rnd(api.W*0.13,api.W*0.15),type:"bigcloud",hp:3,maxHp:3,dead:false});
+          }else if(r3<0.07+0.06){ // ⑧ ひこうせん/UFO: 宇宙ゾーンにも大きい物を混ぜる
             const dir=Math.random()<0.5?-1:1,bw3=api.W*0.16;
             obs.push({alt:maxGenAlt,x:dir<0?api.W*0.78:api.W*0.22,r:bw3,hw:bw3,hh:bw3*0.42,type:"blimp",color:pick(BCOL),vx:dir*rnd(0.5,0.9),dead:false});
-          }else if(r3<0.06+0.44)meteors.push({alt:maxGenAlt+rnd(-30,30),x:rnd(api.W*0.1,api.W*0.9),r:rnd(api.W*0.03,api.W*0.045),vx:rnd(-2.6,2.6)*(Math.random()<0.5?1:-1),sp:rnd(0.2,0.5),ph:rnd(0,TAU),dead:false});   // いんせき少し多め・少し速め(7〜8歳向け)
+          }else if(r3<0.07+0.06+0.44)meteors.push({alt:maxGenAlt+rnd(-30,30),x:rnd(api.W*0.1,api.W*0.9),r:rnd(api.W*0.03,api.W*0.045),vx:rnd(-2.6,2.6)*(Math.random()<0.5?1:-1),sp:rnd(0.2,0.5),ph:rnd(0,TAU),dead:false});   // いんせき少し多め・少し速め(7〜8歳向け)
           else{const dir=Math.random()<0.5?-1:1;obs.push({alt:maxGenAlt,x:dir<0?api.W*0.85:api.W*0.15,r:rnd(api.W*0.045,api.W*0.06),type:"balloon",color:pick(BCOL),vx:dir*rnd(1,2),dead:false});}
         }
       }
@@ -115,7 +123,7 @@ function buildJet(api){
     }
     o.dead=true;
     const oy=sy(o);
-    let val=o.type==="balloon"?2:o.type==="kite"?2:o.type==="bird"?3:o.type==="blimp"?5:0;if(o.bonus)val+=1;
+    let val=o.type==="balloon"?2:o.type==="kite"?2:o.type==="bird"?3:o.type==="blimp"?5:0;if(o.bonus)val+=2;
     // ① にじいろ = +8の大量得点 / ② ラッキー色 = +1の隠しボーナス
     const isRainbow=!!o.rainbow;
     const isLucky=o.type==="balloon"&&!isRainbow&&o.color===luckyColor;
@@ -156,6 +164,7 @@ function buildJet(api){
       rings.push({x:o.x,y:oy,r:Math.max(0,o.r*0.4),vr:rnd(3,4.5),life:0.8,decay:0.05,col:"#ffffff"});
       for(let k=rint(8,12);k>0;k--)puffs.push({x:o.x+rnd(-o.r,o.r),y:oy+rnd(-o.r,o.r),r:Math.max(0,rnd(o.r*0.3,o.r*0.6)),vx:rnd(-3,3),vy:rnd(-2,2),life:1,decay:rnd(0.02,0.035)});}
     api.shake(2+Math.min(combo*0.3,5));vy+=1.2; // push-through accel
+    if(o.type==="cloud"&&alt>GATES[0].alt)slow=Math.max(slow,SLOWF);vy=Math.min(vy,SLOWV); // 【軸3】ふつうの雲に つっこむと ぐっと おそくなる(得点0・失敗にはしない)=雲のかべの すきまを ねらう意味
     if(combo>2&&combo%3===0){flash=Math.min(1,flash+0.35);floats.push({x:o.x,y:oy-20,txt:"x"+combo,life:1,vy:-1.1,col:combo>=9?"#ff3b3b":"#ffd23f",size:32});}
     if(combo>=6&&combo%3===0){ // climax: full-screen color wash + burst
       wash=1;api.shake(7);if(tk-lastHS>14){api.hitStop(3);lastHS=tk;}api.boom(1);api.tone(440+combo*18,0.18,"sawtooth",0.05);api.slide(300,1200,0.05,0.22,"triangle");
@@ -219,8 +228,9 @@ function buildJet(api){
       if(boost>0)boost=Math.max(0,boost-dt);
       const thr=thrusting||boost>0;
       if(thr){vy+=(alt<GATES[0].alt?0.8:0.62)*dt;px+=(aimX-px)*0.12*dt;} // 【軸4改善】最初のゲートに届くまでだけ推進力を強め、序盤の到達を早める(上位ゾーンの難度はそのまま)
-      const gNow=grav*(1+clamp(alt/100000,0,1)*0.65);   // 高空ほど重力を強めに(7〜8歳向け・操作は同じ)
+      const gNow=grav*(1+clamp(alt/52000,0,1)*0.65);   // 高空ほど重力を強めに(7〜8歳向け・操作は同じ)
       vy-=gNow*dt;vy=clamp(vy,-9,12);
+      if(slow>0){slow-=dt;vy=Math.min(vy,SLOWV);}
       alt+=vy*dt;if(alt<0){alt=0;if(vy<0)vy=0;}
       bestAlt=Math.max(bestAlt,alt);
       checkGate();
@@ -670,7 +680,7 @@ function buildJet(api){
     g.textAlign="left";
     // hint pill (bottom): rounded translucent panel + outline
     g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-    const ht="おしっぱなしで じょうしょう！ ゆびで よける／つきぬける！";
+    const ht=alt>=GATES[2].alt?"いんせきを よけよう！":"おしっぱなしで じょうしょう！ ゆびで ふうせんを ねらおう！";
     const hw=((g.measureText(ht)||{}).width||ht.length*10)+40,hh=38,hx=api.W/2-hw/2,hy=api.H-hh-12;
     rrect(hx,hy,hw,hh,15);g.fillStyle="rgba(20,30,60,.5)";g.fill();
     rrect(hx,hy,hw,hh,15);g.strokeStyle="rgba(255,255,255,.5)";g.lineWidth=2;g.stroke();g.lineWidth=1;
