@@ -64,11 +64,20 @@ function buildRobot(api){
     stage=1;stageDone=0;stageNeed=stageQuota(1);stageBanner="";stageBannerT=0;finale=0;finaleT=0;rampage=0;rampageT=0;rampagePulse=0;
     luckyColor=pick(COLORS);luckySeen=false;luckyMsgT=0;rbMsgT=0;comboKept=true;nonstopT=0;shooter=null;shootCD=rnd(3,6);shootMsgT=0;
     for(let i=0;i<4;i++)clouds.push({x:rnd(0,1),y:rnd(0.08,0.4),s:rnd(0.6,1.3),sp:rnd(0.004,0.012)});layout();}
+  // 軸6: 浮き文字が同じ場所に重ならないよう、近くに生き残りがあれば数×32px 上へずらして出す。
+  // ステージバナー/にじいろバナー中は、詰まらないよう最大3個まで(keep:true の特別な文字は除く)
+  function addFloat(o){
+    if((stageBannerT>0||rbMsgT>0)&&!o.keep&&floats.length>=3)return;
+    let n=0;
+    for(const f of floats){if(f.life>0&&Math.abs(f.x-o.x)<slotW*0.9&&Math.abs(f.y-o.y)<30)n++;}
+    o.y-=n*32;
+    floats.push(o);
+  }
   function stageQuota(s){return 8+(s-1)*4;} // 8,12,16,20,24 buildings per stage（7〜8歳向けに手応えを増やした）
   function clearStage(){
     // ③ ノンストップ ボーナス: このステージをコンボを切らさずクリアしたら +5 & みどりの祝福。気づくと得する隠し判定。
     if(comboKept){count+=5;api.setScore(count);nonstopT=1.8;
-      floats.push({x:api.W/2,y:api.H*0.56,txt:"ノンストップ！＋5",life:1.3,vy:-0.7,col:"#7be08a",size:38,pop:1.7});
+      addFloat({x:api.W/2,y:api.H*0.56,txt:"ノンストップ！＋5",life:1.3,vy:-0.7,col:"#7be08a",size:38,pop:1.7,keep:true});
       api.tone(1318,0.14,"triangle",0.1);setTimeout(()=>api.tone(1976,0.16,"triangle",0.08),110);}
     comboKept=true;   // 次ステージのノンストップ判定をリセット
     // big payoff: full-screen wash + ファンファーレ, then advance
@@ -103,7 +112,7 @@ function buildRobot(api){
       api.slide(200,90,0.18,0.4,"square");api.noise(0.18,0.3,800,"lowpass");
       api.shake(8);bodyBob=6;
       for(let k=rint(4,7);k>0;k--)shards.push({x:b.x+rnd(-b.w/2,b.w/2),y:groundY-b.h*rnd(0.3,1),vx:rnd(-5,5),vy:rnd(-8,-2),s:rnd(b.w*0.06,b.w*0.14),color:"#9aa6b6",rot:rnd(0,TAU),vr:rnd(-0.5,0.5),life:1,decay:rnd(0.01,0.016)});
-      floats.push({x:b.x,y:groundY-b.h-16,txt:"カチン！",life:0.8,vy:-1,col:"#cfd8e6",size:24,pop:1.4});
+      addFloat({x:b.x,y:groundY-b.h-16,txt:"カチン！",life:0.8,vy:-1,col:"#cfd8e6",size:24,pop:1.4});
       return;
     }
     // 積みコンテナは上から1段ずつへこんで落ちる(3段→2段→1段→最後で崩壊)。tough(カチン)とは別の壊れ方
@@ -115,7 +124,7 @@ function buildRobot(api){
       api.shake(8);bodyBob=6;
       // 崩れ落ちる1段分の箱(四角い破片ではなく大きめの箱として落とす=とがった破片と違う壊れ方)
       shards.push({x:b.x+rnd(-b.w*0.25,b.w*0.25),y:groundY-b.h-tierH*0.5,vx:rnd(-2.5,2.5),vy:rnd(-1.5,0.5),s:Math.max(4,b.w*0.55),color:shade(b.color,-0.08*b.hp),rot:0,vr:rnd(-0.12,0.12),life:1,decay:rnd(0.01,0.016)});
-      floats.push({x:b.x,y:groundY-b.h-tierH-16,txt:"ガコン！",life:0.8,vy:-1,col:"#cfe6ff",size:24,pop:1.4});
+      addFloat({x:b.x,y:groundY-b.h-tierH-16,txt:"ガコン！",life:0.8,vy:-1,col:"#cfe6ff",size:24,pop:1.4});
       return;
     }
     b.state="flat";b.squash=0.16;b.respawnT=rnd(50,100);   // 立て直しが少し遅い=空振りしないよう見て狙う(7〜8歳向け)
@@ -154,18 +163,18 @@ function buildRobot(api){
       // 丸い給水タンク: 横に大きく転がって画面外へ消えるイメージ(丸い破片が高速で飛ぶ)
       const dir=Math.random()<0.5?-1:1;
       for(let k=0;k<3;k++)shards.push({x:b.x,y:groundY-b.h*0.4,vx:dir*rnd(9,15),vy:rnd(-6,-2),s:Math.max(4,b.w*rnd(0.3,0.5)),color:b.color,rot:0,vr:dir*rnd(1.2,2.2),shape:"circle",life:1,decay:rnd(0.01,0.018)});
-      floats.push({x:b.x,y:groundY-b.h-30,txt:"ゴロゴロ〜！",life:0.9,vy:-1,col:"#cfe6ff",size:22,pop:1.4});
+      addFloat({x:b.x,y:groundY-b.h-30,txt:"ゴロゴロ〜！",life:0.9,vy:-1,col:"#cfe6ff",size:22,pop:1.4});
     }else if(b.type==="bus"){
       // バス/トラック: 前後にぺしゃんこに潰れて跳ねる(描画側でバウンド、ここでは低い横破片を撒く)
       b.bounceStart=timeT;
       for(let k=0;k<6;k++)shards.push({x:b.x+rnd(-b.w/2,b.w/2),y:groundY-rnd(2,10),vx:rnd(-9,9),vy:rnd(-5,-1),s:rnd(b.w*0.08,b.w*0.14),color:shade(b.color,-0.15),rot:rnd(0,TAU),vr:rnd(-0.6,0.6),life:1,decay:rnd(0.012,0.02)});
-      floats.push({x:b.x,y:groundY-b.h-30,txt:"ベコッ！",life:0.8,vy:-1,col:"#ffd9a0",size:24,pop:1.4});
+      addFloat({x:b.x,y:groundY-b.h-30,txt:"ベコッ！",life:0.8,vy:-1,col:"#ffd9a0",size:24,pop:1.4});
     }
     if(perfect){
       api.tone(1320,0.1,"square",0.2);api.slide(700,1400,0.18,0.14,"sine");
-      floats.push({x:b.x,y:groundY-b.h-44,txt:"PERFECT!",life:1.1,vy:-1.4,col:"#fff04a",size:38,pop:1.8});
+      addFloat({x:b.x,y:groundY-b.h-44,txt:"PERFECT!",life:1.1,vy:-1.4,col:"#fff04a",size:38,pop:1.8,keep:true});
     }
-    if(b.type==="gold")floats.push({x:b.x,y:groundY-b.h-44,txt:"+"+gain,life:1.1,vy:-1.3,col:"#ffd23f",size:40,pop:1.7});
+    if(b.type==="gold")addFloat({x:b.x,y:groundY-b.h-44,txt:"+"+gain,life:1.1,vy:-1.3,col:"#ffd23f",size:40,pop:1.7});
     // ① にじいろビル 撃破: 虹色の破片＋にじ色のカラーウォッシュ＋大きな祝福バナー(激レアの爽快ごほうび)
     if(b.type==="rainbow"){
       rbMsgT=1.4;colorWash=Math.min(1,colorWash+0.7);washHue="#ff5da2";
@@ -176,7 +185,7 @@ function buildRobot(api){
         sparks.push({x:b.x,y:groundY-b.h*0.6,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-3,life:1,decay:rnd(0.016,0.03),col:RB[k%RB.length],r:rnd(2,4.5)});}
       for(let k=Math.round(rint(8,12));k>0;k--)shards.push({x:b.x+rnd(-b.w/2,b.w/2),y:groundY-b.h*rnd(0,1),vx:rnd(-8,8),vy:rnd(-12,-3),s:rnd(b.w*0.1,b.w*0.2),color:RB[k%RB.length],rot:rnd(0,TAU),vr:rnd(-0.5,0.5),life:1,decay:rnd(0.008,0.014)});
       waves.push({x:b.x,y:groundY,r:b.w*0.3,max:slotW*3,life:1});
-      floats.push({x:b.x,y:groundY-b.h-70,txt:"にじいろ！",life:1.2,vy:-1.1,col:"#ff5da2",size:44,pop:1.9});
+      addFloat({x:b.x,y:groundY-b.h-70,txt:"にじいろ！",life:1.2,vy:-1.1,col:"#ff5da2",size:44,pop:1.9});
     }
     // ② ラッキー色 命中: 頭上に星がキラッ＋小さな祝福(白飛びしないよう控えめ)
     if(isLucky){
@@ -184,21 +193,21 @@ function buildRobot(api){
       const ty=groundY-b.h-24;
       for(let k=0;k<5;k++){const a=-TAU*0.5*rnd(0.2,0.8),sp=rnd(2,5);
         sparks.push({x:b.x,y:ty,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1.5,life:1,decay:rnd(0.02,0.035),col:luckyColor,r:rnd(2,4)});}
-      floats.push({x:b.x,y:ty,txt:"ラッキー！",life:1,vy:-1.1,col:luckyColor,size:26,pop:1.5});
+      addFloat({x:b.x+b.w*0.6,y:ty,txt:"ラッキー！",life:1,vy:-1.1,col:luckyColor,size:22,pop:1.5});
     }
-    if(combo>1)floats.push({x:b.x,y:groundY-b.h-20,txt:"x"+combo,life:1,vy:-1.2,col:combo>=6?"#ff3b3b":combo>=3?"#ff8c42":"#ffd23f",size:combo>=4?42:30,pop:1.6});
+    if(combo>=4)addFloat({x:b.x,y:groundY-b.h-20,txt:"x"+combo,life:1,vy:-1.2,col:combo>=6?"#ff3b3b":combo>=3?"#ff8c42":"#ffd23f",size:combo>=4?42:30,pop:1.6});
     // --- chain collapse: tall chain-building topples its neighbours ---
     if(b.type==="chain"&&!chained){
       const idx=builds.indexOf(b);
       [idx-1,idx+1].forEach((j,n)=>{const nb=builds[j];if(nb&&nb.state==="up"){setTimeout(()=>{if(nb.state==="up")impact(nb,false,true);},120+n*90);}});
-      floats.push({x:b.x,y:groundY-b.h-70,txt:"れんさ！",life:1.1,vy:-1.2,col:"#ff7adb",size:34,pop:1.7});
+      addFloat({x:b.x,y:groundY-b.h-70,txt:"れんさ！",life:1.1,vy:-1.2,col:"#ff7adb",size:34,pop:1.7});
     }
   }
   function startRampage(){
     rampage=1;rampageT=4.0;rampagePulse=1;
     colorWash=1;washHue="#ff3b6b";api.shake(20);api.boom(0.6);tryHitStop(6);
     api.slide(200,800,0.4,0.18,"sawtooth");api.tone(440,0.2,"square",0.16);
-    floats.push({x:api.W/2,y:groundY-api.H*0.32,txt:"むそうモード！",life:1.4,vy:-0.8,col:"#ff3b6b",size:50,pop:2});
+    addFloat({x:api.W/2,y:groundY-api.H*0.32,txt:"むそうモード！",life:1.4,vy:-0.8,col:"#ff3b6b",size:50,pop:2,keep:true});
   }
   function rampageW(){return rampage?1.5:1;} // robot size multiplier
   reset();
@@ -231,7 +240,7 @@ function buildRobot(api){
         api.tone(1318,0.1,"triangle",0.1);setTimeout(()=>api.tone(1760,0.12,"triangle",0.08),80);
         for(let k=0;k<10;k++){const a=rnd(0,TAU),sp=rnd(2,6);
           sparks.push({x:shooter.x,y:shooter.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1,life:1,decay:rnd(0.02,0.035),col:k%2?"#ffd23f":"#fff4c2",r:rnd(2,4)});}
-        floats.push({x:shooter.x,y:shooter.y-10,txt:"＋2",life:1,vy:-1.2,col:"#ffd23f",size:30,pop:1.6});
+        addFloat({x:shooter.x,y:shooter.y-10,txt:"＋2",life:1,vy:-1.2,col:"#ffd23f",size:30,pop:1.6});
         shooter=null;return;
       }
       /* 空ぶり: 小さな白い波紋だけ(得点なし) */
@@ -364,8 +373,8 @@ function buildRobot(api){
       for(const f of floats){f.y+=f.vy*dt;f.life-=0.016*dt;if(f.pop>1)f.pop+=(1-f.pop)*0.2*dt;
         g.save();g.globalAlpha=Math.max(0,f.life);g.translate(f.x,f.y);g.scale(f.pop,f.pop);
         g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-        g.shadowColor=f.col;g.shadowBlur=14;
-        g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText(f.txt,0,0);g.fillStyle=f.col;g.fillText(f.txt,0,0);
+        g.shadowColor=f.col;g.shadowBlur=8;
+        g.lineWidth=8;g.strokeStyle="rgba(0,0,0,.75)";g.strokeText(f.txt,0,0);g.fillStyle=f.col;g.fillText(f.txt,0,0);
         g.restore();}
       g.globalAlpha=1;g.textAlign="left";floats=floats.filter(f=>f.life>0);
       // impact flash overlay

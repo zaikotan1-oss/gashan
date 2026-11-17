@@ -7,6 +7,7 @@ function buildMeteor(api){
   let stage,wave,meteorSp,clearT,clearStars,clearName,banner,banT,ufoT,finalDone,stageBest;
   const BCOL=["#e0563a","#3a8ee6","#f5c518","#9b6bff","#ff8c42","#e85d9a"];
   // ---- 隠し発見レイヤー(クレーン/ハンマー/トラックと同じ思想) ----
+  let lastScoreT=0;  // 最後に得点した時刻(tnow単位)。取りこぼしが続いた時の着弾吸着に使う
   let luckyColor,luckySeen,luckyMsgT,rbMsgT,perfMsgT,stageWasted,moonWink;  // ②ラッキー色 ①にじいろ ③パーフェクト ④月ひみつ
   const moonHit={x:0,y:0,r:0};   // ④ 月ひみつタップの当たり判定(描画と一致)
   const COLNAME={"#e0563a":"あか","#3a8ee6":"あお","#f5c518":"きいろ","#9b6bff":"むらさき","#ff8c42":"オレンジ","#e85d9a":"ピンク"};
@@ -57,12 +58,12 @@ function buildMeteor(api){
   function mkMotes(){motes=[];for(let i=0;i<22;i++)motes.push({x:Math.random(),y:Math.random(),r:rnd(1.4,4),ph:rnd(0,TAU),sp:rnd(0.012,0.03),drift:rnd(0.1,0.4),col:pick(["#ffd27a","#ffb24a","#bcd0ff","#ff7ac0"])});}
   function reset(){objs=[];meteors=[];craters=[];rings=[];fire=[];shards=[];dust=[];floats=[];sparks=[];embers=[];ufos=[];count=0;combo=0;comboT=0;flash=0;colorWash=0;scorePop=0;bestCombo=0;
     stage=1;wave=0;meteorSp=14;clearT=0;clearStars=0;clearName="";banner="";banT=0;ufoT=rnd(180,320);finalDone=false;stageBest=0;
-    luckyColor=pick(BCOL);luckySeen=false;luckyMsgT=0;rbMsgT=0;perfMsgT=0;stageWasted=0;moonWink=0;
+    lastScoreT=tnow;luckyColor=pick(BCOL);luckySeen=false;luckyMsgT=0;rbMsgT=0;perfMsgT=0;stageWasted=0;moonWink=0;
     mkStars();mkMotes();layout();
     banner=skyOf().name+"まちを ぜんぶ こわせ！";banT=2.2;}
   // begin a fresh street for the current stage
   function startStage(){
-    stageBest=0;stageWasted=0;   // ③ パーフェクト判定: この街で「1発も外さず(空振り無し)」を数え直す
+    stageBest=0;stageWasted=0;lastScoreT=tnow;   // ③ パーフェクト判定: この街で「1発も外さず(空振り無し)」を数え直す
     meteorSp=clamp(14+stage*1.7,15,27); // meteors fall a touch faster each stage (7〜8歳向けに少し速め)
     objs=[];ufos=[];meteors=[];layout();
     banner=skyOf().name+"まちを ぜんぶ こわせ！";banT=2.2;
@@ -74,11 +75,13 @@ function buildMeteor(api){
   function drop(tx){
     // 終盤(残り2体以下)は着弾点を最寄りの残存オブジェクトへ寄せる。ランダムタップでも当たりやすくし、
     // 無反応時間(maxQuietSec)が終盤の低命中率で跳ね上がるのを防ぐ(軸3対策)。狙って外すのは通常どおり自由。
-    if(standCount()<=3){
+    // 追加(軸3の保険): 6秒(tnow=360)得点が無い時も最寄りへ寄せる。序盤は広い判定のまま、取りこぼしが続いた時だけ助ける。
+    const cold=tnow-lastScoreT>360;
+    if(standCount()<=3||cold){
       let best=null,bd=Infinity;
       for(const o of objs){if(o.state!=="stand")continue;
         const d=Math.abs(o.x-tx);if(d<bd){bd=d;best=o;}}
-      if(best&&bd<=slotW*4)tx=best.x;
+      if(best&&(cold||bd<=slotW*4))tx=best.x;
     }
     const ty=groundY-4;
     meteors.push({x:tx-api.H*0.5,y:-60,tx,ty,r:clamp(api.W*0.04,18,30),life:1,trail:0});
@@ -99,6 +102,7 @@ function buildMeteor(api){
       sparks.push({x,y:groundY,vx:Math.cos(a)*s,vy:Math.sin(a)*s,len:rnd(8,18),life:1,decay:rnd(0.03,0.06),col:pick(["#fff2a0","#ffd23f","#fff"])});}
     for(let i=0;i<5;i++)dust.push({x:x+rnd(-slotW,slotW),y:groundY,r:rnd(slotW*0.2,slotW*0.4),vr:rnd(1,2.5),vx:rnd(-4,4),life:1,decay:rnd(0.01,0.02)});
     const R=slotW*1.8;let hitCount=0;
+    const lastShot=clearT<=0&&standCount()>0;  // 軸6: この1発で全部倒れうるか(後で判定)
     for(const o of objs){if(o.state!=="stand")continue;
       const d=Math.abs(o.x-x);
       if(d<=R){const dir=o.x>=x?1:-1;
@@ -139,7 +143,7 @@ function buildMeteor(api){
         floats.push({x:u.x,y:u.y-30,txt:"ボーナス！",life:1,vy:-1.2,col:"#7affd2",size:38});}
     }
     // コンボは命中した時だけ伸ばす(空振りでx2等が出ていた実装ミスの修正・軸2/軸3対策)
-    if(hitCount>0){combo++;comboT=1;}
+    if(hitCount>0){combo++;comboT=1;lastScoreT=tnow;}
     // ③ パーフェクト判定: 何も壊せなかった空振りを1回でもしたら パーフェクトは消える
     if(hitCount===0&&clearT<=0)stageWasted++;
     // hitStop is reserved for standout moments only (multi-destroy, or first impact
@@ -150,8 +154,12 @@ function buildMeteor(api){
     if(combo>bestCombo)bestCombo=combo;
     if(combo>stageBest)stageBest=combo;
     if(hitCount>=4){colorWash=1;washHue=hitCount>=6?28:48;api.shake(38);}
-    if(hitCount>=3)floats.push({x,y:groundY-100,txt:hitCount+"はかい！",life:1,vy:-1.1,col:hitCount>=6?"#ff3b3b":"#ff8c42",size:hitCount>=6?46:34});
-    else if(combo>1){floats=floats.filter(f=>!/^x\d/.test(f.txt));floats.push({x,y:groundY-100,txt:"x"+combo,life:1,vy:-1.1,col:combo>=5?"#ff8c42":"#ffd23f",size:32});}
+    // 軸6: 最後の1発(面クリアになる)は パーフェクト！＋3 と同じ帯を通らないよう低い所から浮かせ、中央からも少しずらす
+    const finalShot=lastShot&&standCount()===0;
+    const fy=finalShot?groundY-60:groundY-100;
+    let fx=x;if(finalShot&&Math.abs(x-api.W/2)<api.W*0.2)fx=x<api.W/2?api.W/2-api.W*0.2:api.W/2+api.W*0.2;
+    if(hitCount>=3)floats.push({x:fx,y:fy,txt:hitCount+"はかい！",life:1,vy:-1.1,col:hitCount>=6?"#ff3b3b":"#ff8c42",size:hitCount>=6?46:34});
+    else if(combo>1){floats=floats.filter(f=>!/^x\d/.test(f.txt));floats.push({x:fx,y:fy,txt:"x"+combo,life:1,vy:-1.1,col:combo>=5?"#ff8c42":"#ffd23f",size:32});}
     // stage clear: every building/tree toppled
     if(clearT<=0&&standCount()===0)clearStage();
   }
@@ -443,13 +451,13 @@ function buildMeteor(api){
       g.globalAlpha=1;g.textAlign="left";}
     // ① にじいろビル！ 発見バナー(虹色に色替わり=激レアの大きな祝福・中央上=HUD安全帯)
     if(rbMsgT>0){const pop=1+Math.max(0,rbMsgT-1)*1.3,col=["#ff5da2","#ffd23f","#5ad1ff","#7be08a","#9b6bff"][Math.floor(tnow*0.15)%5];
-      g.save();g.translate(api.W/2,api.H*0.2);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
+      g.save();g.translate(api.W/2,api.H*(clearT>0?0.44:0.2));g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
       g.globalAlpha=clamp(rbMsgT*1.4,0,1);g.font="900 "+clamp(api.W*0.07,30,48)+"px 'Hiragino Maru Gothic ProN',system-ui";
       g.lineWidth=8;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText("にじいろビル！",0,0);
       g.fillStyle=col;g.fillText("にじいろビル！",0,0);
       g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";}
     // ② きょうのラッキー色 ヒント(初回だけ大きく・以降は小さく)
-    if(luckyMsgT>0){g.save();g.translate(api.W/2,api.H*0.28);g.textAlign="center";g.textBaseline="middle";
+    if(luckyMsgT>0){g.save();g.translate(api.W/2,api.H*(clearT>0?0.34:0.28));g.textAlign="center";g.textBaseline="middle";
       g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 "+clamp(api.W*0.038,18,26)+"px 'Hiragino Maru Gothic ProN',system-ui";
       const t2="きょうのラッキーいろは "+(COLNAME[luckyColor]||"")+"！";
       g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.45)";g.strokeText(t2,0,0);
@@ -457,7 +465,7 @@ function buildMeteor(api){
       g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";}
     // ③ パーフェクト！ ボーナス(クリア文字と重ねない下側)
     if(perfMsgT>0){const pop=1+Math.max(0,perfMsgT-1.3)*1.3;
-      g.save();g.translate(api.W/2,api.H*0.62);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
+      g.save();g.translate(api.W/2,api.H*0.54);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
       g.globalAlpha=clamp(perfMsgT*1.3,0,1);g.font="900 "+clamp(api.W*0.055,26,38)+"px 'Hiragino Maru Gothic ProN',system-ui";
       g.lineWidth=7;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText("パーフェクト！＋3",0,0);
       g.fillStyle="#c7ffcf";g.fillText("パーフェクト！＋3",0,0);

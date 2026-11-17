@@ -48,16 +48,19 @@ function build_icicle(api){
 
   function spawnWalker(direct){
     // a snow-blob or hut walking along the ground(+新形状: そり(sled)・雪だるまタワー(tower))
-    const kinds=stage>=3?["blob","blob","hut","big","tower","sled"]:stage>=2?["blob","blob","hut","sled","tower"]:["blob","blob","blob","hut","sled"];
+    const kinds=stage>=3?["blob","blob","hut","big","tower","sled"]:stage>=2?["blob","blob","hut","sled","tower"]:["blob","blob","hut","sled"];
     let kind=pick(kinds);
     // rare golden snowball: fast, shiny, worth a lot (7%)
     if(Math.random()<0.07)kind="gold";
     const dir=Math.random()<0.5?1:-1;
     const r=kind==="big"?rnd(40,48):kind==="tower"?rnd(28,34):kind==="hut"?rnd(36,44):kind==="gold"?rnd(26,32):kind==="sled"?rnd(28,34):rnd(26,36);
     const sp=clamp((kind==="hut"?0.55:kind==="gold"?1.45:kind==="tower"?0.75:kind==="sled"?1.05:0.95)+(stage-1)*0.14,0.4,2.8)*dir;  // 7〜8歳向けに少し速め
-    const startX=direct?rnd(W*0.25,W*0.75):(dir>0?-r-10:W+r+10);  // 直接出現(direct)は画面内、それ以外は従来どおり画面端
+    const dIc=direct&&icicles.length?icicles[Math.floor(icicles.length/2)+rint(-1,1)]||icicles[0]:null;   // 1体目は中ほどのつららの真下あたり(進む向きの少し手前)に置く=最初のタップがすぐ当たる
+    const startX=direct?(dIc?clamp(dIc.x-Math.sign(sp)*18,W*0.2,W*0.8):rnd(W*0.25,W*0.75)):(dir>0?-r-10:W+r+10);  // 直接出現(direct)は画面内、それ以外は従来どおり画面端
+    // 出現位置(画面の端)の2r以内に生きた的がいたら今回は出さず、すぐ次に延ばす(端で雪だまが団子にならず、形の違いが読める)
+    if(!direct&&walkers.some(w=>!w.dead&&Math.abs(w.x-startX)<2*Math.max(r,w.r))){spawnT=8;return false;}
     walkers.push({x:startX,y:groundY,r,kind,sp,vx:0,rot:0,
-      hp:kind==="big"?2:1,bob:rnd(0,TAU),squash:1,dead:false,flash:0,
+      hp:kind==="big"?2:1,maxhp:kind==="big"?2:1,bob:rnd(0,TAU),squash:1,dead:false,flash:0,
       col:kind==="hut"?"#8fb8d8":kind==="gold"?"#ffd23f":"#eef6ff",
       scarf:(kind==="blob"||kind==="big"||kind==="tower"||kind==="sled")?pick(SCARF).c:null});  // ② マフラーの色=ラッキー色の手がかり
     if(kind==="gold"){ // "!" chime so it grabs attention the moment it appears
@@ -87,13 +90,14 @@ function build_icicle(api){
   function smashWalker(wk,hx,hy){
     if(wk.kind==="big"&&wk.hp>1&&fever<=0){   // during fever everything pops in one hit
       wk.hp--;wk.flash=1;wk.squash=0.8;
+      count++;api.setScore(count);   // でかだまの1発目も+1(あと1発のワクワク。無反応の時間を作らない)。2発目で base 2 → 合計はこれまでと同じ3
       api.noise(0.08,0.16,1600,"highpass",0.9);api.tone(360,0.07,"square",0.1);api.shake(4);
       hitFx(hx,hy,"#dfeeff",false,false);return;
     }
     wk.dead=true;wk.squash=1.3;
     const gold=wk.kind==="gold";
     const rainbow=wk.kind==="rainbow";
-    const base=rainbow?8:gold?5:wk.kind==="hut"?2:wk.kind==="big"?3:wk.kind==="tower"?2:1;
+    const base=rainbow?8:gold?5:wk.kind==="hut"?2:wk.kind==="big"?(wk.hp<=1&&wk.maxhp>1?2:3):wk.kind==="tower"?2:1;
     // ② ラッキー色: きょうの秘密の色のマフラーを持つ子を落とすと +2 の隠しボーナス
     const isLucky=!rainbow&&!gold&&wk.scarf&&wk.scarf===luckyColor;
     let gain=base*(fever>0?2:1);                 // fever = double points
@@ -127,6 +131,10 @@ function build_icicle(api){
         // ⑤ タワーだけ「へこむ」ではなく横に転がりながら崩れる(倒れる/吹っ飛ぶ)。段ごとに高さをずらして破片を出す。
         wk.vx=(wk.sp>=0?1:-1)*rnd(3.5,6);
         for(let i=0;i<3;i++)hitFx(hx,hy-wk.r*0.7*i,i===2?"#eef6ff":wk.col,i===0,false);
+      }else if(wk.kind==="hut"){
+        // おうちは屋根ごと少し吹っ飛ぶ(tower と同じ vx の仕組みを再利用。くずれ方の違い)
+        wk.vx=(wk.sp>=0?1:-1)*rnd(2,3.5);
+        hitFx(hx,hy,wk.col,combo>=5,false);hitFx(hx,hy-wk.r*0.8,"#c8dff0",false,false);
       }else{
         hitFx(hx,hy,wk.col,combo>=5,false);
       }
@@ -221,7 +229,20 @@ function build_icicle(api){
         if(d<bd){bd=d;best=ic;}
       }
       const pickR=stage===1?Math.max(W*0.30,170):Math.max(W*0.20,110);
-      if(best&&bd<pickR){dropIcicle(best);return;}
+      if(best&&bd<pickR){
+        // ステージ2以降: タップ位置のX付近(±60px)に歩く的が1体もいない時は落とさない(叱らず、低い音だけ)。
+        // 的の近くをタップした時は、その的の少し先(落ちる間に進む分)にいちばん近いつららを落とす=的を見て狙った子が報われる。
+        if(stage>=2){
+          let tw=null,td=1e9;
+          for(const wk of walkers){if(wk.dead||wk.x<-wk.r||wk.x>W+wk.r)continue;
+            const dx=Math.abs(wk.x-x);if(dx<60+wk.r*0.3&&dx<td){td=dx;tw=wk;}}
+          if(!tw){api.tone(300,0.05,"triangle",0.05);return;}
+          const aim=tw.x+tw.sp*36;let ab=null,ad=1e9;
+          for(const ic of icicles){if(!ic.ready)continue;const dd=Math.abs(ic.x-aim);if(dd<ad){ad=dd;ab=ic;}}
+          if(ab)best=ab;
+        }
+        dropIcicle(best);return;
+      }
       // tap landed nowhere useful: gentle feedback (no crash on empty)
       api.tone(300,0.05,"triangle",0.05);
     },
@@ -316,8 +337,8 @@ function build_icicle(api){
         // ① にじいろだま: ステージ2以降、ときどき(約6%)予告を出してから登場(いつ来るか=ドキドキ)
         if(stage>=2&&fever<=0&&rainbowPending<=0&&!walkers.some(w=>w.kind==="rainbow"&&!w.dead)&&Math.random()<0.06){
           rainbowPending=100;rainbowDir=Math.random()<0.5?1:-1;api.tone(988,0.1,"sine",0.06);
-        }else spawnWalker();
-        spawnT=clamp(70-(stage-1)*9,34,70)*(fever>0?0.4:1);}   // 軸3(c)対策: 外した直後でも次の的が早く来るよう間隔を詰める(7〜8歳向け)
+        }else if(spawnWalker()===false)spawnT=8;   // 端が混んでいたら次フレーム側へ延ばす
+        if(spawnT<=0)spawnT=(stage===1?70:clamp(82-(stage-1)*7,50,82))*(fever>0?0.4:1);}   // 軸3(c)対策: 外した直後でも次の的が早く来るよう間隔を詰める(7〜8歳向け)
         if(rainbowPending>0){rainbowPending-=dt;if(rainbowPending<=0)spawnRainbow();}}
 
       // ---------- walkers ----------
@@ -353,7 +374,7 @@ function build_icicle(api){
         for(const wk of walkers){
           if(wk.dead)continue;
           const tipY=d.y;
-          const hitR=stage===1?wk.r*1.25:wk.r*0.95;         // ③ ステージ1(はじめて遊ぶ回)だけ判定を緩めて当てやすくする。2以降は現状(0.95)を維持して歯ごたえを保つ。
+          const hitR=stage===1?wk.r*1.25:stage===2?wk.r*0.88:stage===3?wk.r*0.85:wk.r*0.8;         // ③ ステージ1(はじめて遊ぶ回)だけ判定を緩めて当てやすくする。2以降は現状(0.95)を維持して歯ごたえを保つ。
           const topSpan=wk.kind==="tower"?wk.r*2.7:wk.r*1.6;  // タワーは背が高いので上側の当たり判定も伸ばす
           if(Math.abs(d.x-wk.x)<hitR&&tipY>=wk.y-topSpan&&tipY<=wk.y+wk.r*0.3){
             smashWalker(wk,d.x,wk.y-wk.r*0.6);hit=true;break;

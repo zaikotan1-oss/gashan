@@ -12,6 +12,7 @@ function build_gummy(api){
   // ② きょうのラッキー色: セッション秘密の1色。そのグミを つぶすと 小ボーナス＋頭上に星のキラッ
   let luckyColor,luckyMsgT=0,luckySeen=false;
   let rbMsgT=0;                 // ① にじいろグミ 発見バナー
+  let missStreak=0,idleT=0;                // 連続ミス数(3回続けて外した子には次の1回だけ吸着を広げる=叱らない助け)
   let stageEscaped=0,perfectT=0; // ③ パーフェクト: この ステージで 1こも にがさず たおしたら ボーナス
   // per-stage candy palettes (pastel sweet-world backdrops)
   const STAGE_BG=[
@@ -168,9 +169,12 @@ function build_gummy(api){
       m:{kind:"boss",color:"#ff4d8d",state:"up",up:1,wob:rnd(0,TAU),bob:rnd(0,TAU),
          flash:0,blink:999,squash:1,hp:9,life:9999,baseY:0,x:0,hi:-1}};
     api.boom(0.55);api.shake(12);api.slide(120,60,0.5,0.4,"sine");
+    // すでに出ている真ん中の穴のグミは ひっこめて、キングの足と かさならないようにする
+    for(const m of moles)if(m.hi===4&&(m.state==="up"||m.state==="rise"))m.state="duck";
   }
   function hitBoss(){
     if(!boss||boss.state==="die")return;
+    missStreak=0;idleT=0;
     boss.hp--;boss.hurt=1;boss.m.flash=1;boss.m.wob=0;
     combo++;comboT=0.9;count++;api.setScore(count);
     flashCol="#ff4d8d";flash=Math.min(1,flash+0.25);
@@ -200,9 +204,10 @@ function build_gummy(api){
   }
   function smash(m){
     // hard jelly: first tap only wobbles it (fever time: everything pops in 1 tap)
-    if(m.kind==="jelly"&&m.hp>1&&feverT<=0){m.hp--;m.flash=1;m.squash=0.8;m.wob=0;
+    if(m.kind==="jelly"&&m.hp>1&&feverT<=0){missStreak=0;idleT=0;m.hp--;m.flash=1;m.squash=0.8;m.wob=0;
       api.slide(360,240,0.1,0.2,"sine");api.noise(0.06,0.1,1200);api.shake(4);
       smashFx(m.x,m.baseY-R*0.5,"#cfeee6",false);return;}
+    missStreak=0;idleT=0;
     m.state="smashed";m.squash=1;holes[m.hi].occ=false;
     let gain=m.kind==="gold"?3:(m.kind==="rainbow"?6:1);
     // ② きょうのラッキー色: 秘密の色(ふつうのグミ)を つぶすと +1 の隠しボーナス。気づくと得する。
@@ -246,14 +251,15 @@ function build_gummy(api){
         const d=Math.hypot(x-m.x,y-my);
         if(d<bd){bd=d;best=m;}}
       // さいしょの1こ(count===0)だけは広めに吸着=最初の成功を必ず来させる。2こ目からは狙わないと当たらない半径。
-      const assist=count===0?Math.max(R*3.2,150):Math.max(R*2.0,80);
+      // ふつうは グミの見た目よりひとまわり大きい程度(R*1.5)。3回つづけて外したら次の1回だけ広げる(たすけるけど しからない)。
+      const assist=count===0?Math.max(R*3.2,150):(missStreak>=3?Math.max(R*2.0,80):idleT>4?Math.max(R*2.4,100):Math.max(R*1.5,70));
       if(best&&bd<assist){smash(best);return;}
       // ④ ひみつ発見: そらに ういている おかしを タップすると きらめき＋コイン(＋1)。げんてん なし。
       // 1こにつき1回だけ(画面外へ流れて再登場したら また光る) = 連打の的にならない
       for(const s of sweets){
         const sy=s.y+Math.sin(s.ph)*s.amp;
         if(!s.tapped&&Math.hypot(x-s.x,y-sy)<Math.max(R*0.9,34)){
-          s.tapped=true;count+=1;api.setScore(count);
+          s.tapped=true;missStreak=0;idleT=0;count+=1;api.setScore(count);
           api.tone(1318,0.1,"triangle",0.09);api.tone(1760,0.12,"triangle",0.07);
           floats.push({x:s.x,y:sy-10,txt:"＋1",life:1,vy:-0.8,col:"#ffd23f",size:22});
           smashFx(s.x,sy,s.col,false); // ④ そらのおかしも壊れた感(リング/破片/スパーク)を出す。得点はgum並みの+1のまま
@@ -261,6 +267,7 @@ function build_gummy(api){
         }
       }
       // miss: tiny candy puff feedback
+      missStreak++;
       api.tone(260,0.05,"sine",0.08);
       for(let i=0;i<5;i++){const a=rnd(0,TAU),s=rnd(2,5);
         sparks.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,len:rnd(5,11),life:1,decay:rnd(0.06,0.1)});}
@@ -336,6 +343,7 @@ function build_gummy(api){
       }
       // ---- spawning (paused on clear) ----
       if(hsCool>0)hsCool--;
+      if(clearT<=0)idleT+=0.016*dt;   // 4秒なにも当てられないと次のタップは広めにすいつく(こまっている子をたすける)
       const paused=clearT>0;
       if(!paused){
         spawnT-=dt;
@@ -343,7 +351,7 @@ function build_gummy(api){
         if(!moles.some(m=>m.state!=="smashed")&&spawnT>4&&!boss)spawnT=4;
         if(spawnT<=0){spawn();
           if(feverT>0&&Math.random()<0.5)spawn(); // fever: gummies flood out
-          spawnT=clamp(38-(stage-1)*5,20,38);   // 7〜8歳向け: 出現テンポを少し速く
+          spawnT=clamp(34-(stage-1)*5,20,34);   // 7〜8歳向け: 出現テンポを少し速く
           if(bossStage&&boss)spawnT*=1.15;        // boss fight: fewer distractions
           if(feverT>0)spawnT=Math.min(spawnT,15);
         }
@@ -574,7 +582,7 @@ function build_gummy(api){
     g.beginPath();g.rect(bx-R*3.4,0,R*6.8,base+R*0.66);g.clip();
     g.translate(bx,by);g.scale(2.3,2.3);g.translate(-bx,-by);
     drawGummy(boss.m,bx,by,sq);
-    drawCrown(bx,by-R*1.28*sq);
+    drawCrown(bx,by-R*0.92*sq);
     g.restore();
   }
   function drawCrown(x,cy){

@@ -24,7 +24,7 @@ function build_gumball(api){
   const STAGES=5;
   const CANDY=["#ff7bb5","#5ad0ff","#ffd23f","#7be08a","#ff8c42","#b58bff","#ff5b8a","#5be0c0"];
   const SWEET_KINDS=["candy","choco","gummy","cake","donut"];
-  const SWEET_SIZE={candy:1.0,choco:1.25,gummy:0.8,cake:1.05,donut:1.15}; // 軸7: 種類ごとの大小コントラスト
+  const SWEET_SIZE={candy:1.0,choco:1.45,gummy:0.8,cake:1.05,donut:1.15}; // 軸7: 種類ごとの大小コントラスト
   // ステージごとの空グラデ(お菓子の国のパステル)
   const SKY=[
     {a:"#ffe3f1",b:"#ffd0e8",c:"#ffc2a8"}, // いちごミルク
@@ -65,13 +65,14 @@ function build_gumball(api){
 
   function spawnSweets(){
     // トップアップ式: 生き残りは残したまま目標数まで補充する(尽きてSTALLしない)
-    const target=7+Math.min(stage,4)+(fever>0?5:0); // フィーバー中は大量発生
+    const target=7+Math.min(stage,4)+(fever>0?4:0); // フィーバー中は大量発生
     for(let i=sweets.length;i<target;i++){
       const relx=rnd(0.30,0.92);
       const x=clamp(relx*W,unit,W-unit);
-      const onGround=Math.random()<0.7;
+      const airN=sweets.filter(q=>q.air&&!q.dead).length;
+      const onGround=airN>=3||Math.random()<0.55;   // 空中のお菓子が溜まりすぎない(地面分は必ず残る)
       // 空中に出す場合も坂の少し上(必ずボールが届く高さへ落ちてくる)
-      const y=onGround? slopeAt(x)-unit*0.5 : slopeAt(x)-unit*rnd(1.2,3.0);
+      const y=onGround? slopeAt(x)-unit*0.5 : slopeAt(x)-unit*rnd(2.0,3.6);
       // ① 激レア にじいろガムボール(ステージ2以降・約3%): 虹色に光り、食べると大量点+虹の大破裂
       const rainbow=(stage>=2)&&Math.random()<0.032;
       // 低確率でゴールドキャンディ(星型・光る・大量点)
@@ -79,7 +80,7 @@ function build_gumball(api){
       const kind=(rainbow||gold)?"candy":pick(SWEET_KINDS);
       sweets.push({relx,x,y,kind,
         col:rainbow?"#ff5b8a":(gold?"#ffd23f":pick(CANDY)),
-        r:unit*(rainbow?1.12:gold?1.0:SWEET_SIZE[kind]*rnd(0.9,1.05)),rot:rnd(0,TAU),vr:rnd(-0.02,0.02),bob:rnd(0,TAU),dead:false,gold,rainbow});
+        r:unit*(rainbow?1.12:gold?1.0:SWEET_SIZE[kind]*rnd(0.9,1.05)),rot:rnd(0,TAU),vr:rnd(-0.02,0.02),bob:rnd(0,TAU),dead:false,gold,rainbow,air:!onGround});
     }
   }
   spawnSweets();
@@ -108,6 +109,7 @@ function build_gumball(api){
       sparks.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:1,decay:rnd(0.03,0.06),s:rnd(1.5,3.5),col});}
   }
   function addFloat(f){ if(floats.length>=6) floats.shift(); floats.push(f); }  // 同時表示数に上限
+  function bigY(hy){ return Math.max(H*0.18,Math.min(hy-unit*1.3,ball.y-ball.r-unit*0.8)); }   // 軸6: 大きいボールの上端より上に出す
   function ringAt(x,y,col){ rings.push({x,y,r:unit*0.5,vr:unit*0.6,life:1,decay:0.05,col}); }
 
   function eatSweet(s){
@@ -121,8 +123,8 @@ function build_gumball(api){
     count+=gain;stageEat++;ball.eaten++;combo++;comboT=0.9;
     api.setScore(count);
     // フィーバーゲージ蓄積(レアは大きく進む)
-    feverGauge=Math.min(1,feverGauge+(s.rainbow?0.5:s.gold?0.34:0.09));
-    if(fever<=0&&feverGauge>=1&&clearT<=0&&endingT<=0) startFever();
+    if(fever<=0) feverGauge=Math.min(1,feverGauge+(s.rainbow?0.5:s.gold?0.34:0.075));   // フィーバー中は溜めない(終わった直後にまたフィーバーが連続して、特別感が消えるのを防ぐ)
+    if(fever<=0&&feverGauge>=1&&clearT<=0&&endingT<=0&&stageEat<stageGoal) startFever();   // 軸6: 最後の1個でゲージ満タンなら、クリア帯が消えるまでフィーバーを保留(文字が重ならない)
     // ガムボールが大きくカラフルに育つ
     ball.r=Math.min(ball.r+unit*0.12, unit*2.0);
     if(ball.eaten%2===0) ball.col=pick(CANDY);
@@ -169,8 +171,8 @@ function build_gumball(api){
       col:s.rainbow?"#ff5b8a":s.gold?"#ffd23f":"#ff2bff",size:s.rainbow?36:s.gold?34:26});
     if(combo>1&&(combo<=3||combo%5===0)) addFloat({x:hx,y:hy-unit*0.6,txt:"x"+combo,life:1,vy:-1,
       col:combo>=8?"#ff2bff":combo>=5?"#ff5b8a":"#ffd23f",size:combo>=4?38:28});
-    if(ball.eaten===4) addFloat({x:hx,y:hy-unit*1.3,txt:"おおきく なった！",life:1,vy:-0.7,col:"#ffe14a",size:22});
-    if(ball.eaten===8) addFloat({x:hx,y:hy-unit*1.3,txt:"きょだいガムボール！",life:1,vy:-0.7,col:"#ff2bff",size:22});
+    if(ball.eaten===4) addFloat({x:hx,y:bigY(hy),txt:"おおきく なった！",life:1,vy:-0.7,col:"#ffe14a",size:22});
+    if(ball.eaten===8) addFloat({x:hx,y:bigY(hy),txt:"きょだいガムボール！",life:1,vy:-0.7,col:"#ff2bff",size:22});
     checkStage();
   }
 
@@ -277,9 +279,10 @@ function build_gumball(api){
         return;
       }
       if(ball&&ball.rolling&&!ball.done){
-        const near=Math.hypot(x-ball.x,y-ball.y)<unit*2.0;
+        const near=Math.hypot(x-ball.x,y-ball.y)<unit*2.6;
         if(near){
-          ball.vx=Math.min(ball.vx+1.0,12);ball.vy=Math.min(ball.vy+0.6,6);
+          ball.vx=Math.min(ball.vx+0.6,12);
+          if(!ball.air){ ball.vy=-Math.sqrt(0.64*unit*2.3); ball.air=true; spawnSparks(ball.x,ball.y+ball.r,"#ffffff",5); }   // 軸3: ボールの近くをタップ=ジャンプ(空中のお菓子はジャンプで取る)
           api.tone(620,0.06,"triangle",0.08);
           spawnSparks(ball.x,ball.y-ball.r,ball.col,4);
         }
@@ -396,7 +399,7 @@ function build_gumball(api){
       if(fever>0&&!paused){
         fever=Math.max(0,fever-0.016*dt);
         // お菓子を絶やさない+キャンディ紙吹雪
-        if(sweets.length<11&&Math.random()<0.12) spawnSweets();
+        if(sweets.length<9&&Math.random()<0.08) spawnSweets();
         if(shards.length<80&&Math.random()<0.3)
           shards.push({x:rnd(0,W),y:-12,vx:rnd(-1,1),vy:rnd(2,4.5),s:rnd(unit*0.16,unit*0.3),
             col:pick(CANDY),rot:rnd(0,TAU),vr:rnd(-0.3,0.3),life:1,decay:0.008});
@@ -412,7 +415,7 @@ function build_gumball(api){
         s.bob+=0.05*dt;s.rot+=s.vr*dt;
         // ふわふわ落下: どの位置のお菓子も坂の上へゆっくり寄っていく(必ず食べられる)
         const sgy=slopeAt(s.x)-unit*0.5;
-        if(Math.abs(s.y-sgy)>1){ s.y+=(sgy-s.y)*Math.min(1,0.008*dt); }
+        if(!s.air&&Math.abs(s.y-sgy)>1){ s.y+=(sgy-s.y)*Math.min(1,0.008*dt); }   // 軸3: 地面のお菓子だけ坂へ降りる。空中のはその場に浮く=ジャンプで取る
         const wob=Math.sin(s.bob)*unit*0.05;
         if(s.rainbow){
           drawRainbowSweet(s,wob);
@@ -453,6 +456,7 @@ function build_gumball(api){
           ball.x+=ball.vx*dt;
           ball.y+=ball.vy*dt;
           const gy=slopeAt(ball.x)-ball.r*0.85;
+          if(ball.y>=gy-0.5){ ball.air=false; }
           if(ball.y>gy){ ball.y=gy; if(ball.vy>0)ball.vy*=0.4; }
           ball.rot+=ball.vx*0.04*dt;
           // 軸3: お菓子の巻き込みで失速しきったら一旦止まる(タイミングよく打ち直す意味が生まれる)
@@ -460,9 +464,10 @@ function build_gumball(api){
           // 当たり判定: お菓子を巻き込む + 近くのお菓子を吸い寄せるマグネット(寛容オートエイム)
           for(const s of sweets){
             if(s.dead) continue;
+            if(s.air&&!ball.air) continue;   // 軸3: 空中のお菓子は、ボールがジャンプして浮いている間だけ取れる(フィーバーは別)
             const dx=s.x-ball.x,dy=s.y-ball.y,d=Math.hypot(dx,dy)||1;
             if(d < ball.r+s.r*0.7){ eatSweet(s); continue; }
-            const pull=ball.r+unit*(fever>0?7:1.0); // フィーバー中は吸引パワーUP(通常時はほぼ接触サイズまで狭めて『狙う』余地を作る)
+            const pull=ball.r+unit*(fever>0?3.0:1.0); // フィーバー中は吸引パワーUP(通常時はほぼ接触サイズまで狭めて『狙う』余地を作る)
             if(d<pull){const f=(1-d/pull)*unit*0.6*dt;
               s.x-=dx/d*f;s.y-=dy/d*f;s.relx=s.x/W;}
           }
@@ -530,7 +535,7 @@ function build_gumball(api){
       for(const f of floats){f.y+=f.vy*dt;f.life-=0.016*dt;
         g.save();g.globalAlpha=Math.max(0,f.life);
         g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-        g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText(f.txt,f.x,f.y);
+        g.lineWidth=8;g.lineJoin="round";g.strokeStyle="rgba(0,0,0,.75)";g.strokeText(f.txt,f.x,f.y);
         g.fillStyle=f.col;g.fillText(f.txt,f.x,f.y);g.restore();}
       g.globalAlpha=1;g.textAlign="left";
       floats=floats.filter(f=>f.life>0);
@@ -554,9 +559,10 @@ function build_gumball(api){
       // ---- ヒント(最初のボールが待機中) ----
       if(ball&&!ball.rolling&&!ball.done&&!paused){
         const a=0.5+0.5*Math.sin(tsec*4);
-        g.save();g.globalAlpha=0.5+0.4*a;g.textAlign="center";
-        g.font="800 20px 'Hiragino Maru Gothic ProN',system-ui";
-        g.fillStyle="#fff";g.strokeStyle="rgba(0,0,0,.4)";g.lineWidth=4;
+        g.save();g.globalAlpha=0.8+0.2*a;g.textAlign="center";
+        g.fillStyle="rgba(0,0,0,.35)";roundRect(W/2-150,H*0.94-24,300,36,18);g.fill();   // 軸6: ピンクの道と同化しない黒い下地
+        g.font="800 24px 'Hiragino Maru Gothic ProN',system-ui";
+        g.fillStyle="#fff";g.strokeStyle="rgba(0,0,0,.7)";g.lineWidth=5;
         const hintTxt=ball.eaten>0?"ボールを タップ！":"タップで ころがそう！";
         g.strokeText(hintTxt,W/2,H*0.94);
         g.fillText(hintTxt,W/2,H*0.94);
@@ -633,7 +639,7 @@ function build_gumball(api){
         g.font="800 17px 'Hiragino Maru Gothic ProN',system-ui";g.fillStyle="#ffe6a0";
         g.fillText("ゴールドキャンディが でやすくなるよ！",0,68);
         g.restore();g.globalAlpha=1;g.textAlign="left";
-        if(clearT<=0){clearT=0;newBall();spawnSweets();}
+        if(clearT<=0){clearT=0;newBall();spawnSweets();if(feverGauge>=1&&fever<=0) startFever();}
       }
 
       // ---- ぜんぶクリア演出 ----
@@ -686,7 +692,7 @@ function build_gumball(api){
       g.save();g.shadowBlur=8+4*Math.sin(tsec*8);g.shadowColor="#ff2bff";
       g.fillStyle="hsl("+(((tsec*200)|0)%360)+",95%,62%)";
       roundRect(fx2,fy2,Math.max(fh2,fw2*fr2),fh2,fh2/2);g.fill();g.restore();
-      g.font="800 13px 'Hiragino Maru Gothic ProN',system-ui";
+      g.font="800 14px 'Hiragino Maru Gothic ProN',system-ui";
       g.fillStyle="#fff";g.shadowColor="rgba(255,43,255,.8)";g.shadowBlur=6;
       g.fillText("フィーバー！ 2ばい！",W/2,fy2+fh2+15);g.shadowBlur=0;
     }else if(feverGauge>0.02){
@@ -695,7 +701,7 @@ function build_gumball(api){
       gg2.addColorStop(0,"#ffb84a");gg2.addColorStop(1,"#ff2bff");
       g.fillStyle=gg2;roundRect(fx2,fy2,Math.max(fh2,fw2*clamp(feverGauge,0,1)),fh2,fh2/2);g.fill();
       g.restore();
-      g.font="800 12px 'Hiragino Maru Gothic ProN',system-ui";
+      g.font="800 14px 'Hiragino Maru Gothic ProN',system-ui";
       g.fillStyle="rgba(255,255,255,.85)";
       g.fillText("フィーバーゲージ",W/2,fy2+fh2+13);
     }

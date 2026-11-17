@@ -237,6 +237,13 @@ function build_jellypop(api){
     stageMiss=0;
     stage++;stageGoal=stageGoalFor(stage);stagePop=0;layout();
   }
+  // バナー文字: 暗い太ふち+(任意)背板で、淡い背景でも白文字が読める
+  function bannerText(txt,fill,plate,py){
+    const w=g.measureText(txt).width+36,h=plate?plate:0;
+    if(h){g.save();g.shadowBlur=0;g.globalAlpha*=0.4;g.fillStyle="#5a1f4a";
+      roundRect(-w/2,py-h*0.72,w,h,h/2);g.fill();g.restore();}
+    g.shadowBlur=0;g.lineWidth=6;g.lineJoin="round";g.strokeStyle="rgba(120,40,90,.6)";g.strokeText(txt,0,0);
+  }
   return {
     resize:layout,
     input(x,y,type){
@@ -246,7 +253,9 @@ function build_jellypop(api){
       const hitPad=(count===0||tsec<6)?R*0.5:R*0.25;
       for(let i=bubbles.length-1;i>=0;i--){const b=bubbles[i];
         if(b.state==="pop")continue;
-        if(Math.hypot(x-b.x,y-b.y)<b.r+hitPad){popBubble(b,i);return;}}
+        const hit=b.shape===3?(Math.pow((x-b.x)/(b.r*1.35+hitPad),2)+Math.pow((y-b.y)/(b.r+hitPad),2)<1)
+          :(Math.hypot(x-b.x,y-b.y)<b.r+hitPad);   // だ円は見た目どおり横長に当たる
+        if(hit){popBubble(b,i);return;}}
       // ④ ひみつ発見: あわを外したタップが背景のおかしに届いたら、コインをこぼす(ミスにしない)
       for(let i=sweets.length-1;i>=0;i--){const s=sweets[i];
         const sy=s.y+Math.sin(tsec*0.6+s.ph)*8, hr=22*s.s+R*0.15;
@@ -391,25 +400,28 @@ function build_jellypop(api){
         g.save();g.translate(api.W/2,api.H*0.22);g.scale(pop,pop);g.textAlign="center";
         g.font="900 34px 'Hiragino Maru Gothic ProN',system-ui";
         g.globalAlpha=clamp(rbMsgT*1.4,0,1);g.shadowColor=col;g.shadowBlur=18;
-        g.fillStyle="#ffffff";g.fillText("にじいろ ゼリー!",0,0);
+        bannerText("にじいろ ゼリー!",0,0,0);
+        g.shadowColor=col;g.shadowBlur=18;g.fillStyle="#ffffff";g.fillText("にじいろ ゼリー!",0,0);
         g.shadowBlur=0;g.lineWidth=2;g.strokeStyle=col;g.strokeText("にじいろ ゼリー!",0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";if(rbMsgT<0)rbMsgT=0;}
       // ---- ② きょうのラッキー色は◯! 中央上に一度だけ教える ----
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
-        const pop=1+Math.max(0,luckyMsgT-0.9)*1.2, t2="きょうのラッキー色は "+(COLNAME[luckyColor]||"")+"!";
+        const pop=1+Math.max(0,luckyMsgT-0.9)*1.2, t2="きょうのラッキーいろは "+(COLNAME[luckyColor]||"")+"!";
         g.save();g.translate(api.W/2,api.H*0.29);g.scale(pop,pop);g.textAlign="center";
-        g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
-        g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.shadowColor=luckyColor;g.shadowBlur=12;
-        g.fillStyle="#ffffff";g.fillText(t2,0,0);
-        g.shadowBlur=0;g.lineWidth=1.5;g.strokeStyle=luckyColor;g.strokeText(t2,0,0);
+        g.font="800 28px 'Hiragino Maru Gothic ProN',system-ui";
+        g.globalAlpha=clamp(luckyMsgT*1.3,0,1);
+        bannerText(t2,0,44,0);
+        g.shadowColor=luckyColor;g.shadowBlur=12;g.fillStyle="#ffffff";g.fillText(t2,0,0);
+        g.shadowBlur=0;g.lineWidth=2;g.strokeStyle=luckyColor;g.strokeText(t2,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";if(luckyMsgT<0)luckyMsgT=0;}
       // ---- FEVER TIME! バナー(コンボ0.14/にじいろ0.22/ラッキー0.29と重ならない0.38に配置) ----
-      if(feverBanner>0){
+      if(feverBanner>0&&clearT<=0){
         const pop=1+Math.max(0,feverBanner-1.2)*1.3, col=COLORS[Math.floor(tsec*8)%COLORS.length];
         g.save();g.translate(api.W/2,api.H*0.38);g.scale(pop,pop);g.textAlign="center";
         g.font="900 32px 'Hiragino Maru Gothic ProN',system-ui";
         g.globalAlpha=clamp(feverBanner*1.2,0,1);g.shadowColor=col;g.shadowBlur=18;
-        g.fillStyle="#ffffff";g.fillText("フィーバー タイム!",0,0);
+        bannerText("フィーバー タイム!",0,50,0);
+        g.shadowColor=col;g.shadowBlur=18;g.fillStyle="#ffffff";g.fillText("フィーバー タイム!",0,0);
         g.shadowBlur=0;g.lineWidth=2;g.strokeStyle=col;g.strokeText("フィーバー タイム!",0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";if(feverBanner<0)feverBanner=0;
       }
@@ -419,7 +431,8 @@ function build_jellypop(api){
         g.save();g.translate(api.W/2,api.H*0.62);g.scale(pop,pop);g.textAlign="center";
         g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";
         g.globalAlpha=clamp(noMissT*1.3,0,1);g.shadowColor="rgba(120,240,140,.9)";g.shadowBlur=16;
-        g.fillStyle="#c7ffcf";g.fillText("パーフェクト!",0,0);
+        bannerText("パーフェクト!",0,0,0);
+        g.shadowColor="rgba(120,240,140,.9)";g.shadowBlur=16;g.fillStyle="#c7ffcf";g.fillText("パーフェクト!",0,0);
         g.shadowBlur=0;g.lineWidth=1.5;g.strokeStyle="rgba(40,150,70,.7)";g.strokeText("パーフェクト!",0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";if(noMissT<0)noMissT=0;}
       // ---- HUD: stage + progress gauge (top center, safe band) ----

@@ -14,6 +14,7 @@ function build_magmaflow(api){
   let stageWaste,perfectT;                       // ③ パーフェクト: 冷えたレーンへ流し切って捨てた数=0で祝福
   let shootStar,starSeen;                         // ④ ながれ星ひみつ: 夜空をよぎる星をタッチでごほうび
   const STAGES=5;
+  const NEAR_MIN_T=0.2;   // 軸3対策(5R): 狙える/向きが変わる最小の流れ位置
   const FEVER_LEN=10;   // seconds
   const RAINBOW=["#ff5b5b","#ff8c42","#ffd23f","#7be08a","#4db8ff","#b58bff","#ff7bd0"];
   const STAGE_NAMES=["あかい かざん","ばらいろの かざん","むらさきの かざん","よるの かざん","きんいろの かざん"];
@@ -74,7 +75,7 @@ function build_magmaflow(api){
     // ① にじいろ ようがん: 数%の激レア。虹色に光り 大量得点。いつ流れてくるか分からない=ドキドキ
     const rbP=0.02+(stage-1)*0.004;
     // rare GOLD nugget: big points + fanfare when eaten. slightly more common late-stage / in fever
-    const goldP=fever>0?0.16:0.07+(stage-1)*0.012;
+    const goldP=fever>0?0.16:0.05+(stage-1)*0.01;
     if(Math.random()<rbP)type="rainbow";
     else if(Math.random()<goldP)type="gold";
     // items roll in from above the source, drift toward whichever lane the flow points
@@ -83,7 +84,7 @@ function build_magmaflow(api){
     // 少し(22%)は そのまま流れ込むので、何もしなくても時々は成果が出る(低学年の安心設計は保つ)。
     // 軸3対策(3R): 0.74→0.78に引き上げ、タップ不要で流れ込む「自動得点」の割合を約26%→約22%に下げる
     // (0.85まで上げるとfirstScoreSec/maxQuietSecが悪化することをN=12計測で確認したため、やり過ぎない範囲に留める)
-    let d=Math.random()<0.78?-dir:dir;
+    let d=Math.random()<0.83?-dir:dir;
     // 軸6対策(4R): 同じ道の入り口(t<0.22)に すでに物がいるなら 重ねて団子にしない(少し待ってから出す。
     // 道を振り替えると 光る道へ流れる=自動得点が増えて軸3が崩れるので、道は変えず出現だけ遅らせる)
     // 軸3対策(4R): 最初の2個は光る道(dir)に出す
@@ -139,7 +140,7 @@ function build_magmaflow(api){
       for(let i=0;i<22;i++){const a=rnd(0,TAU),sp=rnd(3,9);
         blobs.push({x:p.x,y:p.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-3,r:rnd(3,8),
           life:1,decay:rnd(0.015,0.03),col:pick(RAINBOW)});}
-      floats.push({x:clamp(p.x,70,api.W-70),y:p.y-laneH*0.6,txt:"ゴールド！ +"+pts,life:1,vy:-0.9,col:"#ffe14a",size:30});
+      floats.push({x:clamp(p.x,70,api.W-70),y:Math.min(p.y+laneH*0.55,api.H-70),txt:"ゴールド！ +"+pts,life:1,vy:-0.9,col:"#ffe14a",size:30});
     }else if(rb){ // ① にじいろ ようがん撃破: 虹のしぶき + ファンファーレ + 大量得点(白飛びは控えめ)
       rbMsgT=1.6;rbComingT=0;flash=Math.min(1,flash+0.4);api.shake(14);hs(5);api.boom(0.7);
       [0,4,7,11,14].forEach((s,i)=>setTimeout(()=>api.tone(659.25*Math.pow(2,s/12),0.16,"triangle",0.1),i*70));
@@ -148,7 +149,7 @@ function build_magmaflow(api){
       for(let i=0;i<30;i++){const a=rnd(0,TAU),sp=rnd(3,11);
         blobs.push({x:p.x,y:p.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-3,r:rnd(3,9),
           life:1,decay:rnd(0.015,0.03),col:RAINBOW[i%RAINBOW.length]});}
-      floats.push({x:clamp(p.x,80,api.W-80),y:p.y-laneH*0.6,txt:"にじいろ ようがん！ +"+pts,life:1,vy:-0.9,col:"#ff7bd0",size:26});
+      floats.push({x:clamp(p.x,80,api.W-80),y:Math.min(p.y+laneH*0.55,api.H-70),txt:"にじいろ ようがん！ +"+pts,life:1,vy:-0.9,col:"#ff7bd0",size:26});
     }else if(fever>0){
       floats.push({x:clamp(p.x,50,api.W-50),y:p.y-laneH*0.5,txt:"+"+pts,life:1,vy:-1,col:"#fff",size:20});
     }
@@ -299,8 +300,8 @@ function build_magmaflow(api){
       // glowing golden star nugget: pulses so it grabs the eye instantly
       const tw=0.6+0.4*Math.sin(tGlobal*0.4+it.bob*3);
       g.save();g.globalCompositeOperation="lighter";
-      g.fillStyle="rgba(255,225,90,"+(0.3+0.3*tw)+")";
-      g.beginPath();g.arc(0,0,r*1.9,0,TAU);g.fill();g.restore();
+      g.fillStyle="rgba(255,225,90,"+(0.15+0.15*tw)+")";
+      g.beginPath();g.arc(0,0,Math.max(0,r*1.4),0,TAU);g.fill();g.restore();
       const gg=g.createRadialGradient(-r*0.3,-r*0.3,r*0.1,0,0,r);
       gg.addColorStop(0,"#fff6c0");gg.addColorStop(0.5,"#ffd23f");gg.addColorStop(1,"#c98a10");
       g.fillStyle=gg;
@@ -314,8 +315,8 @@ function build_magmaflow(api){
       // ① にじいろ ようがん: 虹色に回る円盤。脈動する光でひとめで分かる激レア
       const tw=0.6+0.4*Math.sin(tGlobal*0.4+it.bob*3);
       g.save();g.globalCompositeOperation="lighter";
-      g.fillStyle="rgba(255,180,220,"+(0.22+0.28*tw)+")";
-      g.beginPath();g.arc(0,0,Math.max(0,r*1.95),0,TAU);g.fill();g.restore();
+      g.fillStyle="rgba(255,180,220,"+(0.12+0.18*tw)+")";
+      g.beginPath();g.arc(0,0,Math.max(0,r*1.5),0,TAU);g.fill();g.restore();
       g.rotate(tGlobal*0.05);
       const rr=Math.max(0,r*(0.95+0.1*tw));
       for(let k=0;k<RAINBOW.length;k++){
@@ -425,6 +426,9 @@ function build_magmaflow(api){
         // 軸3対策(4R): 光っている道(it.d===dir)の物は もう流れているので狙い先にしない。
         // 「いま流れていない(冷えた道の)物」の近くを叩いたときだけ切り替える=流れていない物を狙って叩くのが本筋
         if(it.d===dir)continue;
+        // 軸3対策(5R): 出たばかりの物(t<0.2)は狙い先にしない=火口付近へのでたらめな連打が出現直後の物に当たって得点化するのを防ぐ。
+        // ある程度流れてから叩く(冷えた道は約1秒でt=0.2に届く)
+        if(it.t<NEAR_MIN_T)continue;
         const p=lavaPos(it.d,it.t);
         // 軸3対策(2R): 1.5→1.1に絞り、アイテムの すぐ近くでないと「狙った」扱いにしない
         // 軸3対策(3R): ①②だけではscorePerTapの下がりが足りなかったため、1.1→0.95・下限34→28にもう一段絞る
@@ -451,7 +455,7 @@ function build_magmaflow(api){
       // 軸3対策(4R): 100/0.14→80/0.11。団子になった冷えた道でも1タップで向きが変わるのは1〜2個に絞る
       const infR=Math.max(80,api.W*0.11);
       for(const it of items){
-        if(it.eaten)continue;
+        if(it.eaten||it.t<NEAR_MIN_T)continue;   // 軸3対策(5R): 出たばかりの物は巻き込まない(団子ごと得点の連鎖を抑える)
         const p=lavaPos(it.d,it.t);
         if(Math.hypot(x-p.x,y-p.y)<infR)it.d=dir;
       }
@@ -622,7 +626,9 @@ function build_magmaflow(api){
       drawHUD();
 
       // ---- combo text (top center) ----
-      if(combo>1){
+      // 軸6対策(5R): にじいろ撃破バナー中は ラッキー/予告/コンボ文字を出さず重ならないようにする
+      if(rbMsgT>0){luckyMsgT=0;rbComingT=0;}
+      if(combo>1&&!(rbMsgT>0)){
         const pop=1+Math.max(0,comboT-0.7)*0.8;
         g.save();g.translate(api.W/2,api.H*0.105);   // 軸6対策(4R): 光る火口(H*0.2付近)の発光から離すため H*0.13→0.105
         g.scale(pop,pop);

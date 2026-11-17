@@ -53,13 +53,14 @@ function mkBossSections(type,gY){
   // 超巨大ボス: 各セクションが300-500px → 画面に足しか見えないレベル
   const C={
     tokyotower:[
-      {h:380,hp:700,c:'#FF4500',d:'#CC2200'},
-      {h:420,hp:800,c:'#FF4500',d:'#CC2200'},
-      {h:460,hp:850,c:'#FFFFFF',d:'#CCCCCC'},
-      {h:420,hp:750,c:'#FF4500',d:'#CC2200'},
-      {h:360,hp:650,c:'#FF4500',d:'#CC2200'},
-      {h:300,hp:550,c:'#FF6600',d:'#CC4400'},
-      {h:240,hp:400,c:'#FF6600',d:'#CC4400'},
+      // 総高さを画面内(約700px)に収め、「1本の巨大な柱」でなく「タワー」と一目で分かる形にする
+      {h:110,hp:700,c:'#FF4500',d:'#CC2200'},
+      {h:110,hp:800,c:'#FF4500',d:'#CC2200'},
+      {h:120,hp:850,c:'#FFFFFF',d:'#CCCCCC'},
+      {h:110,hp:750,c:'#FF4500',d:'#CC2200'},
+      {h:95,hp:650,c:'#FF4500',d:'#CC2200'},
+      {h:80,hp:550,c:'#FF6600',d:'#CC4400'},
+      {h:70,hp:400,c:'#FF6600',d:'#CC4400'},
     ],
     temple:[
       {h:360,hp:3000,c:'#CC3300',d:'#991100'},
@@ -154,17 +155,20 @@ function drawTokyoTower(obj,sx,gY){
     const r=sec.hp/sec.maxHp,st=sec.drawTopY+(sec.shakeDx||0)*0.3;
     const pct=cumH/obj.totalH,pctT=(cumH+sec.h)/obj.totalH;
     const bw=obj.w*(0.95-pct*0.78)+6,tw=obj.w*(0.95-pctT*0.78)+6;
-    ctx.save();ctx.globalAlpha=0.3+r*0.7;
+    ctx.save();ctx.globalAlpha=0.62+r*0.38;
     ctx.fillStyle=sec.col;
     ctx.beginPath();ctx.moveTo(cx-bw/2,st+sec.h);ctx.lineTo(cx+bw/2,st+sec.h);
     ctx.lineTo(cx+tw/2,st);ctx.lineTo(cx-tw/2,st);ctx.closePath();ctx.fill();
+    ctx.strokeStyle='#fff';ctx.lineWidth=3;   // 白い輪郭で背景から浮かせる
+    ctx.beginPath();ctx.moveTo(cx-bw/2,st+sec.h);ctx.lineTo(cx-tw/2,st);ctx.lineTo(cx+tw/2,st);ctx.lineTo(cx+bw/2,st+sec.h);ctx.closePath();ctx.stroke();
     ctx.strokeStyle=sec.dark;ctx.lineWidth=2.5;
     ctx.beginPath();ctx.moveTo(cx-bw/2,st+sec.h);ctx.lineTo(cx+tw/2,st);ctx.stroke();
     ctx.beginPath();ctx.moveTo(cx+bw/2,st+sec.h);ctx.lineTo(cx-tw/2,st);ctx.stroke();
     ctx.beginPath();ctx.moveTo(cx-(bw+tw)/4,st+sec.h*0.5);ctx.lineTo(cx+(bw+tw)/4,st+sec.h*0.5);ctx.stroke();
     if(i%2===1){ctx.fillStyle='rgba(255,255,255,0.2)';ctx.fillRect(cx-tw/2,st,tw,sec.h*0.35);}
     // Observation deck
-    if(i===2){ctx.fillStyle='#FFFFFF';ctx.fillRect(cx-bw*0.55,st+sec.h*0.3,bw*1.1,12);}
+    if(i===2){ctx.fillStyle='#FFFFFF';ctx.fillRect(cx-bw*0.55,st+sec.h*0.3,bw*1.1,12);ctx.strokeStyle='#CC2200';ctx.lineWidth=2;ctx.strokeRect(cx-bw*0.55,st+sec.h*0.3,bw*1.1,12);}
+    if(i===5){ctx.fillStyle='#FFFFFF';ctx.fillRect(cx-bw*0.6,st+sec.h*0.35,bw*1.2,9);}
     // Crumble
     if(r<0.6&&Math.random()<0.05){spawnHitFx(cx+(Math.random()-0.5)*bw,st+Math.random()*sec.h,sec.col,3);}
     if(r<0.35){ctx.strokeStyle='rgba(80,20,0,0.7)';ctx.lineWidth=1.5;
@@ -183,7 +187,7 @@ function drawTemple(obj,sx,gY){
     const r=sec.hp/sec.maxHp,st=sec.drawTopY,sh=sec.h;
     const shrink=i*0.14;
     const tw=obj.w*(1-shrink),tx=cx-tw/2;
-    ctx.save();ctx.globalAlpha=0.3+r*0.7;ctx.translate(sec.shakeDx||0,0);
+    ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(sec.shakeDx||0,0);
 
     // 石の基壇（最下層）
     if(i===0){
@@ -278,7 +282,7 @@ function drawCastle(obj,sx,gY){
     const r=sec.hp/sec.maxHp,st=sec.drawTopY,sh=sec.h;
     const shrink=i*0.16;
     const fw=obj.w*(1-shrink),fx=cx-fw/2;
-    ctx.save();ctx.globalAlpha=0.3+r*0.7;ctx.translate(sec.shakeDx||0,0);
+    ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(sec.shakeDx||0,0);
 
     // 石垣（最下層）
     if(i===0){
@@ -385,7 +389,7 @@ function drawRobot(obj,sx,gY){
   secs.forEach((sec,i)=>{
     if(!sec.alive)return;
     const r=sec.hp/sec.maxHp,st=sec.drawTopY;
-    ctx.save();ctx.globalAlpha=0.3+r*0.7;ctx.translate(sec.shakeDx||0,0);
+    ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(sec.shakeDx||0,0);
     ctx.fillStyle=sec.col;
     if(i===0){// legs
       ctx.fillRect(cx-55,st,42,sec.h);ctx.fillRect(cx+13,st,42,sec.h);
@@ -407,7 +411,7 @@ function drawRobot(obj,sx,gY){
       ctx.fillStyle=eyeC;ctx.globalAlpha*=(0.6+Math.abs(Math.sin(Date.now()*0.012))*0.4);
       ctx.beginPath();ctx.ellipse(cx-14,st+sec.h*0.38,10,6,0,0,Math.PI*2);ctx.fill();
       ctx.beginPath();ctx.ellipse(cx+14,st+sec.h*0.38,10,6,0,0,Math.PI*2);ctx.fill();
-      ctx.globalAlpha=0.3+r*0.7;
+      ctx.globalAlpha=0.62+r*0.38;
       ctx.fillStyle='#888';ctx.fillRect(cx-5,st,10,8);
     }
     if(r<0.6&&Math.random()<0.05)spawnHitFx(cx+(Math.random()-0.5)*obj.w*0.8,st+Math.random()*sec.h,'#8888AA',4);
@@ -423,7 +427,7 @@ function drawMothership(obj,sx,gY){
     if(!sec.alive)return;
     const r=sec.hp/sec.maxHp,st=sec.drawTopY;
     const ry=sec.h*0.48;const rx=obj.w*(i===1?0.5:0.36);
-    ctx.save();ctx.globalAlpha=0.3+r*0.7;ctx.translate(sec.shakeDx||0,0);
+    ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(sec.shakeDx||0,0);
     const g2=ctx.createRadialGradient(cx,st+ry,5,cx,st+ry,rx);
     g2.addColorStop(0,'#A0A0B8');g2.addColorStop(1,sec.col);
     ctx.fillStyle=g2;ctx.beginPath();ctx.ellipse(cx,st+ry,rx,ry,0,0,Math.PI*2);ctx.fill();
@@ -435,7 +439,7 @@ function drawMothership(obj,sx,gY){
       ctx.globalAlpha=(0.5+Math.sin(t+l)*0.5)*(0.3+r*0.7);
       ctx.beginPath();ctx.arc(cx+Math.cos(a)*rx*0.9,st+ry+Math.sin(a)*ry*0.6,5,0,Math.PI*2);ctx.fill();
     }
-    ctx.globalAlpha=0.3+r*0.7;
+    ctx.globalAlpha=0.62+r*0.38;
     if(i===1){ctx.fillStyle='#80FF80';ctx.globalAlpha=0.12;
       ctx.fillRect(cx-16,st+ry*1.9,32,gY-(st+ry*1.9));}
     if(r<0.6&&Math.random()<0.05)spawnHitFx(cx+(Math.random()-0.5)*rx*1.5,st+Math.random()*ry*2,'#8080BB',4);
@@ -679,7 +683,12 @@ function runFABRIK(tx,ty){
   }
   return fabPts;
 }
+// 指がアームの届く距離(約300px)より遠いと、バケットは届かず「ちょっとしか当たらない」(狙わず画面のどこを押しても当たる=退屈 を防ぐ)
+const REACH_GRACE=40;   // 届く距離のすこし外までは やさしく当たる
+let reachMul=1;
 function updateArmTarget(){
+  if(armTouching&&fingerX>0){const pv=pivScreen();reachMul=Math.hypot(fingerX-shakeX-pv.x,fingerY-shakeY-pv.y)>SEG_TOTAL+BKT+REACH_GRACE?0:1;}
+  else reachMul=1;
   const tx=armTouching&&fingerX>0?fingerX-shakeX:toS(exWorldX)+220;
   const ty=armTouching&&fingerY>0?fingerY-shakeY:toSY(getTerrainY(exWorldX+40))-70;
   smoothTX+=(tx-smoothTX)*0.22;smoothTY+=(ty-smoothTY)*0.22;
@@ -1050,13 +1059,16 @@ function drawSunMoon(){
 // 同じ物に指(バケット先端)を置きっぱなしのままでは効きにくくする(ゴリゴリ掘る=指を動かす遊びにする)
 let lastHitObj=null,lastHitX=-999,lastHitY=-999;
 function repeatMul(obj,tp){
-  const same=lastHitObj===obj&&Math.hypot(tp.x-lastHitX,tp.y-lastHitY)<30;
-  if(!same){lastHitObj=obj;lastHitX=tp.x;lastHitY=tp.y;}
-  return same?0.4:1;
+  // 同じ物への連続ヒットは「前のヒットから指先が36px以上動いた」時だけ満額。置きっぱなし・同じ場所の連打は 0.25 倍
+  if(lastHitObj!==obj){lastHitObj=obj;lastHitX=tp.x;lastHitY=tp.y;return reachMul;}
+  if(Math.hypot(tp.x-lastHitX,tp.y-lastHitY)>=36){lastHitX=tp.x;lastHitY=tp.y;return reachMul;}
+  return 0.25*reachMul;
 }
 function checkHit(){
   if(hitCD>0)return;
-  const tp=getTip(),m=feverActive?80:24;
+  // 指が届かない所を押している間は、アームは伸びきるだけで空振りにする(狙って近づく遊びを得にする)
+  if(reachMul<=0)return;
+  const tp=getTip(),m=feverActive?56:24;
 
   flyingObjs.forEach(obj=>{
     if(!obj.alive)return;
@@ -1098,12 +1110,12 @@ function checkHit(){
       if(obj.posts.every(p=>!p.alive))obj.alive=false;
     } else {
       if(tp.y<gY-obj.h-m||tp.y>gY+m)return;
-      const dmg=(feverActive?40:16+rng()*10)*repeatMul(obj,tp);
+      const rm=repeatMul(obj,tp),dmg=(feverActive?40:16+rng()*10)*rm;
       obj.hp=Math.max(0,obj.hp-dmg);
       if(obj.shakeDx!==undefined)obj.shakeDx=(rng()-0.5)*14;
       if(obj.kind==='car'||obj.kind==='bus'||obj.kind==='truck')obj.vx=(rng()-0.5)*80;
       spawnHitFx(tp.x,tp.y,obj.col||'#AAA',12);
-      addScore(12);addCombo();playHit(false);addShake(7);hitCD=feverActive?2:7;
+      addScore(rm<1?4:12);if(rm>=1)addCombo();playHit(false);addShake(7);hitCD=feverActive?2:7;
       if(obj.hp<=0)destroyObj(obj,sx,gY);
     }
   });
@@ -1120,9 +1132,10 @@ function hitBuilding(obj,tp,sx,gY,m){
     if(tp.y<st-topM||tp.y>sb+botM)continue;
     // ボスは総HPが重いので、フィーバー中でなくても1発あたりのダメージを底上げして詰まり感を減らす
     // 第3ラウンド改善: ボスは総HPが重く長い無得点区間の主因だったため、1発ダメージの下限を底上げ。
-    const dmg=(feverActive?50:(obj.kind==='boss'?22+rng()*14:15+rng()*10))*repeatMul(obj,tp);
+    const rm=repeatMul(obj,tp);
+    const dmg=(feverActive?50:(obj.kind==='boss'?22+rng()*14:15+rng()*10))*rm;
     sec.hp=Math.max(0,sec.hp-dmg);sec.shakeDx=(rng()-0.5)*14;obj.shakeDx=(rng()-0.5)*6;
-    spawnHitFx(tp.x,tp.y,obj.col,14);addScore(12);addCombo();
+    spawnHitFx(tp.x,tp.y,obj.col,14);addScore(rm<1?4:12);if(rm>=1)addCombo();
     playHit(sec.hp/sec.maxHp<0.3);addShake(8);hitCD=feverActive?2:7;
     if(sec.hp<=0&&sec.alive){
       sec.alive=false;
@@ -1163,11 +1176,12 @@ function hitMegaBuilding(obj,tp,sx){
     const st=sec.drawTopY,sb=st+sec.h;
     // 上方向は小さいマージン（幽霊当たり防止）
     if(tp.y<st-16||tp.y>sb+40)continue;
-    const dmg=feverActive?999:(18+rng()*14)*repeatMul(obj,tp);
+    const rm=repeatMul(obj,tp);
+    const dmg=feverActive?999:(18+rng()*14)*rm;
     sec.hp=Math.max(0,sec.hp-dmg);
     sec.shakeDx=(rng()-0.5)*10;
     spawnHitFx(tp.x,tp.y,sec.col,10);
-    addScore(8);addCombo();playHit(false);addShake(6);hitCD=feverActive?2:7;
+    addScore(rm<1?3:8);if(rm>=1)addCombo();playHit(false);addShake(6);hitCD=feverActive?2:7;
     if(sec.hp<=0){
       sec.alive=false;
       spawnFrag(sx,sec.drawTopY,obj.w,sec.h,[sec.col,'#CCC','#DDD'],0.9);
@@ -1201,7 +1215,7 @@ function destroyObj(obj,sx,gY){
 function feverAttack(){
   if(!feverActive)return;
   const tp=getTip();
-  const radius=110;
+  const radius=90;
   worldObjs.forEach(obj=>{
     if(!obj.alive)return;
     const sx=toS(obj.wx),gY=toSY(obj.groundY);
@@ -1350,8 +1364,9 @@ function drawBuilding(obj){
   for(let i=0;i<obj.sections.length;i++){
     const sec=obj.sections[i];if(!sec.alive){st+=sec.h;continue;}
     const r=sec.hp/sec.maxHp;
-    ctx.save();ctx.globalAlpha=0.28+r*0.72;ctx.translate(sec.shakeDx,0);
+    ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(sec.shakeDx,0);
     ctx.fillStyle=obj.col;ctx.fillRect(sx,st,obj.w,sec.h);
+    ctx.strokeStyle='rgba(20,10,0,.55)';ctx.lineWidth=2.5;ctx.strokeRect(sx,st,obj.w,sec.h);
     ctx.fillStyle=obj.dark;ctx.fillRect(sx+obj.w-7,st,7,sec.h);
     if(obj.type==='glass'){ctx.fillStyle='rgba(255,255,255,0.14)';ctx.fillRect(sx+2,st,obj.w*0.35,sec.h);}
     if(i===obj.sections.length-1||(i<obj.sections.length-1&&!obj.sections[i+1].alive)){
@@ -1377,8 +1392,8 @@ function drawWaterTower(obj){
   const s=obj.sections;
   ctx.strokeStyle='#5A3010';ctx.lineWidth=5;
   [[10],[25],[40]].forEach(([lx])=>{ctx.beginPath();ctx.moveTo(sx+lx,gY-s[0].h);ctx.lineTo(sx+lx,gY);ctx.stroke();});
-  if(s[0].alive){const r=s[0].hp/s[0].maxHp;ctx.save();ctx.globalAlpha=0.28+r*0.72;ctx.translate(obj.shakeDx,0);ctx.fillStyle=obj.dark;ctx.fillRect(sx,gY-s[0].h,obj.w,10);ctx.fillStyle=r>0.5?'#4CAF50':'#F44336';ctx.fillRect(sx,gY-s[0].h,obj.w*r,4);ctx.restore();}
-  if(s[1].alive){const r=s[1].hp/s[1].maxHp,ty=gY-s[0].h-s[1].h;ctx.save();ctx.globalAlpha=0.28+r*0.72;ctx.translate(obj.shakeDx,0);ctx.fillStyle=obj.col;ctx.fillRect(sx+2,ty,obj.w-4,s[1].h);ctx.fillStyle=obj.dark;ctx.fillRect(sx+obj.w-6,ty,6,s[1].h);ctx.strokeStyle='#4A2010';ctx.lineWidth=3;[0.2,0.5,0.8].forEach(t=>{ctx.beginPath();ctx.moveTo(sx,ty+s[1].h*t);ctx.lineTo(sx+obj.w,ty+s[1].h*t);ctx.stroke();});ctx.fillStyle=r>0.5?'#4CAF50':'#F44336';ctx.fillRect(sx,ty,obj.w*r,4);ctx.restore();}
+  if(s[0].alive){const r=s[0].hp/s[0].maxHp;ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(obj.shakeDx,0);ctx.fillStyle=obj.dark;ctx.fillRect(sx,gY-s[0].h,obj.w,10);ctx.fillStyle=r>0.5?'#4CAF50':'#F44336';ctx.fillRect(sx,gY-s[0].h,obj.w*r,4);ctx.restore();}
+  if(s[1].alive){const r=s[1].hp/s[1].maxHp,ty=gY-s[0].h-s[1].h;ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(obj.shakeDx,0);ctx.fillStyle=obj.col;ctx.fillRect(sx+2,ty,obj.w-4,s[1].h);ctx.fillStyle=obj.dark;ctx.fillRect(sx+obj.w-6,ty,6,s[1].h);ctx.strokeStyle='#4A2010';ctx.lineWidth=3;[0.2,0.5,0.8].forEach(t=>{ctx.beginPath();ctx.moveTo(sx,ty+s[1].h*t);ctx.lineTo(sx+obj.w,ty+s[1].h*t);ctx.stroke();});ctx.fillStyle=r>0.5?'#4CAF50':'#F44336';ctx.fillRect(sx,ty,obj.w*r,4);ctx.restore();}
   obj.shakeDx*=0.75;
 }
 
@@ -1387,7 +1402,7 @@ function drawTree(obj){
   const sx=toS(obj.wx),gY=toSY(obj.groundY);if(sx>W+10||sx+obj.w<-10)return;
   const r=obj.hp/obj.maxHp,cx=sx+obj.w/2;
   drawGroundShadow(cx,gY,obj.w*0.42);
-  ctx.save();ctx.globalAlpha=0.3+r*0.7;ctx.translate(obj.shakeDx||0,0);
+  ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(obj.shakeDx||0,0);
   // 画像の木: 生成画像は下部(72%以下)に草の土台が残っているので、そこを clip で切り落とし
   //   幹の根元(=画像の72%位置)を地面に合わせる。見た目は当たり判定(w×h)より少し大きめ。
   {
@@ -1427,7 +1442,7 @@ function drawCactus(obj){
   const sx=toS(obj.wx),gY=toSY(obj.groundY);if(sx>W+10||sx+obj.w<-10)return;
   const r=obj.hp/obj.maxHp,cx=sx+obj.w/2;
   drawGroundShadow(cx,gY,obj.w*0.6);
-  ctx.save();ctx.globalAlpha=0.28+r*0.72;ctx.translate(obj.shakeDx,0);
+  ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(obj.shakeDx,0);
   ctx.fillStyle=obj.col;ctx.beginPath();ctx.roundRect(cx-7,gY-obj.h,14,obj.h,7);ctx.fill();
   ctx.beginPath();ctx.roundRect(cx-22,gY-obj.h*0.65,13,obj.h*0.35,6);ctx.fill();
   ctx.beginPath();ctx.roundRect(cx+9,gY-obj.h*0.5,12,obj.h*0.3,6);ctx.fill();
@@ -1439,7 +1454,8 @@ function drawVehicle(obj){
   const sx=toS(obj.wx),gY=toSY(obj.groundY);if(sx>W+10||sx+obj.w<-10)return;
   const r=obj.hp/obj.maxHp,isBus=obj.kind==='bus',isTruck=obj.kind==='truck';
   drawGroundShadow(sx+obj.w/2,gY,obj.w*0.5);
-  ctx.save();ctx.globalAlpha=0.3+r*0.7;ctx.translate((obj.shakeDx||0)+(obj.vx||0)*0.02,0);
+  ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate((obj.shakeDx||0)+(obj.vx||0)*0.02,0);
+  ctx.shadowColor='rgba(20,10,0,.75)';ctx.shadowBlur=5;   // 背景に溶けないよう輪郭の影
   // ── 車体グラデ ──
   const cg=ctx.createLinearGradient(sx,gY-obj.h*1.6,sx,gY);
   cg.addColorStop(0,'rgba(255,255,255,0.35)');cg.addColorStop(0.3,obj.col);cg.addColorStop(1,obj.col);
@@ -1531,7 +1547,7 @@ function drawSnowman(obj){
   if(!obj.alive)return;
   const sx=toS(obj.wx),gY=toSY(obj.groundY);if(sx>W+10||sx+obj.w<-10)return;
   const r=obj.hp/obj.maxHp,cx=sx+obj.w/2;
-  ctx.save();ctx.globalAlpha=0.28+r*0.72;ctx.translate(obj.shakeDx,0);
+  ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(obj.shakeDx,0);
   [[0,20,24],[0,-13,18],[0,-36,12]].forEach(([dx,dy,rad])=>{ctx.fillStyle='#F0F8FF';ctx.beginPath();ctx.arc(cx+dx,gY+dy-16,rad,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#B0C8D8';ctx.lineWidth=1.5;ctx.stroke();});
   ctx.fillStyle='#333';[-24,-14,-4].forEach(dy=>{ctx.beginPath();ctx.arc(cx,gY+dy-16,2.5,0,Math.PI*2);ctx.fill();});
   ctx.beginPath();ctx.arc(cx-5,gY-50,2.5,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(cx+5,gY-50,2.5,0,Math.PI*2);ctx.fill();
@@ -1544,7 +1560,7 @@ function drawRocket(obj){
   if(!obj.alive)return;
   const sx=toS(obj.wx),gY=toSY(obj.groundY);if(sx>W+10||sx+obj.w<-10)return;
   const r=obj.hp/obj.maxHp,cx=sx+obj.w/2;
-  ctx.save();ctx.globalAlpha=0.3+r*0.7;ctx.translate(obj.shakeDx||0,0);
+  ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(obj.shakeDx||0,0);
   const bw=obj.w*0.42;
   // ロケット本体（メタリックグラデ）
   const mg=ctx.createLinearGradient(cx-bw,gY-obj.h,cx+bw,gY-obj.h);
@@ -1586,7 +1602,7 @@ function drawHelicopter(obj){
   const sx=toS(obj.wx);if(sx>W+60||sx+obj.w<-60)return;
   obj.wobble+=0.025;obj.rotorAngle=(obj.rotorAngle||0)+0.3;
   const fy=H*0.3+Math.sin(obj.wobble)*16,cx=sx+obj.w/2,r=obj.hp/obj.maxHp;
-  ctx.save();ctx.globalAlpha=0.3+r*0.7;
+  ctx.save();ctx.globalAlpha=0.62+r*0.38;
   // 画像のヘリ(進行方向=左向き)。回るローターだけ canvas で上に重ねる
   const heliImg=api.drawAsset("helicopter.png",cx,fy+2,obj.w*1.4,obj.w*1.4,{center:true});
   if(!heliImg){
@@ -1615,7 +1631,7 @@ function drawUFO(obj){
   const sx=toS(obj.wx);if(sx>W+60||sx+obj.w<-60)return;
   obj.wobble+=0.03;
   const fy=obj.baseY+Math.sin(obj.wobble)*14,cx=sx+obj.w/2,r=obj.hp/obj.maxHp;
-  ctx.save();ctx.globalAlpha=0.3+r*0.7;
+  ctx.save();ctx.globalAlpha=0.62+r*0.38;
   const g2=ctx.createLinearGradient(cx,fy+obj.h/2,cx,toSY(getTerrainY(obj.wx+obj.w/2)));
   g2.addColorStop(0,'rgba(100,255,100,0.28)');g2.addColorStop(1,'rgba(100,255,100,0)');
   ctx.fillStyle=g2;
@@ -1647,10 +1663,10 @@ function drawBarrel(obj){
   if(!obj.alive)return;
   const sx=toS(obj.wx),gY=toSY(obj.groundY);if(sx>W+10||sx+obj.w<-10)return;
   const r=obj.hp/obj.maxHp,cx=sx+obj.w/2;
-  ctx.save();ctx.globalAlpha=0.3+r*0.7;ctx.translate(obj.shakeDx||0,0);
+  ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(obj.shakeDx||0,0);
   const bg=ctx.createLinearGradient(sx,0,sx+obj.w,0);
   bg.addColorStop(0,'#660000');bg.addColorStop(0.25,'#CC1111');bg.addColorStop(0.7,'#AA0000');bg.addColorStop(1,'#550000');
-  ctx.fillStyle=bg;ctx.beginPath();ctx.roundRect(sx+3,gY-obj.h,obj.w-6,obj.h,6);ctx.fill();
+  ctx.fillStyle=bg;ctx.beginPath();ctx.roundRect(sx+3,gY-obj.h,obj.w-6,obj.h,6);ctx.fill();ctx.strokeStyle='rgba(20,10,0,.55)';ctx.lineWidth=2.5;ctx.stroke();
   // 金属タガ
   ['#FFD700','#DAA520'].forEach((c,idx)=>{
     const ty=gY-obj.h*(idx===0?0.78:0.28);
@@ -1685,8 +1701,9 @@ function drawHouse(obj){
   const body=obj.sections[0],roof=obj.sections[1];
   if(body&&body.alive){
     const r=body.hp/body.maxHp;
-    ctx.save();ctx.globalAlpha=0.3+r*0.7;ctx.translate(body.shakeDx||0,0);
+    ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(body.shakeDx||0,0);
     ctx.fillStyle=obj.col;ctx.fillRect(sx,body.drawTopY,obj.w,body.h);
+    ctx.strokeStyle='rgba(20,10,0,.55)';ctx.lineWidth=2.5;ctx.strokeRect(sx,body.drawTopY,obj.w,body.h);
     ctx.fillStyle=obj.dark;ctx.fillRect(sx+obj.w-6,body.drawTopY,6,body.h);
     body.wins.forEach(w=>{ctx.fillStyle=w.lit?'#FFFACD':'#6080A0';ctx.fillRect(sx+w.lx,body.drawTopY+w.ly,18,22);});
     ctx.fillStyle='rgba(0,0,0,0.35)';ctx.fillRect(sx,body.drawTopY,obj.w,5);
@@ -1696,10 +1713,10 @@ function drawHouse(obj){
   if(roof&&roof.alive){
     const r=roof.hp/roof.maxHp;
     const rt=roof.drawTopY;
-    ctx.save();ctx.globalAlpha=0.3+r*0.7;ctx.translate(roof.shakeDx||0,0);
+    ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(roof.shakeDx||0,0);
     // Triangle roof
     ctx.fillStyle=obj.roof;
-    ctx.beginPath();ctx.moveTo(sx-6,rt+roof.h);ctx.lineTo(sx+obj.w/2,rt);ctx.lineTo(sx+obj.w+6,rt+roof.h);ctx.closePath();ctx.fill();
+    ctx.beginPath();ctx.moveTo(sx-6,rt+roof.h);ctx.lineTo(sx+obj.w/2,rt);ctx.lineTo(sx+obj.w+6,rt+roof.h);ctx.closePath();ctx.fill();ctx.strokeStyle='rgba(20,10,0,.55)';ctx.lineWidth=2.5;ctx.stroke();
     // Chimney
     ctx.fillStyle='#886644';ctx.fillRect(sx+obj.w*0.7,rt-18,12,22);
     ctx.restore();roof.shakeDx=(roof.shakeDx||0)*0.7;
@@ -1711,7 +1728,7 @@ function drawTrain(obj){
   const sx=toS(obj.wx),gY=toSY(obj.groundY);
   if(sx>W+10||sx+obj.w<-10)return;
   const r=obj.hp/obj.maxHp;
-  ctx.save();ctx.globalAlpha=0.3+r*0.7;ctx.translate(obj.shakeDx||0,0);
+  ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(obj.shakeDx||0,0);
   // Carriages
   ctx.fillStyle=obj.col;ctx.beginPath();ctx.roundRect(sx,gY-obj.h,obj.w,obj.h*0.7,6);ctx.fill();
   // Cab
@@ -1760,7 +1777,7 @@ function drawMegaBuilding(obj){
   obj.sections.forEach(sec=>{
     if(!sec.alive)return;
     const r=sec.hp/sec.maxHp;
-    ctx.save();ctx.globalAlpha=0.3+r*0.7;
+    ctx.save();ctx.globalAlpha=0.62+r*0.38;
     ctx.fillStyle=sec.col;
     ctx.fillRect(sx+sec.shakeDx,sec.drawTopY,obj.w,sec.h);
     // Thin border for depth
@@ -2099,9 +2116,9 @@ function initScene(keepScore){
     ctx.fillStyle='#7be0ff';rrect(gx,gy,gw*prog,7,3.5);ctx.fill();
     // コンボ(ボスHPバー表示中はその下(132px)へずらして重ならないようにする)
     if(comboCount>=2){
-      const comboY=bossHudShown?112:72;
+      const comboY=bossHudShown?128:72;
       ctx.font="900 22px 'Hiragino Maru Gothic ProN',system-ui";
-      ctx.lineWidth=6;ctx.strokeStyle='rgba(60,10,0,.6)';
+      ctx.lineWidth=6;ctx.strokeStyle='rgba(255,255,255,.88)';   // 白縁: 桃色の雲の上でも読める
       const ct='コンボ x'+comboCount;
       ctx.strokeText(ct,cx,comboY);
       ctx.fillStyle=comboCount>=5?'#ff5b5b':'#ffd23f';ctx.fillText(ct,cx,comboY);

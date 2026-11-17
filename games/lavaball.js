@@ -14,7 +14,7 @@ function buildLavaball(api){
   let fever=0,feverGauge=0,feverBanner=0;
   let hitCd=0;                                       // hitStop cooldown (frames) - never spam freeze
   let laneHintShown=false;                           // ③ 一度だけ「うえ/した」のヒントを出す
-  let richLane=0,sadT=0,lastLane=-1;                 // 軸3: おいしい道(行ごとに上か下)/ からぶり残念顔 / 直前に選んだ道
+  let richLane=0,sadT=0,lastLane=-1,rowsMade=0;                 // 軸3: おいしい道(行ごとに上か下)/ からぶり残念顔 / 直前に選んだ道
   // ---- 隠し発見レイヤー(クレーン/ハンマー/トラックと同じ思想) ----
   const CANDY=["#ff5b5b","#4db8ff","#7be08a","#ff8c42","#ff5da2","#5ad1ff"];  // ② いろいわ用の あかるい色
   const CNAME={"#ff5b5b":"あか","#4db8ff":"あお","#7be08a":"みどり","#ff8c42":"オレンジ","#ff5da2":"ピンク","#5ad1ff":"みずいろ"};
@@ -29,7 +29,7 @@ function buildLavaball(api){
   function goalFor(s){return 10+(s-1)*3;}     // 10,13,16,...（7〜8歳向けに手応えを2〜3割増）
   // F. next-stage teaser shown during the clear banner
   function teaser(s){
-    if(s===2)return "つぎは きの おうちが でてくる！";
+    if(s===2)return "つぎは おうちが ふえる！";
     if(s===3)return "つぎは ひかる クリスタル とうじょう！";
     if(s===4)return "つぎは ゴールドいわが でやすい！";
     if(s===6)return "つぎは でっかい いわ とうじょう！";
@@ -63,7 +63,7 @@ function buildLavaball(api){
   function mkObj(type,x,lane){
     const base=clamp(api.W*0.04,22,40);
     let r=base,hp=1,pts=1;
-    if(type==="hut"){ r=base*1.25; hp=stage>=4?3:2; pts=2; }   // 後半の おうち は 3回(手応え)
+    if(type==="hut"){ r=base*1.25; hp=stage>=4?3:2; pts=3; }   // 後半の おうち は 3回(手応え)
     else if(type==="crystal"){ r=base*0.95; hp=1; pts=4; }
     else if(type==="gold"){ r=base*1.1; hp=1; pts=10; }
     else if(type==="rainbow"){ r=base*1.15; hp=1; pts=18; }
@@ -83,7 +83,7 @@ function buildLavaball(api){
   function spawnRow(){
     // line objects along the slope so the rolling ball sweeps through them
     objs=[];
-    const n=clamp(5+stage+(fever>0?2:0),5,12);   // 1列の数も少し多め(7〜8歳向け)
+    const n=clamp(4+stage+(fever>0?2:0),5,11);   // 1列の数(道を えらぶ ぶん、ひとつの道に 集まりすぎない よう 1こ へらした)
     const x0=startX+api.W*0.18, x1=api.W*0.92;
     const bag=TYPES.slice();
     if(stage>=2) bag.push("hut");
@@ -100,24 +100,41 @@ function buildLavaball(api){
       if(stage>=2 && Math.random()<0.045) type="rainbow";
       types.push(type);
     }
-    // 軸3: 「おいしい道」と「ふつうの道」に分ける。きらきら/おうち/でかい岩 は おいしい道(上か下を行ごとにランダム)、
-    //   ふつうの いわ は もう一方。どちらの道にも最低2こ置く(からぶりしにくく・でも選ぶ意味が出る)。
+    // 軸3: 「おいしい道」と「ふつうの道」に分ける。きらきら/おうち/でかい岩 は おいしい道(上か下を行ごとにランダム)に集め、
+    //   ふつうの道には いわを すこしだけ。ステージ2からは ふつうの道は 1〜(1行の25%)こ だけ=
+    //   見て「たくさん ある道」を えらぶと 得、てきとうに おすと ちょっと 損(でも どちらも 点は入る)。
     richLane=Math.random()<0.5?0:1;
     const isRich=t=>t!=="rock";
     let rich=types.filter(isRich).length;
-    // おいしい道が多すぎると連打でも稼げるので、きらきら/おうちは 1行の4わり までに(きんいろ・にじいろは そのまま)
-    const cap=Math.max(2,Math.round(n*RICH_FRAC));
-    for(const lowT of ["hut","crystal","boulder"]){
+    // きらきら/おうちは 1行の3こ(以上)まで。多すぎると連打でも稼げる(きんいろ・にじいろは そのまま)
+    const cap=Math.max(3,Math.round(n*RICH_FRAC));
+    for(const lowT of ["hut","crystal","boulder"]){      // おうちから先に へらす=きらきら(クリスタル)・きんいろを 優先して のこす
       for(let k=0;k<n&&rich>cap;k++){ if(types[k]===lowT){ types[k]="rock"; rich--; } }
     }
-    while(rich<2){ const k=rint(0,n-1); if(!isRich(types[k])){ types[k]="hut"; rich++; } }
-    let poor=n-rich;
-    for(let k=0;k<n&&poor<2;k++){ if(types[k]==="hut"){ types[k]="rock"; poor++; rich--; } }
-    for(let i=0;i<n;i++){
-      const x=lerp(x0,x1,n<=1?0.5:i/(n-1))+rnd(-api.W*0.02,api.W*0.02);
-      const type=types[i];
-      objs.push(mkObj(type,x,isRich(type)?richLane:1-richLane));
-    }
+    while(rich<2){ const k=rint(0,n-1); if(!isRich(types[k])){ types[k]=stage>=3?"crystal":"hut"; rich++; } }
+    // ふつうの道の数: ステージ1の最初の行だけ 2こ(最初の成功を逃さない)、そのあとの ステージ1は 1〜2こ、ステージ2〜は 1〜n/4こ
+    let poorN;
+    if(stage===1) poorN=(rowsMade===0)?2:rint(1,2);
+    else poorN=rint(1,Math.max(1,Math.floor(n*0.25)));
+    rowsMade++;
+    poorN=clamp(poorN,1,n-2);
+    const richN=n-poorN;
+    const specials=types.filter(isRich).slice(0,richN);
+    const richTypes=specials.slice();
+    while(richTypes.length<richN) richTypes.push("rock");
+    for(let k=richTypes.length-1;k>0;k--){ const j=rint(0,k); const t=richTypes[k]; richTypes[k]=richTypes[j]; richTypes[j]=t; }
+    const poorTypes=[]; for(let k=0;k<poorN;k++) poorTypes.push("rock");
+    // 道ごとに 左から右へ 等間隔に並べる(道が1こだけなら まんなか あたり)
+    const placeLane=(arr,lane)=>{
+      const m=arr.length;
+      for(let i=0;i<m;i++){
+        const u=m<=1?0.5+rnd(-0.18,0.18):i/(m-1);
+        const x=lerp(x0,x1,u)+rnd(-api.W*0.02,api.W*0.02);
+        objs.push(mkObj(arr[i],x,lane));
+      }
+    };
+    placeLane(richTypes,richLane);
+    placeLane(poorTypes,1-richLane);
     // announce the lucky find so the kid spots it right away
     const gg=objs.find(o=>o.type==="gold");
     if(gg){ pushFloat({x:gg.x,y:gg.y-gg.r*1.8,txt:"ゴールドいわ！",life:1,vy:-0.5,col:"#ffd23f",size:24});
@@ -134,9 +151,10 @@ function buildLavaball(api){
     if(!live.length) return;
     const richAlive=live.filter(o=>o.lane===richLane).length;
     if(richAlive===0){ spawnRow(); return; }
-    if(whiffed&&richAlive===live.length){   // からぶりした直後だけ いわを足す(1回のからぶりで十分・何度もは固まらせない)
+    if(whiffed&&richAlive===live.length){   // からぶりした直後だけ いわを足す(ステージ1=2こ・2〜=1こ。からぶりした道に置く=次は あたる)
       const x0=startX+api.W*0.18, x1=api.W*0.92;
-      for(let k=0;k<2;k++) objs.push(mkObj("rock",lerp(x0,x1,0.2+0.6*k+rnd(-0.08,0.08)),1-richLane));
+      const add=stage>=2?1:2, wl=ball.lane===richLane?1-richLane:ball.lane;
+      for(let k=0;k<add;k++) objs.push(mkObj("rock",lerp(x0,x1,add===1?0.35+0.3*Math.random():0.2+0.6*k+rnd(-0.08,0.08)),wl));
     }
   }
   spawnRow();
@@ -208,7 +226,7 @@ function buildLavaball(api){
     if(isLucky) luckySparkle(o.x,o.y-o.r);                  // ② 頭上に星のキラッ
     if(o.type==="crystal"){ api.tone(1046,0.18,"triangle",0.14); api.tone(1318,0.2,"triangle",0.1); }
     if(combo>1) pushFloat({x:o.x,y:o.y-o.r,txt:"x"+combo,life:1,vy:-1.0,
-      col:combo>=6?"#ff3b3b":combo>=3?"#ff8c42":"#ffd23f",size:combo>=4?40:30});
+      col:combo>=6?"#fff2c0":"#ffe08a",size:combo>=4?40:30});
     if(gain>=4) pushFloat({x:o.x,y:o.y-o.r*2.1,txt:"+"+gain,life:1,vy:-0.8,
       col:o.type==="gold"?"#ffd23f":"#c78bff",size:o.type==="gold"?36:26});
     checkStage();
@@ -507,7 +525,7 @@ function buildLavaball(api){
       for(const f of floats){f.y+=f.vy*dt;f.life-=0.02*dt;
         g.save(); g.globalAlpha=Math.max(0,f.life); g.textAlign="center";
         g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";
-        g.lineWidth=6; g.strokeStyle="rgba(0,0,0,.5)"; g.strokeText(f.txt,f.x,f.y);
+        g.lineWidth=8; g.lineJoin="round"; g.strokeStyle="rgba(20,6,4,.9)"; g.strokeText(f.txt,f.x,f.y);
         g.fillStyle=f.col; g.fillText(f.txt,f.x,f.y); g.restore();}
       floats=floats.filter(f=>f.life>0);
 
@@ -537,7 +555,7 @@ function buildLavaball(api){
         g.save(); g.translate(api.W/2,api.H*0.32); g.scale(pop,pop); g.textAlign="center";
         g.globalAlpha=clamp(luckyMsgT*1.4,0,1); g.font="900 23px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor=luckyColor; g.shadowBlur=14;
-        const t2=luckyMsgT>1?("きょうのラッキー色は "+(CNAME[luckyColor]||"")+"！"):"ラッキー！";
+        const t2=luckyMsgT>1?("きょうの ラッキーいろは "+(CNAME[luckyColor]||"")+"！"):"ラッキー！";
         g.fillStyle="#fff5d6"; g.fillText(t2,0,0);
         g.restore(); g.globalAlpha=1; g.textAlign="left"; if(luckyMsgT<0)luckyMsgT=0; }
       // ---------- ③ パーフェクト！ バナー(クリア文字と重ならない下側) ----------
@@ -825,14 +843,20 @@ function buildLavaball(api){
       gg.addColorStop(0,"#ff8c42"); gg.addColorStop(1,"#ffd23f");
       g.fillStyle=gg; roundRect(bx,by,Math.max(bh,bw*fr),bh,bh/2); g.fill();}
     g.strokeStyle="rgba(255,255,255,.5)"; g.lineWidth=2; roundRect(bx,by,bw,bh,bh/2); g.stroke();
-    // 軸4: フィーバーのゲージ(進行バーの下の細い帯)。フィーバー中は のこり時間が へっていく
-    { const fy=by+bh+7, fh=7, ff=fever>0?clamp(fever/12,0,1):clamp(feverGauge,0,1);
-      g.fillStyle="rgba(0,0,0,.4)"; roundRect(bx,fy,bw,fh,fh/2); g.fill();
+    // 軸6: フィーバーのゲージは 溜まりはじめた時(と フィーバー中)だけ出す。ふだんは 文字1行+バー1本。
+    //   出る時は 太めの帯(10px)+ ひだりに ラベル「フィーバー」
+    if(fever>0||feverGauge>0){
+      const fy=by+bh+8, fh=10, ff=fever>0?clamp(fever/12,0,1):clamp(feverGauge,0,1);
+      g.fillStyle="rgba(0,0,0,.45)"; roundRect(bx,fy,bw,fh,fh/2); g.fill();
       if(ff>0){ const fg=g.createLinearGradient(bx,0,bx+bw,0);
         if(fever>0){ fg.addColorStop(0,"#ff5da2"); fg.addColorStop(0.5,"#ffd23f"); fg.addColorStop(1,"#5ad1ff"); }
         else { fg.addColorStop(0,"#ff5b2e"); fg.addColorStop(1,"#ff5da2"); }
         g.fillStyle=fg; roundRect(bx,fy,Math.max(fh,bw*ff),fh,fh/2); g.fill(); }
-      g.strokeStyle="rgba(255,255,255,.4)"; g.lineWidth=1.5; roundRect(bx,fy,bw,fh,fh/2); g.stroke(); }
+      g.strokeStyle="rgba(255,255,255,.5)"; g.lineWidth=1.5; roundRect(bx,fy,bw,fh,fh/2); g.stroke();
+      g.font="800 13px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="right";
+      g.lineWidth=4; g.lineJoin="round"; g.strokeStyle="rgba(20,6,4,.85)";
+      g.strokeText("フィーバー",bx-6,fy+fh-0.5); g.fillStyle="#ffe08a"; g.fillText("フィーバー",bx-6,fy+fh-0.5);
+    }
     g.restore(); g.textAlign="left";
     // bottom hint: 溶岩帯(0.93H)より上の暗い地面に、縁取り付きで大きく(指で押す前提)
     if(!ball.rolling&&clearBanner<=0){

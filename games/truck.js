@@ -220,7 +220,7 @@ function buildTruck(api){
       api.slide(300,900,0.3,0.16,"sawtooth");
       // 軸6(見やすさ)対策: engine.js共通の祝福バナー_fx.bann(y=H*0.3固定・全ゲーム共通で編集不可)と
       // 同時に出ると文字が重なって読めなくなるため、自前のフロート文字はH*0.55前後まで下げてずらす。
-      floats.push({x:api.W*0.5,y:api.H*0.55,txt:"フィーバー！",life:1,vy:-0.7,col:"#ff3b3b",size:54});
+      floats.push({x:api.W*0.5,y:api.H*0.43,txt:"フィーバー！",life:1,vy:-0.7,col:"#ff3b3b",size:54});
     }
     // 区間の撃破カウント。一定数つぶしたらボス出現（ボスはframe側で削る）。
     stageHits++;
@@ -228,7 +228,7 @@ function buildTruck(api){
       // ③ ノンストップ ボーナス: 障害物フェーズをコンボ切らさず走り切ったら +5 & 祝福
       if(comboKept){count+=5;api.setScore(count);
         // 軸6対策: 同上。_fx.bann(y=H*0.3)と重なって読めなくなっていたのでH*0.55前後に下げる。
-        floats.push({x:api.W*0.5,y:api.H*0.55,txt:"ノンストップ！＋5",life:1,vy:-0.7,col:"#7be08a",size:40});
+        floats.push({x:api.W*0.5,y:api.H*0.43,txt:"ノンストップ！＋5",life:1,vy:-0.7,col:"#7be08a",size:40});
         for(let i=0;i<24;i++)confetti.push({x:rnd(api.W*0.3,api.W*0.7),y:api.H*0.3,vx:rnd(-5,5),vy:rnd(-4,4),
           s:rnd(4,8),col:pick(["#7be08a","#ffd23f","#5ad1ff"]),rot:rnd(0,TAU),vr:rnd(-0.4,0.4),life:1,decay:0.008});
         api.tone(1318,0.14,"triangle",0.1);api.tone(1976,0.16,"triangle",0.07);}
@@ -569,9 +569,9 @@ function buildTruck(api){
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(rbMsgT<0)rbMsgT=0;}
       // ② きょうのラッキー色 はっけん！ 中央の小ヒント(初回だけ)
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
-        g.save();g.translate(api.W/2,api.H*0.28);g.textAlign="center";g.textBaseline="middle";
+        g.save();g.translate(api.W/2,api.H*0.12);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 23px 'Hiragino Maru Gothic ProN',system-ui";
-        const t2="きょうのラッキー色は "+(COLNAME[luckyColor]||"")+"！";
+        const t2="きょうのラッキーいろは "+(COLNAME[luckyColor]||"")+"！";
         g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.4)";g.strokeText(t2,0,0);
         g.fillStyle=luckyColor;g.fillText(t2,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(luckyMsgT<0)luckyMsgT=0;}
@@ -585,8 +585,8 @@ function buildTruck(api){
     g.save();
     // bottom hint pill
     const txt="タップで アクセル！ つぶせ！";
-    g.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";
-    const tm=g.measureText(txt), tw=(tm&&tm.width)||txt.length*16, pw=tw+38, ph=34, px=api.W/2-pw/2, py=api.H-ph-10;
+    g.font="800 20px 'Hiragino Maru Gothic ProN',system-ui";
+    const tm=g.measureText(txt), tw=(tm&&tm.width)||txt.length*20, pw=tw+38, ph=40, px=api.W/2-pw/2, py=api.H-ph-10;
     g.shadowColor="rgba(0,0,0,.25)";g.shadowBlur=10;g.shadowOffsetY=3;
     // ⑥ 軸6対策: PAL[0](あさ)のような明るいステージでもヒント文字が薄くならないよう地の濃さを上げる(.62→.72)
     roundR(px,py,pw,ph,ph/2);g.fillStyle="rgba(40,60,90,.72)";g.fill();
@@ -598,14 +598,14 @@ function buildTruck(api){
     // 区間プログレス（上部中央＝engine HUDのもどる/スコアと衝突しない安全帯）
     const big=stage>=STAGES-1;
     const lbl=PAL[stage].name;
-    g.font="800 15px 'Hiragino Maru Gothic ProN',system-ui";
-    const lm=g.measureText(lbl),lw=(lm&&lm.width)||lbl.length*15,lpw=lw+26,lx=api.W/2-lpw/2;
+    g.font="800 19px 'Hiragino Maru Gothic ProN',system-ui";
+    const lm=g.measureText(lbl),lw=(lm&&lm.width)||lbl.length*19,lpw=lw+26,lx=api.W/2-lpw/2;
     g.shadowColor="rgba(0,0,0,.25)";g.shadowBlur=8;g.shadowOffsetY=2;
-    roundR(lx,8,lpw,28,14);g.fillStyle=big?"rgba(120,40,60,.7)":"rgba(40,60,90,.62)";g.fill();
+    roundR(lx,8,lpw,34,17);g.fillStyle=big?"rgba(120,40,60,.7)":"rgba(40,60,90,.62)";g.fill();
     g.shadowColor="transparent";g.shadowBlur=0;g.shadowOffsetY=0;
-    g.textAlign="center";g.textBaseline="middle";g.fillStyle="#ffe9a8";g.fillText(lbl,api.W/2,22);
+    g.textAlign="center";g.textBaseline="middle";g.fillStyle="#ffe9a8";g.fillText(lbl,api.W/2,25);
     // 残りメーター（ボス前は撃破数、ボス中はHP）
-    const remW=lpw,remX=lx,remY=39;
+    const remW=lpw,remX=lx,remY=46;
     g.fillStyle="rgba(255,255,255,.18)";roundR(remX,remY,remW,7,3.5);g.fill();
     let prog;
     if(boss) prog=boss.hp/boss.hpMax; else prog=clamp(stageHits/stageGoal,0,1);

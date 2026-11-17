@@ -57,14 +57,14 @@ function buildDino(api){
       return{x:(i+0.5)*slotW,slot:i,type:"rainbow",
         w:slotW*0.66,h:rnd(api.H*sd.hmin*1.05,api.H*sd.hmax),
         color:"#ff5da2",state:"stand",vx:0,vy:0,rot:0,vr:0,respawnT:0,rise:1,
-        seed:rint(0,999),sway:rnd(0,TAU),hp:1,maxhp:1};
+        seed:rint(0,999),sway:rnd(0,TAU),hp:1,maxhp:1,ttl:rnd(150,210)};   // ねらい所: 約2.5〜3.5秒で消える(見逃しても叱られない)
     }
     const golden=Math.random()<0.07;
     const hard=!golden&&Math.random()<sd.hard;
     return{x:(i+0.5)*slotW,slot:i,type:golden?"gold":"building",
       w:slotW*0.66,h:rnd(api.H*sd.hmin,api.H*sd.hmax),
       color:golden?"#f5c518":(hard?"#7f8694":pick(BCOL)),state:"stand",vx:0,vy:0,rot:0,vr:0,respawnT:0,rise:1,
-      seed:rint(0,999),sway:rnd(0,TAU),hp:hard?2:1,maxhp:hard?2:1,golden:golden,hard:hard};
+      seed:rint(0,999),sway:rnd(0,TAU),hp:hard?2:1,maxhp:hard?2:1,golden:golden,hard:hard,ttl:golden?rnd(150,210):0};
   }
   function reset(){objs=[];shards=[];dust=[];arcs=[];floats=[];sparks=[];rings=[];facing=1;sweepT=0;sweeping=false;sweepDir=1;bob=0;count=0;combo=0;comboT=0;flash=0;tNow=0;squash=0;wash=0;washHue=48;blink=0;
     stage=0;stageHits=0;stageGoal=stageGoalFor(0);banner=null;gauge=0;superFlash=0;roar=0;grow=0;finaleT=0;superCD=0;
@@ -133,7 +133,7 @@ function buildDino(api){
     rings.push({x:o.x,y:groundY-o.h*0.4,r:o.w*0.3,life:1});
     dust.push({x:o.x,y:groundY,r:rnd(slotW*0.3,slotW*0.5),vr:rnd(1,2),vx:sweepDir*rnd(1,3),life:1,decay:isCastle?0.01:0.02});
     if(superCD<=0)gauge=clamp(gauge+(gold?0.22:0.07),0,1); // クールダウン中はゲージを溜めない(連発の準白飛び防止)
-    if(gold){floats.push({x:o.x,y:groundY-o.h-12,txt:"+5 きん！",life:1,vy:-1.3,col:"#ffd23f",size:40,t:0});api.tone(880,0.12,"triangle",0.3);api.tone(1320,0.14,"triangle",0.22);api.boom(0.5);}
+    if(gold){floats.push({x:clamp(o.x,80,api.W-80),y:groundY-o.h-12,txt:"+5 きん！",life:1,vy:-1.3,col:"#ffd23f",size:40,t:0});api.tone(880,0.12,"triangle",0.3);api.tone(1320,0.14,"triangle",0.22);api.boom(0.5);}
   }
   // ① にじいろビル 撃破: 虹のキラキラ大放出＋発見バナー(激レアの爽快ごほうび)。
   // wash/flash は既存の減衰で必ず消えるので白飛びしない。加算は各パーティクルの life で短く消える。
@@ -141,19 +141,20 @@ function buildDino(api){
     rbMsgT=1.4;wash=1;washHue=(tNow*3)%360;
     api.boom(0.6);api.shake(16);
     api.slide(660,1320,0.4,0.22,"triangle");api.tone(880,0.12,"triangle",0.16);api.tone(1320,0.14,"triangle",0.12);api.tone(1760,0.16,"triangle",0.09);
-    floats.push({x:o.x,y:groundY-o.h-16,txt:"+8 にじいろ！",life:1,vy:-1.1,col:"#ff5da2",size:40,t:0});
+    floats.push({x:clamp(o.x,80,api.W-80),y:groundY-o.h-16,txt:"+8 にじいろ！",life:1,vy:-1.1,col:"#ff5da2",size:40,t:0});
     rings.push({x:o.x,y:groundY-o.h*0.5,r:o.w*0.3,life:1});
     for(let k=0;k<34;k++){const a=rnd(0,TAU),sp=rnd(3,11);
       sparks.push({x:o.x,y:groundY-o.h*0.55,vx:Math.cos(a)*sp+sweepDir*2,vy:Math.sin(a)*sp-3,life:1,decay:rnd(0.014,0.028),hue:(k*45)%360});}
   }
-  const HIT_R=0.9;   // 当たり判定の半径(スロット幅の倍数)。中心を押すと1棟・境目を押すと2棟
   function applyHits(){
     // reach/背面判定を縮小: 以前は片側の大半(4〜5棟)がまとめて壊れていたのを、狙った側の2〜3棟だけに絞る(軸3対策)
     // 押した場所基準: 押した所の1〜2棟だけ壊れる(画面のどこを連打しても当たる、をやめて「ビルを ねらう」遊びに。軸3)
-    const reach=slotW*HIT_R;let hit=0,contact=false;
+    let hit=0,contact=false;
     arcs.push({dir:sweepDir,life:1});
     for(const o of objs){if(o.state!=="stand")continue;
-      if(Math.abs(o.x-tapX)<reach){
+      // 当たり判定=見えている物の幅+指の太さ(約8px)。ビルの間(約0.18スロット)を押すと空振り=ねらう遊びに(軸3)
+      const hw=count<=0?slotW*0.55:Math.max(slotW*0.32,o.w*0.5+slotW*0.1); // 最初の1回だけは隙間なし=最初の成功は必ず来る
+      if(Math.abs(o.x-tapX)<hw){
         contact=true;
         // 硬いビル/お城は複数回ヒット
         if((o.hp||1)>1){o.hp--;o.flash=1;combo++;comboT=0.9;
@@ -171,7 +172,7 @@ function buildDino(api){
     else{ // 空振り: 押した所に小さな土ぼこりだけ(ねらいが ずれたと分かる・叱らない)
       dust.push({x:tapX,y:groundY,r:slotW*0.18,vr:1.2,vx:0,life:1,decay:0.05});}
     api.setScore(count);
-    if(hit>=2)floats.push({x:cx+sweepDir*slotW*2,y:groundY-api.H*0.2,txt:hit+"なぎ！",life:1,vy:-1.1,
+    if(hit>=2)floats.push({x:tapX,y:groundY-api.H*0.42,txt:hit+"なぎ！",life:1,vy:-1.1,
       col:hit>=5?"#ff3b3b":hit>=3?"#ff8c42":"#ffd23f",size:hit>=4?44:32,t:0});
     // climax color-wash on big sweeps（ステージが進むほど派手に）
     const intens=Math.min(stage,2); // 終盤ほど加算が溜まらないよう escalation を弱めにクランプ
@@ -188,7 +189,7 @@ function buildDino(api){
     // 同一フレームで白フラッシュ+加算ウォッシュ+超ブレスが重なると準白飛びするため、点火alphaを抑える
     api.shake(30);api.hitStop(9);api.boom(0.8);flash=0.55;wash=0.7;washHue=12;superFlash=0.85;roar=1;
     api.slide(120,900,0.6,0.5,"sawtooth");api.noise(0.35,0.4,500,"lowpass");api.tone(1046,0.2,"triangle",0.3);
-    floats.push({x:cx,y:groundY-api.H*0.12,txt:"ちょうドラゴンブレス！！",life:1,vy:-0.7,col:"#ff5a2a",size:46,t:0});
+    floats.push({x:cx,y:api.H*0.36,txt:"ちょうドラゴンブレス！！",life:1,vy:-0.7,col:"#ff5a2a",size:46,t:0});
     let n=0;
     for(const o of objs){if(o.state!=="stand")continue;
       sweepDir=o.x<cx?-1:1;o.hp=1;smash(o,true);n++;}
@@ -278,10 +279,13 @@ function buildDino(api){
       g.globalAlpha=1;dust=dust.filter(d=>d.life>0);
       // regen + physics
       for(const o of objs){
-        if(o.state==="gone"){o.respawnT-=dt;if(o.respawnT<=0){const fr=mkObj(o.slot);o.type=fr.type;o.w=fr.w;o.h=fr.h;o.color=fr.color;o.seed=fr.seed;o.hp=fr.hp;o.maxhp=fr.maxhp||fr.hp;o.golden=fr.golden;o.hard=fr.hard;o.flash=0;
+        if(o.state==="gone"){o.respawnT-=dt;if(o.respawnT<=0){const fr=mkObj(o.slot);o.type=fr.type;o.w=fr.w;o.h=fr.h;o.color=fr.color;o.seed=fr.seed;o.hp=fr.hp;o.maxhp=fr.maxhp||fr.hp;o.golden=fr.golden;o.hard=fr.hard;o.ttl=fr.ttl||0;o.flash=0;
           o.x=(o.slot+0.5)*slotW;o.vx=0;o.vy=0;o.rot=0;o.vr=0;o.fy=0; // 飛ばされた位置から必ずスロットに戻す
           o.state="rise";o.rise=0;}}
         else if(o.state==="rise"){o.rise=Math.min(1,o.rise+0.05*dt);if(o.rise>=1)o.state="stand";}
+        else if(o.state==="stand"){ // きん/にじいろは時間切れで消える(ねらう楽しさ)。ふつうのビルは消えない
+          if((o.type==="gold"||o.type==="rainbow")&&o.ttl>0&&(o.ttl-=dt)<=0){o.state="gone";o.respawnT=rnd(40,85);o.ttl=0;
+            dust.push({x:o.x,y:groundY,r:slotW*0.2,vr:1.2,vx:0,life:1,decay:0.05});}}
         else if(o.state==="fly"){o.vy+=0.5*dt;o.x+=o.vx*dt;o.fy=(o.fy||0)+o.vy*dt;o.rot+=o.vr*dt;
           if(groundY-o.h+o.fy>api.H+40||o.x<-o.w*2||o.x>api.W+o.w*2){o.state="gone";o.respawnT=rnd(40,85);o.fy=0;}}
         o.sway+=0.03*dt;
@@ -339,9 +343,10 @@ function buildDino(api){
       // grow はステージごとの成長段階なので、ここでは減衰させずそのまま維持する
       if(finaleT>0)finaleT=Math.max(0,finaleT-0.006*dt);
       for(const f of floats){f.t=(f.t||0)+dt;f.y+=f.vy*dt;f.life-=0.016*dt;
-        const pop=1+Math.max(0,0.4-f.t*0.05);g.save();g.globalAlpha=Math.max(0,f.life);
-        g.translate(f.x,f.y);g.scale(pop,pop);
+        const pop=1+Math.max(0,0.4-f.t*0.05);g.save();g.globalAlpha=Math.min(1,Math.max(0,f.life)*1.8); // 前半はくっきり・最後の約半分でスッと消える
         g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
+        {const mw=g.measureText(f.txt),hwf=((mw&&mw.width)||f.size*f.txt.length)*0.5*pop+10;f.x=clamp(f.x,Math.min(hwf,api.W/2),Math.max(api.W-hwf,api.W/2));} // 画面端で切れない
+        g.translate(f.x,f.y);g.scale(pop,pop);
         g.shadowColor=f.col;g.shadowBlur=4; // 背景に溶けないよう光彩は弱く・黒縁を太く濃く
         g.lineWidth=8;g.strokeStyle="rgba(0,0,0,.75)";g.strokeText(f.txt,0,0);
         g.fillStyle=f.col;g.fillText(f.txt,0,0);g.restore();}
@@ -364,7 +369,7 @@ function buildDino(api){
       // ① にじいろビル！ 発見バナー(虹色に色替わり・中央上=HUD安全帯)
       if(rbMsgT>0){rbMsgT-=0.016*dt;
         const pop=1+Math.max(0,rbMsgT-1)*1.3,col="hsl("+((tNow*4)%360)+",90%,62%)";
-        g.save();g.translate(api.W/2,api.H*0.235);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
+        g.save();g.translate(api.W/2,api.H*0.33);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(rbMsgT*1.4,0,1);g.font="900 38px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor=col;g.shadowBlur=18;
         g.lineWidth=7;g.strokeStyle="rgba(0,0,0,.45)";g.strokeText("にじいろビル！",0,0);
@@ -372,7 +377,7 @@ function buildDino(api){
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";g.shadowBlur=0;if(rbMsgT<0)rbMsgT=0;}
       // ② きょうのラッキー色 はっけん！ 中央の小ヒント(初回だけ・下側でクリア文字と重ねない)
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
-        g.save();g.translate(api.W/2,api.H*0.28);g.textAlign="center";g.textBaseline="middle";
+        g.save();g.translate(api.W/2,api.H*0.40);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 23px 'Hiragino Maru Gothic ProN',system-ui";
         const t2="きょうのラッキー色は "+(COLNAME[luckyColor]||"")+"！";
         g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.4)";g.strokeText(t2,0,0);
@@ -390,6 +395,7 @@ function buildDino(api){
     if(o.state==="gone")return;
     let yo=0,a=1;
     if(o.state==="rise"){yo=(1-o.rise)*o.h;a=ease?ease(o.rise):o.rise;}
+    else if(o.state==="stand"&&o.ttl>0&&o.ttl<60&&Math.floor(o.ttl/5)%2===0)a=0.4; // 消える直前の点滅(予告)
     g.save();g.globalAlpha=a;
     if(o.state==="fly"){g.translate(o.x,groundY-o.h*0.5+(o.fy||0));g.rotate(o.rot);g.translate(-o.x,-(groundY-o.h*0.5));}
     // soft ground shadow
@@ -542,7 +548,7 @@ function buildDino(api){
     g.restore();
     // 必殺ゲージ（中央・ステージ表示の下）
     g.save();g.textBaseline="middle";
-    const gw=clamp(api.W*0.32,120,220),gx=api.W/2-gw/2,gy=py+ph+6,gh=20;
+    const gw=clamp(api.W*0.32,120,220),gx=api.W/2-gw/2,gy=py+ph+6,gh=24;
     g.fillStyle="rgba(0,0,0,.3)";roundRect(gx,gy,gw,gh,gh/2);g.fill();
     if(gauge>0){
       const full=gauge>=1,pulse=full?0.5+0.5*Math.sin(tNow*0.3):0;
@@ -551,7 +557,7 @@ function buildDino(api){
       g.fillStyle=gg;roundRect(gx,gy,gw*gauge,gh,gh/2);g.fill();
       if(full){g.save();g.globalCompositeOperation="lighter";g.globalAlpha=pulse*0.6;g.fillStyle="#fff";roundRect(gx,gy,gw,gh,gh/2);g.fill();g.restore();g.globalCompositeOperation="source-over";}
     }
-    g.font="800 13px 'Hiragino Maru Gothic ProN',system-ui";g.fillStyle="#fff";g.textAlign="left";
+    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";g.fillStyle="#fff";g.textAlign="left";
     g.fillStyle="rgba(0,0,0,.4)";g.fillText("ひっさつ",gx+9,gy+gh/2+1);
     g.fillStyle="#fffce8";g.fillText("ひっさつ",gx+8,gy+gh/2);
     g.restore();g.textAlign="left";g.textBaseline="alphabetic";

@@ -5,8 +5,9 @@ function build_icecream(api){
   // 直らなかったため使用しない(手描きのみ)。bg.jpg は良好なので使用する。
   let scoops=[],balls=[],shards=[],rings=[],sparks=[],floats=[],puffs=[],bgItems=[],motes=[];
   let towerX,towerBaseY,R,tsec=0,count=0,combo=0,comboT=0,launchT=0;
-  // ③ 軸3対策: タップ座標が塔から大きく外れたら空振りにする当たり半径の倍率と、連射間隔の下限
-  const HIT_MULT=3.6,SHOT_CD=0.14;
+  // ③ 軸3対策: 指で触ったスコープ(いちばん近い生きた物)だけが当たる。どれにも届かなければ空振り。
+  // 当たり半径=スコープ半径×HIT_MULT(指先ぶんの余裕)。連射間隔の下限=SHOT_CD
+  const HIT_MULT=1.5,SHOT_CD=0.2,HIT_YSCALE=0.55,ASSIST_STEP=0.5,ASSIST_MAX=4;
   let lastShotAt=-999,lastHintAt=-999,missStreak=0;  // missStreak: 続けて外した回数(たすけ用)
   // stage progression
   let stage=1,stageGoal=0,stageBroken=0,clearT=0,clearTxt="",strikeT=0,celebrate=0,flash=0,flashHue="#fff";
@@ -81,7 +82,8 @@ function build_icecream(api){
       const big=!isFace&&(i%3===2||(kind!=="scoop"&&i%2===1));
       const rBase=R*(1-i*0.045);
       const r=big?rBase*1.4:rBase;
-      scoops.push({i,x:towerX,baseY:towerBaseY-R*0.7-i*(R*1.18),r:Math.max(R*0.5,r),
+      const slot=towerBaseY-R*0.7-i*(R*1.18);
+      scoops.push({i,x:towerX,baseY:slot,slotY:slot,r:Math.max(R*0.5,r),
         col:rb?"#ff5b8a":(gold?"#ffd23f":pick(SCOOP)),gold:gold,rb:rb,kind:kind,big:big,broken:false,wob:rnd(0,TAU),sway:0,
         face:isFace,blink:rnd(0,TAU)});
     }
@@ -105,12 +107,12 @@ function build_icecream(api){
     announceBatch();
   }
 
-  function spawnBall(tx,ty){
+  function spawnBall(tx,ty,tgt){
     // fly a candy ball from a side candy-cannon toward target, then resolve hit
     const fromLeft=tx<api.W/2?false:true;
     const launcher=fromLeft?cannonR:cannonL;
     const sx=launcher.x,sy=launcher.y;
-    balls.push({x:sx,y:sy,tx,ty,t:0,col:pick(SCOOP),done:false,rot:rnd(0,TAU)});
+    balls.push({x:sx,y:sy,tx,ty,tgt,t:0,col:pick(SCOOP),done:false,rot:rnd(0,TAU)});
     launchT=1;
     if(fromLeft)canRecoil.R=1;else canRecoil.L=1;   // 発射した側の砲台が反動でちょっと縮む
     api.slide(420,820,0.16,0.16,"triangle");api.noise(0.05,0.08,2600,"highpass");
@@ -120,6 +122,14 @@ function build_icecream(api){
     let best=-1,bi=-1;
     for(const s of scoops){if(!s.broken&&s.i>best){best=s.i;bi=scoops.indexOf(s);}}
     return bi;
+  }
+  // 指で触った所にいちばん近い生きたスコープ(maxD より遠ければ null)
+  function nearestAlive(px,py,maxD){
+    let best=null,bd=maxD===undefined?1e9:maxD;
+    for(const s of scoops){if(s.broken)continue;
+      const d=Math.hypot(px-s.x,py-s.baseY);
+      if(d<=bd){bd=d;best=s;}}
+    return best;
   }
 
   function breakScoop(s,big){
@@ -170,8 +180,8 @@ function build_icecream(api){
     if(combo>1)floats.push({x:hx,y:hy-s.r,txt:"x"+combo,vy:-1.1,life:1,
       col:combo>=8?"#ff2bff":combo>=5?"#ff5b5b":combo>=3?"#ff8c42":"#ffd23f",size:combo>=4?40:30});
     if(combo>=3){celebrate=Math.min(2,celebrate+0.5);}
-    // make the scoops above tumble (gravity feel) by un-anchoring them
-    for(const o of scoops){if(!o.broken&&o.i>s.i&&!o.falling){o.falling=true;o.fvy=rnd(-2,-5);o.fvx=rnd(-3,3);o.fr=rnd(-0.2,0.2);}}
+    // 上の段は消さずに 1 段ぶん下へ詰める(ねらい撃ちで中段を壊しても損に見えない)。ぽんと跳ねてから すとんと落ちる。
+    for(const o of scoops){if(!o.broken&&o.i>s.i){o.slotY+=R*1.18;o.hop=rnd(2.5,4.5);}}
     checkStage();
   }
 
@@ -254,25 +264,31 @@ function build_icecream(api){
           sparks.push({x:sunPos.x,y:sunPos.y,vx:Math.cos(a)*sp*0.7,vy:Math.sin(a)*sp-1,len:rnd(6,12),life:1,decay:0.05});}
         return;
       }
-      // tap to launch a ball; it always heads for the top-most surviving scoop
-      const bi=topAlive();
-      if(bi<0)return;
-      const tgt=scoops[bi];
-      // (軸3) タワーから大きく外れたタップは空振り(得点にしない)。低学年の指でも当てやすい余裕は残す。
-      // 続けて外すほど当たり範囲を少しずつ広げる(5回続けて外してから・最大 +1.0 倍)。低学年が何回も外して投げ出さない保険。
-      if(Math.hypot(px-tgt.x,py-tgt.baseY)>tgt.r*(HIT_MULT+0.5*clamp(missStreak-4,0,2))){
+      // tap to launch a ball; it flies to the scoop you touched (指でさわった いちばん近いスコープ)
+      const topI=topAlive();
+      if(topI<0)return;
+      // (軸3) 触った所に近い物だけが当たる。どれにも届かなければ空振り(得点にしない)。指先ぶんの余裕(HIT_MULT)は残す。
+      // 続けて外すほど当たり範囲を少しずつ広げる(3回続けて外してから・最大 +1.0 倍)。低学年が何回も外して投げ出さない保険。
+      const reach=HIT_MULT+ASSIST_STEP*clamp(missStreak-2,0,ASSIST_MAX);
+      let tgt=null,bd=1e9;
+      for(const s of scoops){if(s.broken)continue;
+        // 縦は少しゆるく見る(塔が低くなっても、指で「塔のあたり」をさわれば当たる)
+        const d=Math.hypot(px-s.x,(py-s.baseY)*HIT_YSCALE)/s.r;
+        if(d<=reach&&d<bd){bd=d;tgt=s;}}
+      if(!tgt){
+        const top=scoops[topI];
         missStreak++;
         api.tone(220,0.06,"sine",0.05);
         // 外しても『どこを押せばいいか』が見えるように、押した所の小さな波紋と「ここを タップ！」を出す
         rings.push({x:px,y:py,r:6,vr:3,life:1,decay:0.06,col:'#ffffff'});
         if(tsec-lastHintAt>0.8){lastHintAt=tsec;
-          floats.push({x:tgt.x,y:tgt.baseY-tgt.r*1.8,txt:'ここを タップ！',vy:0,life:0.9,col:'#ff5b8a',size:22});}
+          floats.push({x:top.x,y:top.baseY-top.r*1.8,txt:'ここを タップ！',vy:0,life:0.9,col:'#ff5b8a',size:22});}
         return;
       }
       // (軸3) 連射間隔の下限。連打の速さだけでは伸びず、狙いの精度がスコアに効くようにする。
       if(tsec-lastShotAt<SHOT_CD)return;
       lastShotAt=tsec;missStreak=0;
-      spawnBall(tgt.x,tgt.baseY);
+      spawnBall(tgt.x,tgt.baseY,tgt);
     },
     frame(dt,now){
       tsec+=0.016*dt;
@@ -400,13 +416,12 @@ function build_icecream(api){
       for(const s of scoops){
         if(s.broken)continue;
         s.wob+=0.05*dt;s.blink+=0.04*dt;
-        if(s.falling){s.fvy+=0.5*dt;s.baseY+=s.fvy*dt;s.x+=(s.fvx||0)*dt;s.wob+=s.fr*dt;
-          if(s.baseY>api.H+R*2){s.broken=true;}
-        }else{
-          s.sway=Math.sin(tsec*1.5+s.i*0.5)*R*0.04*(s.i/Math.max(1,scoops.length));
-        }
-        const dx=s.falling?0:s.sway;
-        drawScoop(s,s.x+dx,s.baseY);
+        // 詰め落ち: slotY へ向かって加速して落ちる(下から壊された時だけ動く)。ちょっと跳ねる。
+        if(s.hop>0){s.baseY-=s.hop*dt;s.hop=Math.max(0,s.hop-0.9*dt);}
+        else if(s.baseY<s.slotY-0.5){s.dropV=(s.dropV||0)+0.7*dt;s.baseY=Math.min(s.slotY,s.baseY+s.dropV*dt);if(s.baseY>=s.slotY)s.dropV=0;}
+        else{s.baseY=s.slotY;s.dropV=0;}
+        s.sway=Math.sin(tsec*1.5+s.i*0.5)*R*0.04*(s.i/Math.max(1,scoops.length));
+        drawScoop(s,s.x+s.sway,s.baseY);
       }
       // prune fully gone & re-check
       scoops=scoops.filter(s=>!(s.broken&&s._counted));
@@ -417,18 +432,18 @@ function build_icecream(api){
         if(b.done)continue;
         b.t+=0.06*dt;b.rot+=0.3*dt;
         const t=ease(Math.min(b.t,1));
+        // ねらった物が詰め落ちで動いたら、玉も追いかける
+        if(b.tgt&&!b.tgt.broken){b.tx=b.tgt.x;b.ty=b.tgt.baseY;}
         b.x=lerp(b.x,b.tx,clamp(0.18*dt,0,1));
         const arc=Math.sin(Math.min(b.t,1)*Math.PI)*R*1.4;
         b.y=lerp(b.y,b.ty-arc,clamp(0.18*dt,0,1));
         drawBall(b);
         if(b.t>=1||Math.hypot(b.x-b.tx,b.y-b.ty)<R*0.4){
           b.done=true;
-          const bi=topAlive();
-          if(bi>=0){
-            // hit the current top scoop (it may differ if changed; recompute target)
-            const tgt=scoops[bi];
-            breakScoop(tgt,combo>=4);
-          }
+          // ねらった物に当てる。もう壊れていたら、その場所に今いちばん近い物(=詰め落ちて来た物)、無ければ いちばん上
+          let tgt=(b.tgt&&!b.tgt.broken)?b.tgt:nearestAlive(b.tx,b.ty);
+          if(!tgt){const bi=topAlive();tgt=bi>=0?scoops[bi]:null;}
+          if(tgt)breakScoop(tgt,combo>=4);
         }
       }
       balls=balls.filter(b=>!b.done);
@@ -525,7 +540,7 @@ function build_icecream(api){
       // ① にじいろアイス! 発見バナー(虹色に色替わり・上部中央=安全帯)
       if(rbMsgT>0){rbMsgT-=0.016*dt;
         const a=clamp(rbMsgT*1.4,0,1),pop=1+Math.max(0,rbMsgT-1)*1.4,col=RAINBOW[Math.floor(tsec*6)%RAINBOW.length];
-        g.save();g.translate(api.W/2,api.H*0.24);g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";
+        g.save();g.translate(api.W/2,bannerY1());g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";
         g.font="900 34px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor=col;g.shadowBlur=18;g.fillStyle="#ffffff";g.fillText("にじいろアイス！",0,0);
         g.shadowBlur=0;g.lineWidth=2;g.strokeStyle=col;g.strokeText("にじいろアイス！",0,0);
@@ -533,7 +548,7 @@ function build_icecream(api){
       // ② きょうの ラッキーいろ バナー(上部中央=安全帯)
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
         const a=clamp(luckyMsgT*1.5,0,1),pop=1+Math.max(0,luckyMsgT-1.2)*1.3;
-        g.save();g.translate(api.W/2,api.H*0.30);g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";
+        g.save();g.translate(api.W/2,bannerY2());g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";
         g.font="900 24px 'Hiragino Maru Gothic ProN',system-ui";g.shadowColor=luckyColor;g.shadowBlur=14;
         g.fillStyle="#fff7c2";g.fillText(luckyMsg,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";if(luckyMsgT<0)luckyMsgT=0;}
@@ -552,6 +567,9 @@ function build_icecream(api){
   };
 
   // ---------- drawing helpers ----------
+  // 発見バナーは 塔の頂点(顔の上のさくらんぼ)より上・HUD の下の帯に置く(塔と重ねない)
+  function bannerY1(){return Math.max(api.H*0.14,api.H*0.05+50);}
+  function bannerY2(){return bannerY1()+Math.max(api.H*0.06,34);}
   function drawHUD(){
     const left=clamp(stageGoal-stageBroken,0,stageGoal);
     const bw=Math.min(api.W*0.6,360),bh=16,bx=(api.W-bw)/2,by=api.H*0.05;
@@ -638,8 +656,13 @@ function build_icecream(api){
       g.save();g.scale(1,0.58);
       const grd=g.createRadialGradient(-rr3*0.3,-rr3*0.3,rr3*0.1,0,0,rr3*1.2);
       grd.addColorStop(0,lighten(col,70));grd.addColorStop(0.6,lighten(col,15));grd.addColorStop(1,col);
+      g.shadowColor="rgba(80,30,60,.35)";g.shadowBlur=10;g.shadowOffsetY=3;
       g.fillStyle=grd;g.beginPath();g.arc(0,0,rr3,0,TAU);g.fill();
-      g.strokeStyle="rgba(120,80,30,.35)";g.lineWidth=1.5;
+      g.shadowBlur=0;g.shadowOffsetY=0;
+      // 輪郭線(背景のピンク・むらさきに溶けないように)。縦 0.58 倍ぶん太さを補う
+      g.strokeStyle="rgba(122,58,94,.6)";g.lineWidth=Math.max(2,r*0.07)/0.58;
+      g.beginPath();g.arc(0,0,rr3,0,TAU);g.stroke();
+      g.strokeStyle="rgba(120,80,30,.35)";g.lineWidth=1.5;g.lineWidth=1.5;
       for(let k=-2;k<=2;k++){g.beginPath();g.moveTo(-rr3*0.9,k*rr3*0.36);g.lineTo(rr3*0.9,k*rr3*0.36);g.stroke();}
       for(let k=-2;k<=2;k++){g.beginPath();g.moveTo(k*rr3*0.36,-rr3*0.9);g.lineTo(k*rr3*0.36,rr3*0.9);g.stroke();}
       g.fillStyle="rgba(255,255,255,.35)";g.beginPath();g.ellipse(-rr3*0.3,-rr3*0.35,rr3*0.35,rr3*0.5,0,0,TAU);g.fill();
@@ -652,7 +675,12 @@ function build_icecream(api){
       g.save();
       const grd=g.createRadialGradient(-outer*0.3,-outer*0.3,outer*0.1,0,0,outer);
       grd.addColorStop(0,lighten(col,60));grd.addColorStop(0.7,col);grd.addColorStop(1,shade(col,-10));
+      g.shadowColor="rgba(80,30,60,.35)";g.shadowBlur=10;g.shadowOffsetY=3;
       g.fillStyle=grd;g.beginPath();g.arc(0,0,outer,0,TAU);g.arc(0,0,inner,0,TAU,true);g.fill("evenodd");
+      g.shadowBlur=0;g.shadowOffsetY=0;
+      g.strokeStyle="rgba(122,58,94,.6)";g.lineWidth=Math.max(2,r*0.07);
+      g.beginPath();g.arc(0,0,outer,0,TAU);g.stroke();
+      g.beginPath();g.arc(0,0,inner,0,TAU);g.stroke();
       g.fillStyle="rgba(255,255,255,.35)";g.beginPath();g.ellipse(-outer*0.32,-outer*0.32,outer*0.26,outer*0.14,-0.3,0,TAU);g.fill();
       g.restore();
       // グレーズのしずく(輪の縁から少し垂れる=ドーナツらしさ)
@@ -664,7 +692,11 @@ function build_icecream(api){
       // soft round scoop body
       const grd=g.createRadialGradient(-r*0.3,-r*0.4,r*0.1,0,0,r*1.2);
       grd.addColorStop(0,lighten(col,70));grd.addColorStop(0.6,lighten(col,15));grd.addColorStop(1,col);
+      g.shadowColor="rgba(80,30,60,.35)";g.shadowBlur=10;g.shadowOffsetY=3;
       g.fillStyle=grd;g.beginPath();g.arc(0,0,r,0,TAU);g.fill();
+      g.shadowBlur=0;g.shadowOffsetY=0;
+      g.strokeStyle="rgba(122,58,94,.6)";g.lineWidth=Math.max(2,r*0.07);
+      g.beginPath();g.arc(0,0,Math.max(1,r),0,TAU);g.stroke();
       // glossy top sheen
       g.fillStyle="rgba(255,255,255,.4)";g.beginPath();
       g.ellipse(-r*0.25,-r*0.4,r*0.4,r*0.22,-0.4,0,TAU);g.fill();

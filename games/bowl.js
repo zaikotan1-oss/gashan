@@ -3,10 +3,11 @@ function buildBowl(api){
   // 画像アセット: 背景だけ使う(無ければ従来の手描きにフォールバック)。
   // ball/goldpin/bombpin は生成が2回とも不良(床の残り・マゼンタの穴・背景残り)だったので手描きのまま(意図的に読み込まない)
   api.preload(["bg.jpg"]);
+  let rackCx=0,rackMidY=0,throwPw=1; // throwPw: ちゃんと上へスワイプした投げは強い(1.3・得点3ばい)・ただのタップは1.0未満(0.8)
   let pins=[],ball,sparks=[],floats=[],trail=[],glints=[];
   let topY,botY,laneTopW,laneBotW,pinN,round,count,combo,sx,sy,lx,ly,aiming,resetT,tms=0,flash=0,wash=0;
   // stage progression
-  let missStreak=1,throwStartCount=0;
+  let missStreak=2,throwStartCount=0;
   let stage,stageGoal,stageDown,clearT,bigT,shocks=[];
   const MAXSTAGE=5;
   // ---- 隠し発見レイヤー(crane/punch/hammer/truck と同じ思想) ----
@@ -51,23 +52,30 @@ function buildBowl(api){
     topY=api.H*0.2;botY=api.H*0.92;
     laneTopW=clamp(api.W*0.16,80,150);laneBotW=clamp(api.W*0.62,300,640);
   }
-  function sc(y){return lerp(0.7,1.3,clamp((y-topY)/(botY-topY),0,1));}
+  function sc(y){return lerp(1.15,1.9,clamp((y-topY)/(botY-topY),0,1));} // 【軸6】主役のピンを大きく(指で狙える大きさ)
+  function ballSc(y){return lerp(0.8,1.4,clamp((y-topY)/(botY-topY),0,1));} // ボールは手前のヒント帯と重ならない大きさに据え置き気味
   function laneHalf(y){return lerp(laneTopW,laneBotW,clamp((y-topY)/(botY-topY),0,1))/2;}
   function rack(){
     pins=[];
     const def=stageDef();
     const rows=clamp(3+Math.floor(round/2),3,6);
-    const cy=topY+api.H*0.12, gap=api.W*0.06; // 【軸3(a)対策】三角形の横幅を少し広げ、狙わないタップでは端まで届きにくくする
+    const cy=topY+api.H*0.14, gap=api.W*0.075; // 【軸6】ピンが大きくなった分、間隔を広げて重ならないように
     let id=0;
     const cells=[];
     for(let r=0;r<rows;r++){
-      const y=cy+r*api.H*0.055;
+      const y=cy+r*api.H*0.075;
       const cnt=r+1;
       for(let c=0;c<cnt;c++){
         const x=api.W/2+(c-(cnt-1)/2)*gap;
         cells.push({x,y});
       }
     }
+    // 【軸3(a)】ラックは毎投、レーン内で左右にずれる=ボールをまっすぐ出すだけでは毎回は当たらない(狙う子が得をする)
+    let maxShift=laneHalf(cy)*0.45;
+    for(const c of cells)maxShift=Math.min(maxShift,laneHalf(c.y)*0.92-Math.abs(c.x-api.W/2));
+    const shift=rnd(-1,1)*Math.max(0,maxShift);
+    for(const c of cells)c.x+=shift;
+    rackCx=api.W/2+shift;rackMidY=cy+(rows-1)*api.H*0.075*0.5;
     // assign special pin types (kind: normal/gold/bomb). Keep it gentle: only a few specials.
     const goldN=def.gold?clamp(1+Math.floor(stage/2),1,3):0;
     const bombN=def.bomb?clamp(stage-2,1,2):0;
@@ -82,7 +90,7 @@ function buildBowl(api){
     // 【軸7】壊す物のバラエティ: 2投に1回ほど、通常ピンの代わりに樽(丸くて太い・大きい)や
     // 積み木(縦2段・段ごとに崩れる)、豆ピン(通常の半分サイズ・小さい)を2〜4本混ぜる。
     // 色違いだけでなく形/大きさ/壊れ方を変え、「大きい/小さい」の対比もはっきりさせる。
-    const varietyRoll=(round%2===0);
+    const varietyRoll=(round===1||round%2===0); // 【軸7】最初の投から樽/積み木/豆ピンを見せる
     const barrelSet=new Set(),stackSet=new Set(),beanSet=new Set();
     if(varietyRoll){
       const restForVariety=restForRare.filter(i=>i!==rbi);
@@ -115,7 +123,7 @@ function buildBowl(api){
       if((p.tier===undefined?2:p.tier)>1){
         // 【軸7】積み木: 1段目のヒットでは倒れきらず、上段だけ崩れて消える(2段階の崩落演出)
         p.tier=(p.tier===undefined?2:p.tier)-1;p.tierCd=14;p.sq=1;
-        count+=1;combo++;api.setScore(count);
+        count+=(throwPw>1?3:1);combo++;api.setScore(count);
         api.slide(360,140,0.09,0.18,"square");api.noise(0.07,0.12,900);api.shake(2);
         for(let k=6;k>0;k--){const a2=rnd(0,TAU),sp=rnd(2,6);sparks.push({x:p.x,y:p.y-14,vx:Math.cos(a2)*sp,vy:Math.sin(a2)*sp-rnd(1,3),r:rnd(2,4),life:1,decay:rnd(0.03,0.06),col:"#f4b183"});}
         pushFloat({x:p.x,y:p.y-26,txt:"+1",col:"#ffe27a",life:0.7,vy:-1,size:20});
@@ -132,6 +140,7 @@ function buildBowl(api){
     const gold=p.kind==="gold", rainbow=p.kind==="rainbow", barrel=p.kind==="barrel";
     const isLucky=p.kind==="normal"&&p.hue===lucky.c;   // ② ラッキー色ヒット
     let gain=rainbow?7:gold?3:barrel?2:1; if(isLucky)gain+=1;
+    if(throwPw>1)gain*=3; // ちゃんとスワイプした「パワーボール」は 1本ごとの得点が3ばい(狙う操作が報われる)
     count+=gain;combo++;stageDown++;api.setScore(count);
     api.slide(420,160,0.1,0.22,"triangle");api.noise(0.08,0.16,1600);
     api.shake(2+Math.min(combo*0.5,8));
@@ -197,7 +206,7 @@ function buildBowl(api){
     flash=Math.min(flash+0.6,1);
     shocks.push({x:p.x,y:p.y,r:10,life:1});
     for(let k=18;k>0;k--){const a2=rnd(0,TAU),sp=rnd(4,12);sparks.push({x:p.x,y:p.y,vx:Math.cos(a2)*sp,vy:Math.sin(a2)*sp-rnd(0,3),r:rnd(3,7),life:1,decay:rnd(0.02,0.04),col:"#ff8a3a"});}
-    for(const q of pins){if(q.state==="stand"&&Math.hypot(q.x-p.x,q.y-p.y)<150){knock(q,p.x,p.y,11);}}
+    for(const q of pins){if(q.state==="stand"&&Math.hypot(q.x-p.x,q.y-p.y)<170){knock(q,p.x,p.y,11);}}
   }
   reset();
   return{
@@ -219,15 +228,28 @@ function buildBowl(api){
         if(aiming&&ball.state==="idle"){
           aiming=false;
           let dx=lx-sx, dy=ly-sy, unaimed=false;
-          // 外した直後(や最初の一投)は横ブレを小さくする=失敗しても叱られず、すぐ次で当たる(得点が止まりにくい)
-          const sc2=missStreak>0?230:520;
-          if(dy>-20){unaimed=true;dy=-200;dx=rnd(-sc2,sc2);} // 【軸3(a)】横ブレを170→420に広げ、狙わない連打はラック端を外す投が増えるように。// 【軸3対策】上まで指を動かしていない=狙いを付けていないタップなので、さらに大きく左右にブレさせてラックを外しやすくする(130→170)
-          else dx*=0.35; // 【軸3対策】しっかり上へスワイプした本筋の操作は、横ブレの影響を弱めて中央のレーンへ通りやすくする(狙う努力がちゃんと報われるように)
-          const power=clamp(Math.hypot(dx,dy)*0.06,9,26);
-          const ang=Math.atan2(dy,dx);
-          ball.vx=Math.cos(ang)*power*0.5;ball.vy=-Math.max(14,Math.abs(Math.sin(ang)*power)+6); // 浅い角度でも前へ進む(横へ流れてガターになりにくい)
-          if(!unaimed)ball.vx*=0.6; // ちゃんと上へスワイプした子は横流れを抑えて救う(狙う努力が報われる)
-          ball.vx=clamp(ball.vx,-14,14);
+          // 【軸3(a)】狙った人が得をする: 指を離した横位置へ向けて転がす(ラックはレーン内でずれているので、
+          // ピンの上あたりを押した子は当たり、端や外を押した連打は外れる)。
+          // 外した直後は救済: missStreak>=1 でラック中心へ引き寄せ、2投連続で外したらさらに強く寄せる(得点が止まらない)。
+          const pull=missStreak>=3?1:missStreak>=2?0.8:missStreak>=1?0.25:0; // 最初の一投は missStreak=2 から始まるので必ず当たる
+          const distY=Math.max(60,(botY-10)-rackMidY);
+          let tx;
+          if(dy>-20){
+            unaimed=true;
+            tx=lerp(lx,rackCx,pull);
+            throwPw=0.8;
+          }else{
+            // ちゃんと上へスワイプ: 向きを(弱めて)反映しつつ、ラックへ寄せる補助つき
+            const dirX=api.W/2+clamp(dx/Math.max(40,-dy),-1.5,1.5)*distY*0.35;
+            tx=lerp(dirX,rackCx,Math.max(pull,0.5));
+            throwPw=1.3; // 狙ってスワイプした投げ: ボールが勢いよく当たり、ドミノも広がる
+          }
+          // 狙わず(あるいは外の方を)押すとレーンの外へ向かいガターになる。ラック付近ならちゃんと当たる
+          tx=clamp(tx,api.W*0.08,api.W*0.92);
+          ball.vy=-18;
+          const frames=distY/(Math.abs(ball.vy)*0.94);
+          ball.vx=clamp((tx-api.W/2)/frames,-14,14);
+          if(throwPw>1)pushFloat({x:api.W/2,y:api.H*0.72,txt:"パワーボール！",col:"#ffb24a",life:0.9,vy:-0.6,size:30});
           ball.state="roll";combo=0;gutterThisBall=false;throwStartCount=count;
           api.slide(120,90,0.3,0.3,"sine");
         }
@@ -393,12 +415,12 @@ function buildBowl(api){
         const half=laneHalf(ball.y);
         if(ball.x<api.W/2-half-22||ball.x>api.W/2+half+22){/* gutter, keep going slower */ball.vx*=0.9; // 【軸3対策】ガター判定の余白を広げ、狙って振った一投がガターで無駄になりにくくする
           if(!gutterThisBall){gutterThisBall=true;stageGutter=true;}}  // ③ ガター=このステージのパーフェクト判定を失う
-        const bs=sc(ball.y);
+        const bs=ballSc(ball.y);
         trail.push({x:ball.x,y:ball.y,r:26*bs,life:1});
         if(trail.length>14)trail.shift();
         for(const p of pins){if(p.state==="stand"){
-          const rHit=p.kind==="barrel"?55*1.6:p.kind==="bean"?55*0.7:55; // 【軸3(a)対策】ボールの直撃判定を少し絞り、狙わない一投で全部倒れきらないようにする(樽は的が大きい分1.6倍、豆ピンは小さい的なので0.7倍)
-          if(Math.hypot(p.x-ball.x,p.y-ball.y)<rHit){knock(p,ball.x,ball.y,Math.max(8,Math.abs(ball.vy)*1.0));}}}
+          const rHit=(p.kind==="barrel"?58*1.6:p.kind==="bean"?58*0.7:58)*throwPw; // 【軸3(a)対策】ボールの直撃判定を少し絞り、狙わない一投で全部倒れきらないようにする(樽は的が大きい分1.6倍、豆ピンは小さい的なので0.7倍)
+          if(Math.hypot(p.x-ball.x,p.y-ball.y)<rHit){knock(p,ball.x,ball.y,Math.max(5,Math.abs(ball.vy)*throwPw));}}}
         if(ball.y<topY-20||Math.abs(ball.vy)<1){ball.state="done";resetT=40;missStreak=count>throwStartCount?0:missStreak+1;}
       }
       for(const t of trail)t.life-=0.09*dt;
@@ -407,7 +429,7 @@ function buildBowl(api){
       for(const p of pins){if(p.state==="fly"){
         p.vy+=0.4*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.rot+=p.vr*dt;
         if(p.sq>0)p.sq=Math.max(0,p.sq-0.06*dt);
-        for(const q of pins){if(q.state==="stand"&&Math.hypot(q.x-p.x,q.y-p.y)<26){knock(q,p.x,p.y,7);}} // 【軸3(a)対策】隣のピンへの連鎖半径をさらに絞り(34→26)、1投で密集ラック全体がドミノで倒れきらないようにする
+        for(const q of pins){if(q.state==="stand"&&Math.hypot(q.x-p.x,q.y-p.y)<(throwPw>1?40:16)){knock(q,p.x,p.y,7);}} // 【軸3(a)対策】隣のピンへの連鎖半径をさらに絞り(34→26)、1投で密集ラック全体がドミノで倒れきらないようにする
         if(p.y>api.H+60||p.y<-60||p.x<-60||p.x>api.W+60)p.state="gone";
       }}
       // ball trail (behind pins)
@@ -428,7 +450,7 @@ function buildBowl(api){
       for(const p of order){if(p.state==="fly")drawPin(p.x,p.y,sc(p.y),p.rot,p.sq,p.kind,0,p.hue,p.tier);}
       // ball
       if(ball.state==="roll"||ball.state==="idle"||ball.state==="done"){
-        const bs=sc(ball.y);drawBall(ball.x,ball.y,26*bs,ball.spin||0);
+        const bs=ballSc(ball.y);drawBall(ball.x,ball.y,26*bs*(ball.state==="roll"&&throwPw>1?1.15:1),ball.spin||0,ball.state==="roll"&&throwPw>1);
       }
       // aim guide
       if(aiming){
@@ -589,7 +611,7 @@ function buildBowl(api){
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
         g.save();g.translate(api.W/2,api.H*0.27);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
-        const t2="きょうのラッキー色は "+lucky.n+"！";
+        const t2="きょうの ラッキーいろは "+lucky.n+"！";
         g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.45)";g.strokeText(t2,0,0);
         g.fillStyle=lucky.c;g.fillText(t2,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(luckyMsgT<0)luckyMsgT=0;}
@@ -779,13 +801,13 @@ function buildBowl(api){
     drawBox(6,13,11,"#8fc4f4","#3d6fa5"); // 下段(青)
     if(tier>1)drawBox(6-11-2,11,9.5,"#f7c79a","#c47f3e"); // 上段(オレンジ・まだ崩れていない時だけ)
   }
-  function drawBall(x,y,r,spin){
+  function drawBall(x,y,r,spin,power){
     // contact shadow
     g.save();g.globalAlpha=0.3;g.fillStyle="#000";g.beginPath();g.ellipse(x,y+r*0.7,r*0.95,r*0.35,0,0,TAU);g.fill();g.restore();
     // outer glow
     g.save();g.globalCompositeOperation="lighter";
     const og=g.createRadialGradient(x,y,r*0.6,x,y,r*1.5);
-    og.addColorStop(0,"rgba(110,142,255,0.35)");og.addColorStop(1,"rgba(110,142,255,0)");
+    og.addColorStop(0,power?"rgba(255,170,60,0.6)":"rgba(110,142,255,0.35)");og.addColorStop(1,power?"rgba(255,170,60,0)":"rgba(110,142,255,0)");
     g.fillStyle=og;g.beginPath();g.arc(x,y,r*1.5,0,TAU);g.fill();g.restore();
     // ボールは手描き(生成スプライトは床の残り・顔の混入で不採用)
     // body

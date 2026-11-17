@@ -8,8 +8,9 @@ function buildBalloon(api){
   let balloons=[],pending=[],confetti=[],rings=[],floats=[],sparks=[],shines=[],links=[],motes=[];
   let ghosts=[],puddles=[],gondolas=[]; // 壊れ方のバラエティ(軸7): 空気が抜けて飛ぶどうぶつ / みずたまり / 落ちるボスのゴンドラ
   let CHAINR,spawnT,count,waveN,clouds=[],hintPulse=0,flash=0,flashCol="#fff";
-  let quietT=0,pityCD=0; // 軸3向けピティ: 無得点の経過フレーム(約60/秒)
-  const PITY_T=300,PITY_CD=80; // 無得点がPITY_T(約5秒)続いたら的カラーを画面の中ほどに差し込み、次はPITY_CD(約1.3秒)空ける
+  let quietT=0,pityCD=0,bigT=0; // bigT: 大きな熱気球(2タップ)の出現タイマー
+  // // 軸3向けピティ: 無得点の経過フレーム(約60/秒)
+  const PITY_T=240,PITY_CD=80; // 無得点がPITY_T(約5秒)続いたら的カラーを画面の中ほどに差し込み、次はPITY_CD(約1.3秒)空ける
   const QUIET_ASSIST=240;       // 無得点が約4秒続いたら当たり判定を広げる(静かな時間だけ)
   const COLORS=["#e85d75","#4aa6c0","#7be08a","#ffd23f","#b58bff","#ff8c42"];
   const CNAME=["あか","みずいろ","みどり","きいろ","むらさき","オレンジ"];
@@ -35,17 +36,19 @@ function buildBalloon(api){
   // stack(つみかさなり)を目に留まりやすく: 0.1→0.18(軸7向け)
   // round/long/stackに加え、低確率で「ハートふうせん」を混ぜて輪郭のバリエーションをもう1種類増やす(軸7向け)
   // みずふうせん(下ぶくれ・割れると水しぶき)を約8%追加(軸7向け)
-  function pickShape(){const r=Math.random();return r<0.18?'stack':(r<0.38?'long':(r<0.46?'heart':(r<0.54?'water':'round')));}
-  function mk(y0,forceTarget){const r=clamp(api.W*0.06,28,50)*rnd(0.75,1.35); // 通常の丸ふうせんにも大小差をつける(軸7向け)
+  function pickShape(){const r=Math.random();return r<0.18?'stack':(r<0.38?'long':(r<0.50?'heart':(r<0.62?'water':'round')));}
+  function mk(y0,forceTarget){const r=clamp(api.W*0.06,28,50)*rnd(0.6,1.5); // 大小の差を広げる(軸7向け)。小さい物の押しやすさは at() の最小半径で守る
     return{x:rnd(r*1.5,api.W-r*1.5),y:y0!=null?y0:api.H+r*1.5,vy:-rnd(0.6,1.4)*stageSpeedMul(),r,
       // 無反応が続く時間(軸3)を縮めるため、一定確率で今の的の色を優先して出す。狙う必要性(missRate)自体は変えない
       // N=1..20再測でmaxQuietSecの裾が崩れたため0.35→0.42に増量(ランダム連打のscorePerTapは変えず、単に的色の巡り合わせを早める)
       color:(forceTarget||Math.random()<0.42)&&target?target:pick(stageColors()),phase:rnd(0,TAU),amp:rnd(8,22),popped:false,
-      sq:1,wob:rnd(0,TAU),shimmer:rnd(0,TAU),rainbow:false,boss:0,shape:pickShape()};}
+      sq:1,wob:rnd(0,TAU),shimmer:rnd(0,TAU),rainbow:false,boss:0,shape:pickShape(),an:Math.random()};}
   // rainbow balloon: matches ANY colour in a chain
   function mkRainbow(){const b=mk();b.rainbow=true;b.r*=1.05;return b;}
   // boss balloon: needs a few taps, then a huge burst(乗り物寄りの輪郭にするため形は固定)
   function mkBoss(){const b=mk(api.H+90);b.boss=BOSS_HP;b.r=clamp(api.W*0.06,28,50)*1.9;b.vy=-rnd(0.3,0.6)*stageSpeedMul();b.color=BOSS_COL;b.shape='round';return b;}
+  // 大きな熱気球(軸7向け): 的の色・2タップで壊れ、ゴンドラが落ちる。ボスより軽い「乗り物」枠
+  function mkBig(){const b=mk(api.H+110,true);b.big=true;b.boss=2;b.r=clamp(api.W*0.06,28,50)*1.8;b.vy=-rnd(0.4,0.7)*stageSpeedMul();b.shape='round';return b;}
   // ② だいあたり ふうせん(激レア): 虹色に光る大きめ。割ると虹の大盤振る舞い＋大量得点。連鎖には巻き込まれない(直接タップ専用)
   function mkMega(){const b=mk(api.H+120);b.mega=true;b.rainbow=true;b.r=clamp(api.W*0.06,28,50)*1.5;b.vy=-rnd(0.35,0.55)*stageSpeedMul();b.shape='round';return b;}
   function hitMega(b){
@@ -89,22 +92,26 @@ function buildBalloon(api){
   }
   function reset(){balloons=[];pending=[];confetti=[];rings=[];floats=[];sparks=[];shines=[];links=[];count=0;spawnT=0;waveN=0;flash=0;hintPulse=0;quietT=0;pityCD=0;
     stage=0;stageClears=0;banner=null;skyShift=0;bossT=420;rainbowT=380;feverT=0;layout();mkClouds();mkMotes();
-    superRareT=rint(560,820);megaWarnT=0;perfectT=0;sunWink=0;escaped=0;
+    bigT=rint(300,420);superRareT=rint(560,820);megaWarnT=0;perfectT=0;sunWink=0;escaped=0;
     luckyIntroT=luckyIntroShown?0:2.8;   // ① ラッキー色は初回だけ中央に教える
     nextStage(true);
     ghosts=[];puddles=[];gondolas=[];
     // 最初の10こは画面を10等分した帯に1こずつ(順番はシャッフル)。端に偏って押せない出だしを減らす(軸3向け)
     const xo=[0,1,2,3,4,5,6,7,8,9];for(let i=xo.length-1;i>0;i--){const j=rint(0,i),t=xo[i];xo[i]=xo[j];xo[j]=t;}
-    for(let i=0;i<10;i++){const b=mk(rnd(api.H*0.3,api.H*0.85));b.x=clamp(api.W*(xo[i]+0.5)/10,b.r*1.2,api.W-b.r*1.2);balloons.push(b);}
+    for(let i=0;i<10;i++){const b=mk(rnd(api.H*0.3,api.H*0.85),i<3);b.x=clamp(api.W*(xo[i]+0.5)/10,b.r*1.2,api.W-b.r*1.2);balloons.push(b);}
     quietT=QUIET_ASSIST;}   // 最初の1こ目を割るまでは判定を広めに(最初の成功を早く)。最初に割れたらquietTは0に戻り普段の判定へ
   // 無得点が続いている間だけ判定を広げる(普段のタップ命中率は変えない)
-  function at(x,y){const k=quietT>=QUIET_ASSIST?1.6:1.05;let best=null,bd=1e9;for(const b of balloons){if(b.popped)continue;const d=Math.hypot(b.x-x,b.y-y);if(d<b.r*k&&d<bd){bd=d;best=b;}}return best;}
-  function pop(b){
+  function at(x,y){const k=quietT>=QUIET_ASSIST+180?2.2:(quietT>=QUIET_ASSIST?1.6:1.05);let best=null,bd=1e9;for(const b of balloons){if(b.popped)continue;const d=Math.hypot(b.x-x,b.y-y);const hr=Math.max(b.r*k,22*(k>1.2?1.2:1));if(d<hr&&d<bd){bd=d;best=b;}}return best;}
+  function pop(b,scores){
     if(b.popped)return;b.popped=true;
-    quietT=0; // 軸3向けピティ: 得点が動いたので無得点タイマーをリセット
-    count++;api.setScore(count);
+    // 軸3: 色えらびを点数に結びつける。的の色・にじいろ・3こ以上のれんさ・しばらく無得点の時だけ点が入る
+    // (単発の外れ色も割れる演出はそのまま・点だけ入らない。叱る文言は出さない)
+    if(scores!==false){
+      quietT=0; // 軸3向けピティ: 得点が動いたので無得点タイマーをリセット
+      count++;api.setScore(count);
+    }
     // ① きょうのラッキー色: 秘密の色を割ると小ボーナス＋頭上に星のキラッ(気づけるヒント)
-    if(!b.rainbow&&!b.mega&&b.color===luckyColor){
+    if(scores!==false&&!b.rainbow&&!b.mega&&b.color===luckyColor){
       count++;api.setScore(count);
       for(let k=3;k>0;k--)sparks.push({x:b.x+rnd(-b.r*0.3,b.r*0.3),y:b.y-b.r*0.95,vx:rnd(-0.8,0.8),vy:-rnd(1,2.2),life:1,decay:0.025,sz:rnd(3,5.5),col:"#fff0a0"});
       api.tone(1568,0.07,"triangle",0.05);
@@ -134,7 +141,7 @@ function buildBalloon(api){
     } else if(b.shape==='long'){
       // どうぶつふうせん: 割れずに「ぷしゅー」と空気が抜けて、ジグザグに飛び回りながら小さくなって消える
       burst(b,b.x,b.y,b.r,big,2,rint(3,5),true);
-      ghosts.push({x:0,y:0,gx:b.x,gy:b.y,r:b.r,color:b.color,shape:'long',phase:b.phase,wob:b.wob,shimmer:b.shimmer,sq:1,boss:0,rainbow:false,
+      ghosts.push({x:0,y:0,gx:b.x,gy:b.y,r:b.r,color:b.color,shape:'long',an:b.an,phase:b.phase,wob:b.wob,shimmer:b.shimmer,sq:1,boss:0,rainbow:false,
         ang:rnd(0,TAU),sp:rnd(3.2,4.6),t:0,life:1,rot:rnd(-0.4,0.4)});
       if(ghosts.length<=3){api.noise(0.45,0.1,1500,"bandpass",0.8);api.slide(900,260,0.4,0.05,"sawtooth");}
     } else if(b.shape==='heart'){
@@ -173,14 +180,15 @@ function buildBalloon(api){
     for(let k=6;k>0;k--){const a=rnd(0,TAU),s=rnd(3,7);
       sparks.push({x:b.x,y:b.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,decay:rnd(0.03,0.05),sz:rnd(3,6),col:"#fff"});}
     if(b.boss<=0){
-      b.popped=true;quietT=0;count++;api.setScore(count);
+      b.popped=true;quietT=0;count+=b.big?2:1;api.setScore(count);
       api.boom(0.85);api.shake(13);tryHitStop(5);flash=Math.max(flash,0.7);flashCol=lightenC(b.color,80);
-      if(targetLeft>0){targetLeft=Math.max(0,targetLeft-2);if(targetLeft<=0)clearStage();}
+      if(b.big){if(targetLeft>0&&b.color===target){targetLeft=Math.max(0,targetLeft-1);if(targetLeft<=0)clearStage();}}
+      else if(targetLeft>0){targetLeft=Math.max(0,targetLeft-2);if(targetLeft<=0)clearStage();}
       // 熱気球が壊れて、ゴンドラが切り離されて下へ落ちる(別の壊れ方)
       {const brx=b.r*0.85,bry=b.r;
        gondolas.push({x:b.x,y:b.y+bry*0.62+bry*0.21,w:Math.max(6,brx*0.34),h:Math.max(6,bry*0.42),vx:rnd(-1.2,1.2),vy:-2.2,rot:0,vr:rnd(-0.08,0.08),life:1});
        api.slide(500,120,0.5,0.08,"triangle");}
-      floats.push({x:b.x,y:b.y-30,txt:"ボス どっかーん！",life:1,vy:-1.1,t:0,col:"#ff3b3b",size:42});
+      floats.push({x:b.x,y:b.y-30,txt:b.big?"ねっききゅう どかーん！":"ボス どっかーん！",life:1,vy:-1.1,t:0,col:b.big?"#ffd23f":"#ff3b3b",size:b.big?34:42});
       for(let k=40;k>0;k--){const a=rnd(0,TAU),s=rnd(3,12);
         confetti.push({x:b.x,y:b.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-3,s:rnd(5,11),color:pick(COLORS),rot:rnd(0,TAU),vr:rnd(-0.6,0.6),life:1,decay:rnd(0.01,0.02)});}
     }
@@ -206,7 +214,7 @@ function buildBalloon(api){
     return o.rainbow||cur.rainbow||o.color===seedColor;
   }
   function startChain(b){
-    waveN=0;
+    waveN=0;const p0=pending.length,assisted=quietT>=QUIET_ASSIST;
     const seedColor=b.rainbow?null:b.color;
     const seen=new Set([b]);let frontier=[b],depth=0;
     while(frontier.length){
@@ -220,6 +228,9 @@ function buildBalloon(api){
       frontier=next;depth++;
     }
     const total=seen.size;
+    // 点が入るれんさ: 的の色/にじいろ/3こ以上/しばらく無得点(最初の1こ目や詰まった時の救済)
+    const sc=assisted||total>=6||b.rainbow||seedColor===target;
+    for(let i=p0;i<pending.length;i++)pending[i].sc=sc;
     // tiered chain reward: 3 / 6 / 10+
     if(total>=6){
       const pw=clamp(total/12,0.3,1);api.boom(pw);tryHitStop(clamp(2+Math.floor(total/4),2,6));
@@ -312,7 +323,9 @@ function buildBalloon(api){
       // occasional rainbow balloon (stage 2+)
       if(stage>=1){rainbowT-=dt;if(rainbowT<=0){if(balloons.length<15)balloons.push(mkRainbow());rainbowT=rint(360,560);}}
       // occasional boss balloon (stage 3+)
-      if(stage>=2){bossT-=dt;if(bossT<=0){if(balloons.filter(b=>b.boss>0).length===0&&balloons.length<14)balloons.push(mkBoss());bossT=rint(520,760);}}
+      if(stage>=2){bossT-=dt;if(bossT<=0){if(balloons.filter(b=>b.boss>0&&!b.big).length===0&&balloons.length<14)balloons.push(mkBoss());bossT=rint(520,760);}}
+      // 大きな熱気球(stage 2+): 2タップで壊れる乗り物ふうせん
+      if(stage>=1){bigT-=dt;if(bigT<=0){if(!balloons.some(b=>b.big)&&balloons.length<14)balloons.push(mkBig());bigT=rint(420,620);}}
       // ② だいあたり ふうせん(全ステージ・激レア): 接近予告→出現。割ると虹の大盤振る舞い＋大量得点
       superRareT-=dt;
       if(superRareT<=60&&megaWarnT<=0&&!balloons.some(b=>b.mega)){megaWarnT=1.4;api.tone(1568,0.1,"triangle",0.06);}
@@ -321,12 +334,12 @@ function buildBalloon(api){
       for(const b of balloons){if(b.popped)continue;b.phase+=0.04*dt;b.y+=b.vy*dt;b.x+=Math.sin(b.phase)*0.4*dt;
         b.wob+=0.08*dt;b.shimmer+=0.06*dt;b.sq+=(1-b.sq)*0.12*dt;}
       // ③ パーフェクト判定: 的の色のふうせんを画面上に にがしたら記録
-      for(const b of balloons){if(!b.popped&&b.y<=-b.r*2.5&&!b.rainbow&&!b.mega&&b.color===target)escaped++;}
+      for(const b of balloons){if(!b.popped&&b.y<=-b.r*2.5&&!b.rainbow&&!b.mega&&!b.big&&b.color===target)escaped++;}
       balloons=balloons.filter(b=>!b.popped&&b.y>-b.r*2.5);
       // pending pops (wave)
       for(const p of pending)p.delay-=dt;
       const go=pending.filter(p=>p.delay<=0);pending=pending.filter(p=>p.delay>0);
-      for(const p of go)pop(p.b);
+      for(const p of go)pop(p.b,p.sc);
       balloons=balloons.filter(b=>!b.popped);
       // みずたまり(みずふうせんが割れた跡・しばらく残る)
       for(const pd of puddles){pd.r+=(pd.max-pd.r)*0.12*dt;pd.life-=0.011*dt;
@@ -474,7 +487,7 @@ function buildBalloon(api){
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(perfectT<0)perfectT=0;}
       hintPulse+=0.05*dt;
       // cute rounded HUD: hint pill (bottom)
-      g.save();const hint="ふうせんを タップ！ おなじ いろが れんさで われる！";
+      g.save();const hint="うえの いろを タップ！ おなじ いろが れんさで われる！";
       g.font="800 19px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";g.textBaseline="middle";
       const mt=g.measureText(hint),tw2=(mt&&mt.width)||hint.length*11,pw=tw2+40,ph2=40,pulse=1+Math.sin(hintPulse)*0.02;
       g.translate(api.W/2,api.H-30);g.scale(pulse,pulse);
@@ -526,6 +539,12 @@ function buildBalloon(api){
         const hiY=-ry*0.55,hiRx=Math.max(0.5,rx*0.72),hiRy=Math.max(0.5,ry*0.42);
         g.beginPath();g.ellipse(0,loY,loRx,loRy,0,0,TAU);g.fill();
         g.beginPath();g.ellipse(0,hiY,hiRx,hiRy,0,0,TAU);g.fill();
+        // どうぶつの耳(軸7向け): ねこ(三角)とうさぎ(長い耳)を風船ごとに出し分ける
+        if((b.an||0)<0.5){
+          for(const sg of[-1,1]){g.beginPath();g.moveTo(sg*hiRx*0.95,hiY-hiRy*0.15);g.lineTo(sg*hiRx*0.75,hiY-hiRy*1.45);g.lineTo(sg*hiRx*0.12,hiY-hiRy*0.85);g.closePath();g.fill();}
+        } else {
+          for(const sg of[-1,1]){g.beginPath();g.ellipse(sg*hiRx*0.5,hiY-hiRy*1.25,Math.max(0.5,hiRx*0.26),Math.max(0.5,hiRy*0.85),sg*0.18,0,TAU);g.fill();}
+        }
         g.save();g.globalAlpha=0.3;g.strokeStyle="rgba(30,50,80,.6)";g.lineWidth=Math.max(1,rx*0.14);
         g.beginPath();g.ellipse(0,-ry*0.05,Math.max(0.5,rx*0.42),Math.max(0.5,ry*0.15),0,0,TAU);g.stroke();g.restore();
       } else if(b.shape==='water'){
@@ -548,6 +567,17 @@ function buildBalloon(api){
         g.beginPath();g.ellipse(0,0,rx,ry,0,0,TAU);g.fill();
       }
       g.restore();
+      // どうぶつの顔(軸7向け): 目2つ+はな+口。ghost(空気が抜けて飛ぶ)も同じ絵なので飛び回る動物に見える
+      if(b.shape==='long'){
+        const hiY2=-ry*0.55,hiRx2=Math.max(0.5,rx*0.72),hiRy2=Math.max(0.5,ry*0.42),er=Math.max(1.5,hiRx2*0.2);
+        g.save();
+        for(const sg of[-1,1]){g.fillStyle="#fff";g.beginPath();g.arc(sg*hiRx2*0.42,hiY2-hiRy2*0.05,er,0,TAU);g.fill();
+          g.fillStyle="#2a2a3a";g.beginPath();g.arc(sg*hiRx2*0.42,hiY2-hiRy2*0.02,Math.max(0.8,er*0.55),0,TAU);g.fill();}
+        g.fillStyle="#ff8aa8";g.beginPath();g.ellipse(0,hiY2+hiRy2*0.28,Math.max(0.8,er*0.55),Math.max(0.6,er*0.4),0,0,TAU);g.fill();
+        g.strokeStyle="rgba(40,30,50,.7)";g.lineWidth=Math.max(1,er*0.3);g.lineCap="round";
+        g.beginPath();g.arc(0,hiY2+hiRy2*0.3,Math.max(0.8,er*1.0),0.15*Math.PI,0.85*Math.PI);g.stroke();
+        g.restore();
+      }
       // つみかさなりふうせん(軸7向け): 同じ色の小さい風船を上に重ねて連なった輪郭にする(あたり判定は1個のまま)
       if(b.shape==='stack'){
         const r2=Math.max(0.5,rx*0.62),ry2=Math.max(0.5,ry*0.62),oy=-ry*0.85;
@@ -573,6 +603,10 @@ function buildBalloon(api){
         g.strokeStyle="rgba(0,0,0,.35)";g.lineWidth=1.5;
         g.strokeRect(-gw,gy,gw*2,gh);
         g.restore();
+        if(b.big){ // 大きな熱気球: 白いたてじまで「乗り物」らしく(ボスの紺の無地と見分ける)
+          g.save();g.strokeStyle="rgba(255,255,255,.75)";g.lineWidth=Math.max(2,rx*0.07);
+          for(const k of[-0.5,0,0.5]){g.beginPath();g.moveTo(0,-ry*0.98);g.quadraticCurveTo(rx*k*2.2,0,rx*k*0.9,ry*0.78);g.stroke();}
+          g.restore();}
         // boss face: show remaining taps as little dots
         g.fillStyle="rgba(255,255,255,.9)";
         for(let i=0;i<b.boss;i++){g.beginPath();g.arc((i-(b.boss-1)/2)*rx*0.32,ry*0.18,rx*0.09,0,TAU);g.fill();}

@@ -72,7 +72,7 @@ function build_chocofount(api){
     for(const sw of sweets)if(sw.type==="rainbow"&&!sw.launched)hasRainbow=true;
     if(!hasRainbow&&Math.random()<0.07)type="rainbow";
     // 軸7: 同じ大きさが並ばないよう、種類ごとに大きさをはっきりばらつかせる
-    let col=pick(SWEETCOL),hp=1,r=unit;
+    let col=pick(SWEETCOL),hp=1,r=type==="candy"?unit*rnd(0.8,1.1):unit;
     if(type==="choco"){col="#7a4a28";hp=2;r=unit*1.12;}
     else if(type==="star"){col="#ffe14a";r=unit*rnd(1.1,1.25);} // 大きめ: 高得点で目立つ
     else if(type==="cake"){col="#ff9ec4";r=unit*rnd(1.3,1.4);}  // いちばん大きい
@@ -97,14 +97,23 @@ function build_chocofount(api){
   // pre-seed a few
   for(let i=0;i<5;i++)spawn();
 
-  function fountain(px){
+  function fountain(px,py){
     // shoot a column of chocolate up from the bottom at px
     fountX=clamp(px,unit,api.W-unit);fountY=groundY;
     api.slide(160,520,0.22,0.22,"sine");
     api.noise(0.16,0.14,900,"lowpass",0.8);
+    // 助け舟が働いている間(最初の1個/6秒ぶり無得点/4回つづけて外した)は x座標だけで見る。
+    // 働いていない通常時は「押した高さ」が的から遠いほど届きにくくする(下のほうを連打しても当たる、を防ぐ)
+    const rescue=(count===0||tsec-lastScoreT>6||missStreak>=4);
+    const tapY=(py==null)?groundY:py;
+    const reach=function(sw){
+      const dx=Math.abs(sw.x-fountX);
+      if(rescue)return dx;
+      return dx+Math.max(0,Math.abs(tapY-sw.y)-unit*1.8)*0.5;
+    };
     for(let i=0;i<rint(10,14);i++){
       drops.push({x:fountX+rnd(-unit*0.5,unit*0.5),y:groundY,
-        vx:rnd(-0.9,0.9),vy:rnd(-15,-22),r:rnd(unit*0.16,unit*0.34),
+        vx:rnd(-0.9,0.9),vy:rnd(-15,-22),tapY:tapY,free:rescue,r:rnd(unit*0.16,unit*0.34),
         life:1,col:i%4===0?"#a9683a":"#6b3f22"});
     }
     // splash sparkle at base
@@ -116,7 +125,7 @@ function build_chocofount(api){
     for(const sw of sweets){
       if(sw.launched)continue;
       // 軸3: ふん水の柱そのものの当たり幅も、狙わず連打しても勝ててしまわない程度に少し絞る(旧1.6)
-      if(Math.abs(sw.x-fountX)<sw.r*0.65 && sw.y<groundY){ hitSweet(sw); hit=true; }
+      if(reach(sw)<sw.r*0.65 && sw.y<groundY){ hitSweet(sw); hit=true; }
     }
     // kid-friendly auto-aim: a near miss still splashes the closest sweet
     if(!hit){
@@ -124,11 +133,11 @@ function build_chocofount(api){
       // 助け舟: 最初の1個まではかなり広く / 5秒ぶり無得点のあとの1タップだけ広めに(投げ出さない保険)
       let best=null,bd=unit*0.75;
       if(count===0)bd=1e9;                       // 最初の1個は どこを押しても一番ちかい子に当てる
-      else if(tsec-lastScoreT>4.5)bd=1e9;        // 4.5秒ぶり無得点なら次の1タップは一番ちかい子に当てる
-      else if(missStreak>=3)bd=unit*2.6;         // 3回つづけて外したら、ちょっと広めに助ける
+      else if(tsec-lastScoreT>6)bd=1e9;          // 6秒ぶり無得点なら次の1タップは一番ちかい子に当てる
+      else if(missStreak>=4)bd=unit*1.4;         // 4回つづけて外したら、ちょっと広めに助ける
       for(const sw of sweets){
         if(sw.launched)continue;
-        const d=Math.abs(sw.x-fountX);
+        const d=reach(sw);
         if(d<bd){bd=d;best=sw;}
       }
       if(best){hitSweet(best);hit=true;}
@@ -268,7 +277,7 @@ function build_chocofount(api){
             rot:rnd(0,TAU),vr:rnd(-0.3,0.3),life:1,decay:0.018,col:i%2?"#ffd23f":"#fff0a0"});}
         return;
       }
-      fountain(x);
+      fountain(x,y);
     },
     frame(dt,now){
       tsec+=0.016*dt;fcount++;
@@ -374,7 +383,7 @@ function build_chocofount(api){
         if(d.vy<0){
           for(const sw of sweets){
             if(sw.launched)continue;
-            if(Math.abs(sw.x-d.x)<sw.r*0.55&&Math.abs(sw.y-d.y)<sw.r){hitSweet(sw);d.life-=0.4;}
+            if(Math.abs(sw.x-d.x)<sw.r*0.4&&Math.abs(sw.y-d.y)<sw.r&&(d.free||Math.max(0,Math.abs(d.tapY-sw.y)-unit*1.8)*0.5<sw.r*0.4)){hitSweet(sw);d.life-=0.4;}
           }
         }
       }

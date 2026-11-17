@@ -42,8 +42,8 @@ function build_cakesmash(api){
 
   function layout(){
     W=api.W;H=api.H;
-    tierW=clamp(W*0.5,150,360);
-    tierH=clamp(H*0.07,30,64);
+    tierW=clamp(W*0.5,150,460);
+    tierH=clamp(H*0.09,34,80);
     baseX=W/2;
     baseY=H*0.86;
     // reposition any existing tiers to the new geometry
@@ -357,7 +357,7 @@ function build_cakesmash(api){
         // 軸3(歯ごたえ): 連打で当たり続けないよう吸着範囲を絞る(縦方向の余白が特に広かった)
         const within=(t.shape==="donut")
           ? (Math.abs(x-t.x)<rOut(t)*1.05 && Math.abs(y-t.y)<rOut(t)+H*0.02)   // 見た目の輪っかどおりに当たる
-          : (Math.abs(x-t.x)<Math.max(t.w,tierW*0.8)*0.5 && Math.abs(y-t.y)<tierH*0.9+H*0.04);
+          : (Math.abs(x-t.x)<Math.max(t.w,tierW*0.6)*0.5 && Math.abs(y-t.y)<tierH*0.7+H*0.03);   // 段が大きくなった分、反応範囲は元の絶対サイズ付近に据え置き
         if(within){ smashTier(t,false); return; }
       }
       // ④ ひみつ発見: ケーキに当たらなかったタップが 空にただよう おかし に届いたら、
@@ -445,8 +445,11 @@ function build_cakesmash(api){
         g.fillStyle="rgba(255,255,255,.12)";g.fillRect(0,baseY,W,3);
       }
       // cake plate
-      g.fillStyle="rgba(255,255,255,.85)";
+      g.fillStyle="rgba(90,30,50,.35)";   // 皿の下の影(床や売り台と色が近くても皿が浮く)
+      g.beginPath();g.ellipse(baseX,baseY+tierH*0.22,Math.max(0,tierW*0.82),Math.max(0,tierH*0.46),0,0,TAU);g.fill();
+      g.fillStyle="rgba(255,255,255,.92)";
       g.beginPath();g.ellipse(baseX,baseY+4,tierW*0.78,tierH*0.4,0,0,TAU);g.fill();
+      g.strokeStyle="rgba(120,50,70,.55)";g.lineWidth=2.5;g.stroke();
       g.fillStyle="rgba(0,0,0,.12)";
       g.beginPath();g.ellipse(baseX,baseY+tierH*0.18,tierW*0.62,tierH*0.26,0,0,TAU);g.fill();
 
@@ -766,6 +769,9 @@ function build_cakesmash(api){
     // rim light
     g.strokeStyle="rgba(255,255,255,.25)";g.lineWidth=2;
     roundRect(-w/2,-h*0.5,w,h,h*0.32);g.stroke();
+    // 暗い輪郭線: 「ももいろ」「ソーダ」味でも床や売り台から浮いて見える
+    g.strokeStyle="rgba(120,50,70,.6)";g.lineWidth=3;
+    roundRect(-w/2,-h*0.5,w,h,h*0.32);g.stroke();
     // crack hint if this tier still needs another tap
     if(t.hp>1){
       g.strokeStyle="rgba(120,70,40,.5)";g.lineWidth=2;g.lineCap="round";
@@ -820,6 +826,8 @@ function build_cakesmash(api){
     // rim light
     g.strokeStyle="rgba(255,255,255,.3)";g.lineWidth=2;
     g.beginPath();g.arc(0,0,rOuter,0,TAU);g.stroke();
+    g.strokeStyle="rgba(120,50,70,.6)";g.lineWidth=3;
+    g.beginPath();g.arc(0,0,rOuter,0,TAU);g.stroke();
     g.strokeStyle="rgba(120,70,40,.35)";g.lineWidth=1.5;
     g.beginPath();g.arc(0,0,rInner,0,TAU);g.stroke();
     // crack hint if this tier still needs another tap
@@ -859,6 +867,8 @@ function build_cakesmash(api){
     g.beginPath();g.arc(cx,0,cr,0,TAU);g.stroke();
     // rim light
     g.strokeStyle="rgba(255,255,255,.3)";g.lineWidth=2;
+    roundRect(-rW,-rH,rW*2,rH*2,rH);g.stroke();
+    g.strokeStyle="rgba(120,50,70,.6)";g.lineWidth=3;
     roundRect(-rW,-rH,rW*2,rH*2,rH);g.stroke();
     // powdered sugar dusting along the top
     g.fillStyle="rgba(255,255,255,.7)";
@@ -958,9 +968,11 @@ function build_cakesmash(api){
       g.fillStyle=cg;roundRect(gx,gy,Math.max(gh,gw*gf),gh,gh/2);g.fill();g.restore();
     }
     g.strokeStyle="rgba(255,255,255,.6)";g.lineWidth=1.5;roundRect(gx,gy,gw,gh,gh/2);g.stroke();
-    g.font="800 15px 'Hiragino Maru Gothic ProN',system-ui";
-    g.fillStyle=fever>0?"#ff2bff":"#a8447a";
-    g.fillText(fever>0?"フィーバーちゅう！":"フィーバー",W/2,gy+gh+16);
+    if(fever>0){   // 常時HUDを2段に: 文字はフィーバー中だけ(ふだんは細いゲージのみ)
+      g.font="800 15px 'Hiragino Maru Gothic ProN',system-ui";
+      g.fillStyle="#ff2bff";
+      g.fillText("フィーバーちゅう！",W/2,gy+gh+16);
+    }
     g.restore();g.textAlign="left";
   }
 

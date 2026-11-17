@@ -183,7 +183,8 @@ function build_snowball(api){
     burst(f.x,f.y,f.col,big?18:12,8);
     if(f.rainbow){
       rainbowBurst(f);
-      floats.push({x:f.x,y:Math.max(f.y-f.r,api.H*0.20),txt:"+"+pts,life:1,vy:-1.1,col:"#ff7bd0",size:36});
+      // 軸6: 「にじいろ とりで！」バナー(H*0.22)と重ならないよう、+N は H*0.30 より下に出す
+      floats.push({x:f.x,y:Math.max(f.y-f.r,api.H*0.30),txt:"+"+pts,life:1,vy:-1.1,col:"#ff7bd0",size:36});
     }else if(f.gold){
       // rainbow shower + fanfare (special reward moment)
       [0,4,7,12].forEach((semi,i)=>setTimeout(()=>api.tone(659*Math.pow(2,semi/12),0.16,"triangle",0.12),i*70));
@@ -446,13 +447,16 @@ function build_snowball(api){
 
       // ---- aim guide while charging ----
       if(charging){
-        g.save(); g.globalAlpha=0.5; g.strokeStyle="#ffffff"; g.lineWidth=2; g.setLineDash([8,8]);
+        g.save(); g.setLineDash([8,8]);
         let px=launchX,py=launchY-U*0.6;
         const gv=calcShot(aimX,aimY,chargeP);
         let vx=gv.vx, vy=gv.vy;
         g.beginPath(); g.moveTo(px,py);
         for(let i=0;i<30;i++){vy+=0.28*1.5; px+=vx*1.5; py+=vy*1.5; g.lineTo(px,py); if(py>api.H||py<-40)break;}
-        g.stroke(); g.setLineDash([]); g.restore();
+        // 軸6: 暗い下敷きの点線を先に引き、その上に白い点線を重ねる(白い雪原でも弾道が読める)
+        g.globalAlpha=0.5; g.strokeStyle="rgba(30,55,90,1)"; g.lineWidth=5; g.stroke();
+        g.globalAlpha=0.9; g.strokeStyle="#ffffff"; g.lineWidth=2.5; g.stroke();
+        g.setLineDash([]); g.restore();
       }
 
       // ---- drifting snowflakes (foreground) ----
@@ -581,9 +585,9 @@ function build_snowball(api){
       lg2.addColorStop(0,"#ff7bd0"); lg2.addColorStop(0.5,"#ffd23f"); lg2.addColorStop(1,"#4db8ff");
       g.globalAlpha=blink;
       if(fr2>0){g.fillStyle=lg2; roundRect(gx,gy,Math.max(gh,gw*fr2),gh,gh/2); g.fill();}
-      g.font="800 14px 'Hiragino Maru Gothic ProN',system-ui"; g.fillStyle="#ffd23f";
+      g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui"; g.fillStyle="#ffd23f";
       g.shadowColor="rgba(0,0,0,.5)"; g.shadowBlur=4;
-      g.fillText("フィーバー！ てんすう 2ばい",api.W/2,gy+gh+16);
+      g.fillText("フィーバー！ てんすう 2ばい",api.W/2,gy+gh+20);
       g.shadowBlur=0; g.globalAlpha=1;
     }else if(feverGauge>0){
       const lg2=g.createLinearGradient(gx,0,gx+gw,0);
@@ -661,9 +665,11 @@ function build_snowball(api){
       g.globalCompositeOperation="source-over";}
     const bgr=g.createRadialGradient(b.x-b.r*0.35,b.y-b.r*0.35,b.r*0.1,b.x,b.y,b.r);
     bgr.addColorStop(0,"#ffffff"); bgr.addColorStop(0.6,"#eaf6ff"); bgr.addColorStop(1,"#bcd9ec");
-    g.fillStyle=bgr; g.beginPath(); g.arc(b.x,b.y,b.r,0,TAU); g.fill();
-    g.fillStyle="rgba(255,255,255,.9)"; g.beginPath(); g.arc(b.x-b.r*0.3,b.y-b.r*0.35,b.r*0.25,0,TAU); g.fill();
-    g.strokeStyle="rgba(170,205,225,.6)"; g.lineWidth=1.5; g.beginPath(); g.arc(b.x,b.y,b.r,0,TAU); g.stroke();
+    // 軸6: 濃い輪郭の下敷き(白い雪原・淡い山の上でも雪玉が溶けないよう、砦の輪郭と同じ色味)
+    g.strokeStyle="rgba(30,55,90,.55)"; g.lineWidth=Math.max(2.5,b.r*0.18); g.beginPath(); g.arc(b.x,b.y,Math.max(0,b.r),0,TAU); g.stroke();
+    g.fillStyle=bgr; g.beginPath(); g.arc(b.x,b.y,Math.max(0,b.r),0,TAU); g.fill();
+    g.fillStyle="rgba(255,255,255,.9)"; g.beginPath(); g.arc(b.x-b.r*0.3,b.y-b.r*0.35,Math.max(0,b.r*0.25),0,TAU); g.fill();
+    g.strokeStyle="rgba(60,100,150,.7)"; g.lineWidth=2.5; g.beginPath(); g.arc(b.x,b.y,Math.max(0,b.r),0,TAU); g.stroke();
     g.restore();
   }
 

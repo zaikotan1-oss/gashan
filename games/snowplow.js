@@ -17,6 +17,7 @@ function buildSnowplow(api){
   let rbMsgT=0;                                                 // ① にじいろプレゼント 発見バナー
   let comboKept=true,nonstopT=0;                                // ③ ノンストップ判定(コンボを切らさずクリア)
   let sunWink=0;                                                // ④ 太陽ひみつタップ
+  let idleT=0;   // 軸3: 最後の得点からの秒。7秒たつと ブルドーザが 刃の前の物を もぐもぐ食べる(静かすぎ防止・罰ではない)
   let lastAimT=0;                                               // 軸3: 直近の「狙い成功」タップからの残り秒。これが尽きると刃が壊せなくなる(渋滞)
   const sunHit={x:0,y:0,r:0};
   function shade(hex,amt){let n=parseInt(hex.slice(1),16),r=clamp((n>>16)+amt,0,255),
@@ -65,7 +66,7 @@ function buildSnowplow(api){
     let best=null,bestD=Infinity;
     for(const o of obstacles){
       if(o.dead)continue;
-      const d=Math.abs(o.x-truckX);
+      const d=o.x; // 刃にいちばん近い(=いちばん手前=左)の物が次の標的。車体の下に並んだ後ろの物ではない
       if(d<bestD){bestD=d;best=o;}
     }
     return best;
@@ -83,7 +84,7 @@ function buildSnowplow(api){
     for(const o of obstacles){
       if(o.dead)continue;
       const d=Math.abs(o.x-x),dy=Math.abs(o.y-y);
-      const isT=o===tgt,ww=isT?o.w*HIT_T_W:o.w*HIT_O_W,hh=isT?o.h*HIT_T_H:o.h*HIT_O_H;
+      const isT=o===tgt,ww=isT?Math.max(o.w*HIT_T_W,40):o.w*HIT_O_W,hh=isT?Math.max(o.h*HIT_T_H,40):o.h*HIT_O_H; // 標的は小さいつららでも指先(約40px)で押せる
       if(d<ww&&dy<hh&&d<bestD){bestD=d;best=o;}
     }
     return best;
@@ -110,7 +111,7 @@ function buildSnowplow(api){
     else{h=truckH*0.8;w=h*0.85;hp=2;col="#bfeaff";}            // ice
     const isFirst=!firstSpawnDone;
     let sx=api.W+w*0.5+rnd(0,40);
-    if(!firstSpawnDone){firstSpawnDone=true;sx=truckX+truckW*1.7+rnd(0,30);}   // 軸1/3: 最初の1体だけ手前寄りに出す
+    if(!firstSpawnDone){firstSpawnDone=true;sx=truckX+truckW*1.15+rnd(0,20);}   // 軸1/3: 最初の1体だけ手前寄りに出す
     obstacles.push({x:sx,y:groundY-h*0.5,w,h,type,hp,col,
       squash:1,hit:0,wob:rnd(0,TAU),
       free:isFirst}); // 軸1: 記念すべき最初の1体だけは、位置を問わずどこをタップしても「狙い成功」扱い(最初の成功を確実に)
@@ -167,7 +168,7 @@ function buildSnowplow(api){
     const isLucky=o.type==="block"&&o.col===luckyColor;
     if(isLucky)pts+=1;
     if(fever)pts*=2; // fever = double points
-    count+=pts;stageKill++;api.setScore(count);
+    count+=pts;stageKill++;api.setScore(count);idleT=0;
     combo++;comboT=1.0;
     boost=Math.min(1,boost+0.16);boostT=0.7;
     if(!fever){feverG=Math.min(1,feverG+((gold||rainbow)?0.34:0.09));if(feverG>=1)startFever();}
@@ -266,6 +267,7 @@ function buildSnowplow(api){
     },
     frame(dt,now){
       tsec+=0.016*dt;
+      idleT+=0.016*dt;
       if(lastAimT>0)lastAimT=Math.max(0,lastAimT-0.016*dt); // 軸3: 狙い成功の効き目切れ
       if(hitStopCd>0)hitStopCd--;
       if(combo>0){comboT-=0.016*dt;if(comboT<=0){combo=0;comboKept=false;}} // ③ コンボ切れ=ノンストップ失敗
@@ -376,7 +378,7 @@ function buildSnowplow(api){
         spawnGap=fever?45+rnd(0,15):clamp(120-(stage-1)*12,60,120)+rnd(0,36);}   // 7〜8歳向け: 出現間隔を約15%短く
 
       // ---- move + draw obstacles, collide with plow blade ----
-      const bladeX=truckX-truckW*0.18; // front of the snowplow blade
+      const bladeX=truckX-truckW*0.68; // 軸6: 刃の先端のすぐ前(物が車体の真下に隠れず、刃の前でぶつかるのが見える)
       const aimTarget=nextTarget(); // 軸3: 今どれを狙えばいいかのヒント表示用
       let queueBack=-Infinity; // 軸3: 手前で止まっている未破壊オブジェクトの背面位置(渋滞の壁。詰まり防止)
       for(const o of obstacles){
@@ -391,7 +393,12 @@ function buildSnowplow(api){
           if(o.x<stopX)o.x=stopX;
           // 軸3: 直近0.6秒以内に「狙い成功」タップがあったときだけ、刃に着いたオブジェクトを壊す。
           // タップの正誤に関係なく壊れていた自動衝突をやめ、放っておくと刃の手前で渋滞するようにする。
-          if(lastAimT>0&&o.x<=bladeStop+0.01){hitObstacle(o);if(!fever)lastAimT=0;} // 軸3: 1タップで壊すのは1体だけ(フィーバー中だけ連鎖OK)
+          const atBlade=o.x<=bladeStop+0.01;
+          if(atBlade)o.waitT=(o.waitT||0)+0.016*dt;
+          if(lastAimT>0&&atBlade){hitObstacle(o);if(!fever)lastAimT=0;} // 軸3: 1タップで壊すのは1体だけ(フィーバー中だけ連鎖OK)
+          else if(o.free&&atBlade&&o.waitT>0.35){hitObstacle(o);} // 軸1/3: 最初の1体は タップを待たず ごほうびでもぐもぐ(最初の得点を確実に早く)
+          else if(atBlade&&idleT>7){ // 軸3: 7秒だれも得点できなかったら ブルドーザが自分で食べる(叱らない・静かすぎ防止)
+            o.hp=1;makePuffs(o.x,o.y,5);api.tone(220,0.09,"sine",0.07);api.noise(0.08,0.08,900,"lowpass",0.5);hitObstacle(o);}
         }
         if(o.dead){o.squash-=0.1*dt;o.x-=speed*0.6*dt;
           if(o.type==="cone")o.rot=(o.rot||0)+0.25*dt; // 軸7: コーンは倒れて転がる
@@ -399,7 +406,7 @@ function buildSnowplow(api){
         }else{
           queueBack=Math.max(queueBack,o.x+o.w*0.5); // 次(後ろ)のオブジェクトから見た渋滞の壁
         }
-        drawObstacle(o,o===aimTarget&&!o.dead);
+        drawObstacle(o,false);
       }
       obstacles=obstacles.filter(o=>!o._gone&&o.x>-120);
 
@@ -432,6 +439,7 @@ function buildSnowplow(api){
 
       // ---- the snowplow bulldozer ----
       drawTruck(moving);
+      if(aimTarget&&!aimTarget.dead&&!aimTarget._gone)drawAimRing(aimTarget); // 軸6: 狙いリングは車体の前に描く(隠れない)
 
       // ---- glint sparks ----
       g.save();g.globalCompositeOperation="lighter";g.lineCap="round";
@@ -604,7 +612,7 @@ function buildSnowplow(api){
     const sx=o.x,sy=o.y,w=o.w,h=Math.max(0,o.h*o.squash);  // squashのオーバーシュートで負→楕円の負半径クラッシュを防ぐ
     g.save();g.translate(sx,sy+ (o.h-h)*0.5);
     // ground shadow
-    g.fillStyle="rgba(80,110,130,.25)";g.beginPath();
+    g.fillStyle="rgba(80,110,130,.35)";g.beginPath();
     g.ellipse(0,h*0.5,w*0.55,h*0.12,0,0,TAU);g.fill();
     if(o.type==="gold"){
       // GOLDEN PRESENT: glowing, wobbling, impossible to miss
@@ -747,26 +755,28 @@ function buildSnowplow(api){
       g.quadraticCurveTo(0,-h*0.55,w*0.18,-h*0.3);
       g.quadraticCurveTo(w*0.5,-h*0.2-wob,w*0.5,h*0.5);
       g.closePath();g.fill();
+      g.strokeStyle="rgba(120,160,185,.55)";g.lineWidth=2;g.stroke();   // 軸6: 白い雪山が雪原に溶けないよう輪郭
       // sparkle dots
       g.fillStyle="rgba(255,255,255,.9)";
       g.beginPath();g.arc(-w*0.15,-h*0.1,h*0.04,0,TAU);
       g.arc(w*0.12,h*0.05,h*0.03,0,TAU);g.fill();
     }
-    // 軸3: 「ここを狙おう」の薄いリング(1体だけに重ねる=どこを押せばいいか分かる)
-    if(isTarget){
-      const pr=Math.max(2,w*0.62)*(1+0.04*Math.sin(tsec*6));
-      const lw=Math.max(3,w*0.07);
-      g.save();g.globalAlpha=0.8+0.2*Math.sin(tsec*6);
-      g.strokeStyle="rgba(10,42,58,.6)";g.lineWidth=lw+5;   // 白い雪山の上でも見えるよう濃い青の縁
-      g.beginPath();g.arc(0,0,pr,0,TAU);g.stroke();
-      g.strokeStyle="#ffd23f";g.lineWidth=lw;
-      g.beginPath();g.arc(0,0,pr,0,TAU);g.stroke();
-      g.restore();g.globalAlpha=1;
-    }
     // hit flash overlay
     if(o.hit>0){g.globalAlpha=o.hit*0.6;g.fillStyle="#fff";
       rrect(-w*0.5,-h*0.5,w,h,w*0.1);g.fill();g.globalAlpha=1;}
     g.restore();
+  }
+
+  function drawAimRing(o){
+    // 軸3/6: 「ここを狙おう」のリング(1体だけ・車体より前に描くので隠れない)。小さい物でも指先サイズ以上に
+    const pr=Math.max(32,o.w*0.62)*(1+0.04*Math.sin(tsec*6));
+    const lw=Math.max(3,o.w*0.07);
+    g.save();g.translate(o.x,o.y);g.globalAlpha=0.8+0.2*Math.sin(tsec*6);
+    g.strokeStyle="rgba(10,42,58,.6)";g.lineWidth=lw+5;   // 白い雪山の上でも見えるよう濃い青の縁
+    g.beginPath();g.arc(0,0,Math.max(0,pr),0,TAU);g.stroke();
+    g.strokeStyle="#ffd23f";g.lineWidth=lw;
+    g.beginPath();g.arc(0,0,Math.max(0,pr),0,TAU);g.stroke();
+    g.restore();g.globalAlpha=1;
   }
 
   function drawTruck(moving){

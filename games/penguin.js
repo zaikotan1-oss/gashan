@@ -111,7 +111,7 @@ function buildPenguin(api){
     aim.active=false;
   }
   resetThrow();
-  strikeY=api.H*0.42;
+  strikeY=api.H*0.50;
 
   function fxBurst(x,y,col,big,mode){
     // 軸7(壊す物のバラエティ): kindごとに壊れ方の演出を変える
@@ -243,7 +243,7 @@ function buildPenguin(api){
     const allDown=standing()===0;
     if(allDown && pins.length>0){
       // STRIKE
-      strikeY=(stageDown>=stageGoal&&clearT<=0)?api.H*0.27:api.H*0.42;   // クリアと同時なら重ならない上側へ
+      strikeY=api.H*0.50;   // お祝い(0.3H)・にじいろ(0.40H)・クリア帯(0.54H〜)と縦に分ける
       strikeT=1.8; strikeTxt=pick(["ストライク！","パーフェクト！","ぜんぶ たおした！"]);
       flash=1; api.boom(0.6); api.shake(18);
       if(hsCd<=0){ api.hitStop(5); hsCd=30; }
@@ -260,7 +260,7 @@ function buildPenguin(api){
   }
   function checkStage(){
     if(stageDown<stageGoal || clearT>0) return;
-    if(strikeT>0) strikeY=api.H*0.27;   // 出ている最中のストライク文字はクリア帯の上へ
+    if(strikeT>0) strikeY=api.H*0.50;   // 出ている最中のストライク文字はクリア帯の上へ
     clearStage=stage; clearT=2.0; flash=Math.min(1,flash+0.6);
     api.boom(0.5); api.shake(14);
     api.slide(523,784,0.3,0.2,"triangle"); api.tone(988,0.3,"triangle",0.12);
@@ -437,8 +437,10 @@ function buildPenguin(api){
             knockPin(p,dirx,Math.max(3,Math.abs(peng.vx)*0.5+4));
             // small chain shove to neighbors
             for(const q of pins){ if(q.down||q===p) continue;
-              if(Math.hypot(q.x-p.x,q.y-p.y)<pinR*3.2){
+              if(Math.hypot(q.x-p.x,q.y-p.y)<pinR*2.5){
                 knockPin(q,(q.x-p.x)>=0?1:-1,3); } }
+            // 当てたあとは減速(突き抜けず、ねらった線上の1〜3本が主役)
+            peng.vx*=0.6; peng.vy*=0.7;
           }
         }
         // wall bounce inside lane
@@ -551,8 +553,8 @@ function buildPenguin(api){
         g.save(); g.translate(api.W/2,api.H*0.15); g.scale(pop,pop);
         g.font="800 30px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
         g.globalAlpha=clamp(comboT,0,1); g.shadowColor="rgba(60,160,220,.8)"; g.shadowBlur=14;
-        g.fillStyle="#ffd23f"; g.fillText("コンボ x"+combo,0,0);
-        g.shadowBlur=0; g.lineWidth=1.5; g.strokeStyle="rgba(255,255,255,.6)"; g.strokeText("コンボ x"+combo,0,0);
+        g.shadowBlur=0; g.lineJoin="round"; g.lineWidth=5; g.strokeStyle="rgba(0,40,80,.7)"; g.strokeText("コンボ x"+combo,0,0);
+        g.shadowBlur=14; g.fillStyle="#ffd23f"; g.fillText("コンボ x"+combo,0,0);
         g.restore(); g.globalAlpha=1; g.textAlign="left";
       }
       drawHUD();
@@ -569,8 +571,8 @@ function buildPenguin(api){
       // stage clear banner
       if(clearT>0){ clearT-=0.016*dt;
         const a=clamp(clearT*1.4,0,1), pop=1+Math.max(0,clearT-1.3)*1.8;
-        g.save(); g.globalAlpha=a*0.45; g.fillStyle="#0a2a44"; g.fillRect(0,api.H*0.34,api.W,api.H*0.2); g.restore();
-        g.save(); g.translate(api.W/2,api.H*0.45); g.scale(pop,pop); g.globalAlpha=a; g.textAlign="center";
+        g.save(); g.globalAlpha=a*0.45; g.fillStyle="#0a2a44"; g.fillRect(0,api.H*0.54,api.W,api.H*0.2); g.restore();
+        g.save(); g.translate(api.W/2,api.H*0.65); g.scale(pop,pop); g.globalAlpha=a; g.textAlign="center";
         g.font="900 44px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor="rgba(80,180,240,.9)"; g.shadowBlur=20; g.fillStyle="#9be8ff";
         g.fillText("ステージ"+clearStage+" クリア！",0,0);
@@ -586,7 +588,7 @@ function buildPenguin(api){
       // ① にじいろピン！ 発見バナー(虹色に色替わり)
       if(rbMsgT>0){ rbMsgT-=0.016*dt;
         const pop=1+Math.max(0,rbMsgT-1)*1.3, col=RAINBOW[Math.floor(tsec*7)%RAINBOW.length];
-        g.save(); g.translate(api.W/2,api.H*0.20); g.scale(pop,pop); g.textAlign="center";
+        g.save(); g.translate(api.W/2,api.H*0.40); g.scale(pop,pop); g.textAlign="center";
         g.globalAlpha=clamp(rbMsgT*1.4,0,1); g.font="900 36px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor=col; g.shadowBlur=18; g.fillStyle="#ffffff"; g.fillText("にじいろピン！",0,0);
         g.shadowBlur=0; g.lineWidth=2; g.strokeStyle=col; g.strokeText("にじいろピン！",0,0);
@@ -602,7 +604,7 @@ function buildPenguin(api){
       // ③ ノーミス ボーナス！ バナー(クリア文字と重ねない下側)
       if(noMissT>0){ noMissT-=0.014*dt;
         const pop=1+Math.max(0,noMissT-1.3)*1.4;
-        g.save(); g.translate(api.W/2,api.H*0.60); g.scale(pop,pop); g.textAlign="center";
+        g.save(); g.translate(api.W/2,api.H*0.80); g.scale(pop,pop); g.textAlign="center";
         g.globalAlpha=clamp(noMissT*1.3,0,1); g.font="900 28px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor="rgba(123,224,138,.9)"; g.shadowBlur=16; g.fillStyle="#c7ffcf"; g.fillText("ノーミス ボーナス！",0,0);
         g.shadowBlur=0; g.lineWidth=1.5; g.strokeStyle="rgba(40,120,60,.7)"; g.strokeText("ノーミス ボーナス！",0,0);
@@ -616,7 +618,8 @@ function buildPenguin(api){
     const left=clamp(stageGoal-stageDown,0,stageGoal);
     const bw=Math.min(api.W*0.6,360),bh=14,bx=(api.W-bw)/2,by=api.H*0.05;
     g.save(); g.textAlign="center";
-    g.font="800 17px 'Hiragino Maru Gothic ProN',system-ui";
+    g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
+    g.fillStyle="rgba(0,40,80,.55)"; rr(bx-8,by-34,bw+16,bh+42,12); g.fill();
     g.fillStyle="#fff"; g.shadowColor="rgba(0,40,80,.5)"; g.shadowBlur=6;
     g.fillText("ステージ "+stage+"      あと "+left+" ぼん",api.W/2,by-7);
     g.shadowBlur=0;
@@ -634,7 +637,7 @@ function buildPenguin(api){
     g.save(); g.translate(p.x,p.y);
     if(p.down) g.rotate(p.rot);
     // shadow under standing pin(ボスピンは影も一回り大きく)
-    if(!p.down){ g.fillStyle="rgba(0,40,80,.18)"; g.beginPath();
+    if(!p.down){ g.fillStyle="rgba(0,40,80,.32)"; g.beginPath();
       g.ellipse(0,r*0.9*bigScale,Math.max(0,r*0.9*bigScale),Math.max(0,r*0.3*bigScale),0,0,TAU); g.fill(); }
     // ③ 丸い雪玉ピン: ボウリングピンとは別シルエット(円)で描き、四角/同一形状の繰り返しを崩す
     if(p.kind==='ball'){
@@ -692,6 +695,7 @@ function buildPenguin(api){
     g.bezierCurveTo(-r*0.7,r*0.2, -r*0.15,-r*0.25, -r*0.28,-r*0.4);
     g.bezierCurveTo(-r*0.42,-r*0.6, -r*0.5,-r*1.3, 0,-r*1.4);
     g.closePath(); g.fill();
+    g.strokeStyle='rgba(30,90,140,.55)'; g.lineWidth=Math.max(2,r*0.1); g.stroke();
     // colored stripes (帯の色 = ② きょうのラッキー色さがしのヒント)
     g.save(); g.globalAlpha=0.78; g.fillStyle=(p.rainbow?"rgba(255,255,255,.5)":(p.band||"#50aadc"));
     g.fillRect(-r*0.5,-r*0.75,r*1.0,r*0.16);
@@ -718,6 +722,7 @@ function buildPenguin(api){
     grd.addColorStop(0,"#ffffff"); grd.addColorStop(0.65,p.col||"#eaf7ff"); grd.addColorStop(1,"#cfeeff");
     g.fillStyle=grd;
     g.beginPath(); g.arc(0,0,rr2,0,TAU); g.fill();
+    g.strokeStyle='rgba(30,90,140,.55)'; g.lineWidth=Math.max(2,r*0.1); g.stroke();
     // 帯の色をリング状に残す(② きょうのラッキー色さがしのヒントは丸にも残す)
     g.save(); g.globalAlpha=0.7; g.strokeStyle=p.band||"#50aadc"; g.lineWidth=Math.max(1,rr2*0.16);
     g.beginPath(); g.arc(0,rr2*0.08,Math.max(0,rr2*0.7),0.15*Math.PI,0.85*Math.PI); g.stroke();
@@ -747,6 +752,7 @@ function buildPenguin(api){
     g.lineTo(-w*0.5+rad,h*0.5); g.arcTo(-w*0.5,h*0.5,-w*0.5,h*0.5-rad,rad);
     g.lineTo(-w*0.5,-h*0.5+rad); g.arcTo(-w*0.5,-h*0.5,-w*0.5+rad,-h*0.5,rad);
     g.closePath(); g.fill();
+    g.strokeStyle='rgba(30,90,140,.55)'; g.lineWidth=Math.max(2,r*0.1); g.stroke();
     // 帯の色(② きょうのラッキー色さがしのヒントはブロックにも残す)
     g.save(); g.globalAlpha=0.75; g.fillStyle=p.band||"#50aadc";
     g.fillRect(-w*0.5,-h*0.1,w,h*0.18);
@@ -773,6 +779,7 @@ function buildPenguin(api){
     const bg=g.createRadialGradient(-bodyR*0.3,bodyY-bodyR*0.3,Math.max(0,bodyR*0.1),0,bodyY,Math.max(0,bodyR*1.05));
     bg.addColorStop(0,"#ffffff"); bg.addColorStop(0.65,p.col||"#eaf7ff"); bg.addColorStop(1,"#cfeeff");
     g.fillStyle=bg; g.beginPath(); g.arc(0,bodyY,bodyR,0,TAU); g.fill();
+    g.strokeStyle='rgba(30,90,140,.55)'; g.lineWidth=Math.max(2,r*0.1); g.stroke();
     // 帯の色(頭上のボス感を邪魔しない位置)
     g.save(); g.globalAlpha=0.7; g.strokeStyle=p.band||"#50aadc"; g.lineWidth=Math.max(1,bodyR*0.14);
     g.beginPath(); g.arc(0,bodyY+bodyR*0.1,Math.max(0,bodyR*0.72),0.15*Math.PI,0.85*Math.PI); g.stroke();
@@ -781,6 +788,7 @@ function buildPenguin(api){
     const hg=g.createRadialGradient(-headR*0.3,headY-headR*0.3,Math.max(0,headR*0.1),0,headY,Math.max(0,headR*1.05));
     hg.addColorStop(0,"#ffffff"); hg.addColorStop(0.65,p.col||"#eaf7ff"); hg.addColorStop(1,"#cfeeff");
     g.fillStyle=hg; g.beginPath(); g.arc(0,headY,headR,0,TAU); g.fill();
+    g.strokeStyle='rgba(30,90,140,.55)'; g.lineWidth=Math.max(2,r*0.1); g.stroke();
     // glossy highlight
     g.fillStyle="rgba(255,255,255,.7)";
     g.beginPath(); g.ellipse(-bodyR*0.3,bodyY-bodyR*0.28,Math.max(0,bodyR*0.22),Math.max(0,bodyR*0.14),-0.3,0,TAU); g.fill();

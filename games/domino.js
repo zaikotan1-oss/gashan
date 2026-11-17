@@ -5,12 +5,13 @@ function buildDomino(api){
   //   → 球の直径が当たり判定 2r より一回り大きい 2.1r になるよう、スプライトを 3.65r 角で描き、球中心が原点に来るようずらす。
   const IMG_S=3.65,IMG_OX=-(0.582-0.5)*IMG_S,IMG_OY=-(0.52-0.5)*IMG_S,IMG_FX=(0.617-0.582)*IMG_S,IMG_FY=(0.156-0.52)*IMG_S-0.12;
   function drawBombImg(r){return api.drawAsset("bomb.png",IMG_OX*r,IMG_OY*r,IMG_S*r,IMG_S*r,{center:true});}
-  let bombs=[],pending=[],rings=[],shards=[],sparks=[],floats=[],glints=[],motes=[],crumbles=[];
+  let bombs=[],pending=[],rings=[],shards=[],sparks=[],floats=[],glints=[],motes=[],crumbles=[],topples=[];
   let bestChain=0,clearBest=0,clearNewRecord=false;   // 軸5: この遊びの中での さいこうれんさ(保存はしない)
   let CONNR,baseConnR,count,total,chain,maxChain,flash,megaFlash,hintT,bgT,hitCd;
   // stage / progression state
   const MAXSTAGE=5;
   let stage,stageBombs,banner,clearT,clearStars,clearChain,clearCount,allClear,clearPerfect,ambientT;
+  let lap=0,goldMode=false,lapPerfect=true,nextGold=false,hudStars=0,starPop=[0,0,0];   // 軸5: 2しゅうめ・きんいろ・HUDの★目標
   // per-stage warm/cool accent palette so the board "looks different" over time
   const STAGE_TINT=["#ffd9a0","#a7d8ff","#cdb6ff","#9bff9b","#ff9bd0"];
   // ---- 隠し発見レイヤー(クレーン/ハンマー/トラックと同じ思想) ----
@@ -23,7 +24,7 @@ function buildDomino(api){
   let shootStar,starTimer;                        // ④ ながれ星 ひみつ発見
   function layout(){baseConnR=clamp(api.W*0.10,55,120);applyConnR();}
   function applyConnR(){const sh=stage?stage:1;CONNR=baseConnR*clamp(1.0-sh*0.06,0.62,1);} // 7〜8歳向け: 吸着半径を狭め、面が進んでも広がりすぎないようにする
-  function reset(){bombs=[];pending=[];rings=[];shards=[];sparks=[];floats=[];glints=[];motes=[];crumbles=[];bestChain=0;clearBest=0;clearNewRecord=false;count=0;total=0;chain=0;maxChain=0;flash=0;megaFlash=0;hintT=0;bgT=0;hitCd=0;
+  function reset(){bombs=[];pending=[];rings=[];shards=[];sparks=[];floats=[];glints=[];motes=[];crumbles=[];topples=[];lap=0;goldMode=false;lapPerfect=true;nextGold=false;hudStars=0;starPop=[0,0,0];bestChain=0;clearBest=0;clearNewRecord=false;count=0;total=0;chain=0;maxChain=0;flash=0;megaFlash=0;hintT=0;bgT=0;hitCd=0;
     stage=1;banner=0;clearT=0;clearStars=0;allClear=false;clearPerfect=false;
     luckyHue=pick(LHUES);luckyName=HUENAME[luckyHue];luckyTaught=false;luckyMsgT=0;rbMsgT=0;
     shootStar=null;starTimer=rint(280,520);
@@ -33,9 +34,9 @@ function buildDomino(api){
     startStage(1);}
   function startStage(n){
     stage=n;applyConnR();bombs=[];pending=[];chain=0;maxChain=0;count=0;allClear=false;
-    hintT=0;crumbles=[];
+    hintT=0;crumbles=[];topples=[];hudStars=0;
     chainStarts=0; // ③ このステージで火をつけた回数(=1なら ワンチェイン=パーフェクト)
-    stageBombs=4+n*2+Math.floor(n/2); // 6,9,11,14,16（7〜8歳向けに 5,7,9,11,13 から約25%増）
+    stageBombs=4+n*2+Math.floor(n/2)+Math.min(lap,3)*2; // 6,9,11,14,16（7〜8歳向けに 5,7,9,11,13 から約25%増）。2しゅうめ以降は+2ずつ
     banner=150;
     // 軸5修正(外れタップでの無限増殖を撤廃)で盤面が疎になった分、狙いが下手でも一定間隔で何かが起きるよう
     // 「時限ばくだん」の呼び水を1個だけ時間差で撒く(仕組みは既存のtimed型そのまま・演出/スコアは増やさない)。
@@ -47,8 +48,8 @@ function buildDomino(api){
     const tries=stageBombs*12;let placed=0;
     const fits=(x,y,r,k)=>{for(const o of bombs){if(Math.hypot(o.x-x,o.y-y)<(o.r+r)*k)return false;}return true;};
     for(let a=0;a<tries&&placed<stageBombs;a++){
-      // 1面は 最初に特大(木箱)・2個目に積み木箱を保証: 最初の10秒から丸以外が見える
-      const type=(n===1&&placed===0)?"big":(n===1&&placed===1)?"stack":rollType(n);
+      // 1面は 最初に特大(木箱)・2個目に積み木箱・3個目にドミノの列を保証: 最初の10秒から丸以外が4形見える
+      const type=(n===1&&placed===0)?"big":(n===1&&placed===1)?"stack":(n===1&&placed===2)?"row":rollType(n);
       const nb=mkBomb(0,0,type);
       // 最初の2個は必ず鎖に(連鎖を最初に体験させる)、以降は約1/3をクラスターに
       const cluster=placed>0&&(placed<3||placed%3===1||Math.random()<0.25);
@@ -70,16 +71,20 @@ function buildDomino(api){
   function clearStage(){
     // ③ パーフェクト(ワンチェイン): たった一度の点火でステージ全部を片づけたらボーナス。
     //    「どこに火をつけると全部つながるか」を考える隠しごほうび(気づかなくてもクリアは可能)。
+    // 軸6: 古い文字(れんさ！など)がクリア画面の題字・星と重ならないよう、上の安全帯より下の文字は片づける
+    floats=floats.filter(f=>f.life>0&&f.y<api.H*0.2);luckyMsgT=0;rbMsgT=Math.min(rbMsgT,25);
     clearPerfect=(chainStarts===1);
     if(clearPerfect){count+=5;total+=5;api.setScore(total);}
     clearChain=maxChain;clearCount=count;
     // 星の条件は「その面の爆弾の数」に対する割合(1面6個でも・5面16個でも 3つ/2つに届く)
     clearStars=maxChain>=Math.max(4,Math.ceil(stageBombs*0.7))?3:maxChain>=Math.max(3,Math.ceil(stageBombs*0.4))?2:1;
     // さいこうれんさ(きろく): 前より伸びたら「しんきろく！」
+    if(clearStars<3)lapPerfect=false;   // 5面ぜんぶ★3の周だけ 次の周が きんいろ
     clearNewRecord=(bestChain>=2&&maxChain>bestChain);
     if(maxChain>bestChain)bestChain=maxChain;
     clearBest=bestChain;
     allClear=(stage>=MAXSTAGE);
+    nextGold=allClear&&lapPerfect;
     clearT=allClear?260:160;
     flash=Math.max(flash,0.7);megaFlash=Math.max(megaFlash,allClear?1:0.7);
     api.shake(allClear?40:24);api.boom(allClear?0.7:0.5);
@@ -95,9 +100,15 @@ function buildDomino(api){
   // choose a bomb type; rarer specials appear more as stages progress
   function rollType(n){
     const r=rnd(0,1);
-    // ① にじいろばくだん: 2〜5%の激レア。虹色に光り、割ると虹の大演出＋大量得点。
-    const rainbow=clamp(0.02+n*0.006,0.02,0.05);
+    // ① にじいろばくだん: 2〜5%の激レア。虹色に光り、割ると虹の大演出＋大量得点。2しゅうめ以降は lap 倍(上限8%)
+    const rainbow=clamp((0.02+n*0.006)*(1+lap),0.02,lap>0?0.08:0.05);
     if(r<rainbow)return"rainbow";
+    // 軸7: ドミノの列(倒れる)・くるま(タイヤが転がる)は独立のくじで足す(他の種類の確率は動かさない)
+    const r2=rnd(0,1);
+    const row=clamp(0.04+n*0.02,0,0.12);
+    if(r2<row)return"row";
+    const car=n>=2?clamp(0.03*n,0,0.1):0;
+    if(r2<row+car)return"car";
     const big=clamp(0.05+n*0.04,0,0.28); // 特大爆弾(大連鎖の起点)
     const stack=clamp(0.06+n*0.015,0,0.14); // 積み木箱(3段・崩れるように壊れる)
     const timed=clamp(0.18+n*0.04,0,0.4); // 時限自動着火。軸5修正(外れタップでの増殖廃止)で盤面が疎になった分、
@@ -114,7 +125,8 @@ function buildDomino(api){
     const baseR=clamp(api.W*0.04,20,32);
     // 軸7: 大きさに差をつける(ふつうは0.8〜1.25倍・特大は1.5倍)。reachOf も大きさに比例させる
     const sz=type==="big"?1.5:type==="normal"?rnd(0.8,1.25):1;
-    const r=baseR*sz;
+    // 軸7: ドミノの列は細長いので r を少し大きく(当たりの円 1.6r を指より大きく保つ)。くるまは横長なので r を更に大きく
+    const r=type==="row"?baseR*1.15:type==="car"?baseR*1.25:baseR*sz;
     return{x,y,r,sz,type,state:"idle",t:0,fuse:rnd(0,TAU),sx:1,sy:1,born:1,bob:rnd(0,TAU),
       hue:type==="color"?pick([0,120,200,300,40]):0,
       armT:type==="timed"?rnd(70,150):0}; // timed: auto-ignite countdown (frames)。軸3/5対策で更に短縮(130-260→70-150)し、
@@ -132,12 +144,13 @@ function buildDomino(api){
     b.state="boom";
     chain++;if(chain>maxChain)maxChain=chain;
     // scoring per type: rainbow=激レア大量 / color=high bonus / big=worth more
-    const gain=b.type==="rainbow"?8:b.type==="color"?5:b.type==="big"?3:b.type==="stack"?2:1;
+    const gain=b.type==="rainbow"?(goldMode?12:8):b.type==="row"||b.type==="car"?2:b.type==="color"?5:b.type==="big"?3:b.type==="stack"?2:1;
     // ② ラッキー色: 今日の秘密の色相の色ばくだんを割ると隠しボーナス(+2)
     const isLucky=b.type==="color"&&b.hue===luckyHue;
     const bonus=isLucky?2:0;
     count+=gain+bonus;total+=gain+bonus;api.setScore(total); // 表示は累計(ステージで下がらない)
     const isBig=b.type==="big";
+    checkHudStars();
     const big=Math.min(0.2+chain*0.04,0.8)*(isBig?1.4:1);flash=Math.max(flash,big);
     api.slide(150-Math.min(chain*5,90),40,0.4,0.55,"sine");api.noise(0.3,0.45,700,"lowpass");
     api.tone(120+chain*8,0.12,"sine",0.25);
@@ -148,9 +161,9 @@ function buildDomino(api){
     const rmul=b.sz||1;
     rings.push({x:b.x,y:b.y,r:b.r,max:b.r*4.2*rmul,life:1});
     rings.push({x:b.x,y:b.y,r:b.r*0.5,max:b.r*2.6*rmul,life:1});
-    const cols=b.type==="color"?[hsl(b.hue,90,60),hsl(b.hue+30,90,70),"#ffffff","#ffd23f"]:b.type==="timed"?["#bcd4ff","#7ad8ff","#ffffff","#ffd23f"]:b.type==="stack"?["#c68b4e","#8f5a2a","#e0b070","#ffd23f"]:["#ff8c2c","#ffd23f","#ff5b3b","#3a3a40"];
+    const cols=b.type==="color"?[hsl(b.hue,90,60),hsl(b.hue+30,90,70),"#ffffff","#ffd23f"]:b.type==="timed"?["#bcd4ff","#7ad8ff","#ffffff","#ffd23f"]:b.type==="stack"?["#c68b4e","#8f5a2a","#e0b070","#ffd23f"]:b.type==="row"?["#ffffff","#d8dcec","#2a2a35","#ffd23f"]:b.type==="car"?["#e8503a","#ffd23f","#ffffff","#3a3a40"]:["#ff8c2c","#ffd23f","#ff5b3b","#3a3a40"];
     // 軸7: 破片の形も種類ごとに変える(全て同じ矩形の割れ方だった)。木箱=木片(細長い矩形)/色ばくだん=星のかけら/その他=矩形。
-    const shardShape=(isBig||b.type==="stack")?"plank":b.type==="color"?"star":b.type==="timed"?"gear":"rect";
+    const shardShape=(isBig||b.type==="stack"||b.type==="row")?"plank":b.type==="color"?"star":b.type==="timed"?"gear":"rect";
     for(let k=rint(9,14)*(isBig?1.6:1)|0;k>0;k--){const a=rnd(0,TAU),s=rnd(3,9.5)*rmul;
       shards.push({x:b.x,y:b.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,s:rnd(4,10)*rmul,color:pick(cols),rot:rnd(0,TAU),vr:rnd(-0.4,0.4),life:1,decay:rnd(0.01,0.02),shape:shardShape});}
     for(let k=rint(12,18)*(isBig?1.5:1)|0;k>0;k--){const a=rnd(0,TAU),s=rnd(2,8)*rmul;
@@ -159,9 +172,15 @@ function buildDomino(api){
       glints.push({x:b.x,y:b.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1,life:1,decay:rnd(0.018,0.03),size:rnd(7,14)*rmul,rot:rnd(0,TAU)});}
     // chain to neighbors (use this bomb's reach so big bombs spread wide)
     const reach=reachOf(b);
+    // 軸7: ドミノの列は 隣へ向かって タイルが順に倒れる。倒れる向き=いちばん近い隣の向き。その向きの隣へは倒れ終わるころに火が移る
+    let tdir=Math.random()<0.5?-1:1;
+    if(b.type==="row"){let nd=1e9;for(const o of bombs){if(o.state!=="idle")continue;const d=Math.hypot(o.x-b.x,o.y-b.y);if(d<reach&&d<nd&&Math.abs(o.x-b.x)>2){nd=d;tdir=o.x>b.x?1:-1;}}}
     for(const o of bombs){if(o.state==="idle"&&Math.hypot(o.x-b.x,o.y-b.y)<reach){
-      pending.push({b:o,delay:rnd(6,12)});
+      const fall=b.type==="row"&&(o.x-b.x)*tdir>=0;
+      pending.push({b:o,delay:b.type==="row"?(fall?rnd(24,30):rnd(10,16)):rnd(6,12)});
     }}
+    if(b.type==="row")makeTopples(b,tdir);
+    if(b.type==="car")carWheels(b);
     // ① にじいろばくだん / ② ラッキー色 の特別演出
     if(b.type==="rainbow")rainbowBurst(b);
     if(isLucky)luckySparkle(b);
@@ -172,6 +191,21 @@ function buildDomino(api){
     // 軸7: 積み木箱は「崩れる」: 段ごとに時間差でバラバラ崩れ落ちる
     if(b.type==="stack"){crumbles.push({x:b.x,y:b.y-b.r,delay:4},{x:b.x,y:b.y+b.r,delay:8},{x:b.x,y:b.y,delay:12});}
   }
+  // HUDの★目標: 今の さいだいれんさ が 1/2/3つ目の条件に届いたら★を塗って小さく鳴らす
+  function starTh(){return[1,Math.max(3,Math.ceil(stageBombs*0.4)),Math.max(4,Math.ceil(stageBombs*0.7))];}
+  function checkHudStars(){const th=starTh();let ns=0;for(let i=0;i<3;i++)if(maxChain>=th[i])ns=i+1;
+    if(ns>hudStars){for(let i=hudStars;i<ns;i++)starPop[i]=1;hudStars=ns;api.tone(1046,0.12,"triangle",0.1);if(ns>=2)api.tone(1318,0.14,"triangle",0.08);}}
+  // ドミノの列: 細長いタイル4枚が 順に 80度まで倒れる(板状の破片と小さい輪つき)
+  function makeTopples(b,dir){
+    const h=b.r*1.7,w=b.r*0.4;
+    for(let i=0;i<4;i++){const k=dir>0?i:3-i;
+      topples.push({x:b.x+(i-1.5)*b.r*0.52,y:b.y+h/2,w,h,dir,k,delay:3+k*5,rot:0,vr:0.03,started:false,landed:false,fade:1});}
+  }
+  // くるま: タイヤが外れて飛び、地面で一度はねる
+  function carWheels(b){
+    for(const sg of[-1,1]){
+      shards.push({x:b.x+sg*b.r*0.7,y:b.y+b.r*0.45,vx:sg*rnd(2.2,4.5),vy:-rnd(5,8),s:Math.max(4,b.r*0.34),color:"#2a2a30",rot:rnd(0,TAU),vr:sg*rnd(0.2,0.35),life:1,decay:0.006,shape:"wheel",bn:false});}
+  }
   // ① にじいろばくだん 撃破: 虹の輪＋虹色スパーク＋大バナー(激レアの爽快ごほうび)。
   //    白飛び防止のためフラッシュは上限つき・短命。
   function rainbowBurst(b){
@@ -179,9 +213,9 @@ function buildDomino(api){
     flash=Math.min(Math.max(flash,0.6),0.8);megaFlash=Math.max(megaFlash,0.6);
     api.boom(0.6);api.shake(18);
     api.slide(660,1320,0.4,0.16,"triangle");api.tone(880,0.14,"triangle",0.12);api.tone(1320,0.16,"triangle",0.1);
-    for(let k=0;k<6;k++)rings.push({x:b.x,y:b.y,r:b.r,max:b.r*(3.2+k*0.8),life:1,col:hsl(k*60,90,66)});
+    for(let k=0;k<6;k++)rings.push({x:b.x,y:b.y,r:b.r,max:b.r*(3.2+k*0.8),life:1,col:goldMode?hsl(36+k*5,95,62):hsl(k*60,90,66)});
     for(let k=0;k<26;k++){const a=rnd(0,TAU),s=rnd(3,10);
-      sparks.push({x:b.x,y:b.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,r:rnd(3,6),life:1,decay:rnd(0.02,0.035),col:hsl(k*40,95,68)});}
+      sparks.push({x:b.x,y:b.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,r:rnd(3,6),life:1,decay:rnd(0.02,0.035),col:goldMode?hsl(36+(k%5)*6,95,66):hsl(k*40,95,68)});}
     if(sparks.length>240)sparks.splice(0,sparks.length-240);
   }
   // ② ラッキー色 命中: 頭上に小さな星のキラッ＋控えめな祝福(白飛びしない)。
@@ -331,6 +365,22 @@ function buildDomino(api){
         for(let k=0;k<4;k++){const a=rnd(0,TAU),s2=rnd(1.5,5);
           sparks.push({x:c.x,y:c.y,vx:Math.cos(a)*s2,vy:Math.sin(a)*s2,r:rnd(2,4),life:1,decay:rnd(0.03,0.05),col:pick(["#fff2a0","#ffd23f"])});}}
       crumbles=crumbles.filter(c=>c.delay>0);
+      // ドミノの列のタイル: 順にバタバタ倒れる(倒れた先で板片がはじける)
+      for(const t of topples){t.delay-=dt;
+        if(t.delay<=0){
+          if(!t.started){t.started=true;api.tone(260+t.k*70,0.06,"triangle",0.1);
+            for(let k=0;k<3;k++){const a=rnd(0,TAU),s2=rnd(1.5,4);
+              shards.push({x:t.x,y:t.y-t.h*0.5,vx:Math.cos(a)*s2+t.dir*2,vy:Math.sin(a)*s2-1.5,s:rnd(4,8),color:pick(["#ffffff","#d8dcec","#2a2a35"]),rot:rnd(0,TAU),vr:rnd(-0.4,0.4),life:1,decay:rnd(0.014,0.024),shape:"plank"});}}
+          if(!t.landed){t.vr+=0.014*dt;t.rot+=t.vr*dt;
+            if(t.rot>=1.4){t.rot=1.4;t.landed=true;api.noise(0.08,0.2,900,"lowpass");api.shake(4);
+              rings.push({x:t.x+t.dir*t.h*0.8,y:t.y-t.h*0.1,r:5,max:Math.max(24,t.h*0.5),life:0.8});
+              for(let k=0;k<3;k++)sparks.push({x:t.x+t.dir*t.h*0.8,y:t.y-4,vx:rnd(-2,2),vy:-rnd(1,3),r:rnd(2,3.5),life:1,decay:rnd(0.03,0.05),col:"#fff2a0"});}}
+          else t.fade-=0.03*dt;}
+        const al=clamp(t.fade,0,1);
+        g.save();g.globalAlpha=al;g.translate(t.x+t.dir*t.w/2,t.y);g.rotate(t.dir*t.rot);
+        drawTile(t.dir>0?-t.w:0,-t.h,t.w,t.h,t.w*0.5);
+        g.restore();}
+      topples=topples.filter(t=>t.fade>0);
       // 最初の3秒 何も着火していない時だけ、いちばん真ん中に近いばくだんのまわりに脈打つ輪(「ここをタッチ」の合図)
       if(stage===1&&chainStarts===0&&banner<=0&&clearT<=0)hintT+=dt;
       // draw bombs
@@ -355,10 +405,17 @@ function buildDomino(api){
       g.restore();g.globalAlpha=1;rings=rings.filter(r=>r.life>0);
       // shards (軸7: 種類ごとに壊れ方の形も変える)
       for(const p of shards){p.vy+=0.25*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.rot+=p.vr*dt;p.life-=p.decay*dt;
+        // くるまのタイヤ: 地面で一度はねる
+        if(p.shape==="wheel"&&!p.bn&&p.vy>0&&p.y>api.H*0.85){p.y=api.H*0.85;p.vy=-Math.abs(p.vy)*0.6;p.bn=true;api.tone(180,0.07,"triangle",0.1);
+          for(let k=0;k<3;k++)sparks.push({x:p.x,y:p.y+p.s,vx:rnd(-2,2),vy:-rnd(0.5,2),r:rnd(2,3.5),life:1,decay:rnd(0.04,0.06),col:"#e0c98a"});}
         const al=Math.max(0,p.life);
         if(p.shape==="star"){star(p.x,p.y,Math.max(0,p.s*0.75),p.rot,al,p.color);continue;}
         g.save();g.globalAlpha=al;g.translate(p.x,p.y);g.rotate(p.rot);g.fillStyle=p.color;
-        if(p.shape==="plank")g.fillRect(-p.s*1.3,-p.s*0.35,Math.max(0,p.s*2.6),Math.max(0,p.s*0.7));
+        if(p.shape==="wheel"){const wr=Math.max(0,p.s);g.fillStyle="#26262c";g.beginPath();g.arc(0,0,wr,0,TAU);g.fill();
+          g.strokeStyle="rgba(255,255,255,.55)";g.lineWidth=2;g.stroke();
+          g.fillStyle="#b9bcc8";g.beginPath();g.arc(0,0,wr*0.38,0,TAU);g.fill();
+          g.strokeStyle="#b9bcc8";g.lineWidth=2;for(let t=0;t<4;t++){g.beginPath();g.moveTo(0,0);g.lineTo(Math.cos(t*TAU/4)*wr*0.9,Math.sin(t*TAU/4)*wr*0.9);g.stroke();}}
+        else if(p.shape==="plank")g.fillRect(-p.s*1.3,-p.s*0.35,Math.max(0,p.s*2.6),Math.max(0,p.s*0.7));
         else if(p.shape==="gear"){const gr=Math.max(0,p.s*0.55);g.beginPath();g.arc(0,0,gr,0,TAU);g.fill();
           for(let t=0;t<6;t++){g.save();g.rotate(t*TAU/6);g.fillRect(-gr*0.28,-gr*1.45,gr*0.56,gr*0.7);g.restore();}
           g.fillStyle="rgba(20,30,60,.55)";g.beginPath();g.arc(0,0,gr*0.32,0,TAU);g.fill();}
@@ -409,7 +466,7 @@ function buildDomino(api){
       if(banner>0)banner-=dt;
       // clear-celebration handling
       if(clearT>0){clearT-=dt;if(clearT<=0){
-        if(allClear){startStage(1);} else {startStage(stage+1);}
+        if(allClear){lap++;goldMode=nextGold;lapPerfect=true;startStage(1);} else {startStage(stage+1);}
       }}
       // floats (with pop-in scale + glow)
       for(const f of floats){f.y+=f.vy*dt;f.life-=0.012*dt;f.pop+=(1-f.pop)*0.25*dt;
@@ -423,19 +480,20 @@ function buildDomino(api){
       g.globalAlpha=1;g.textAlign="left";floats=floats.filter(f=>f.life>0);
       // ① にじいろ！ 中央バナー(虹色に色替わり=激レアの大きな祝福 / 上部中央=安全帯)
       if(rbMsgT>0){rbMsgT-=dt;
-        const p=clamp(rbMsgT/120,0,1),pop=1+Math.max(0,p-0.7)*1.3,col=hsl((bgT*4)%360,90,68);
+        const p=clamp(rbMsgT/120,0,1),pop=1+Math.max(0,p-0.7)*1.3,col=goldMode?hsl(45,95,62):hsl((bgT*4)%360,90,68);
         g.save();g.translate(api.W/2,api.H*0.2);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(p*1.6,0,1);g.font="900 "+clamp(api.W*0.1,40,72)+"px 'Hiragino Maru Gothic ProN',system-ui";
-        g.save();g.globalCompositeOperation="lighter";g.globalAlpha=clamp(p,0,1)*0.5;g.shadowColor=col;g.shadowBlur=26;g.fillStyle=col;g.fillText("にじいろ！",0,0);g.restore();
-        g.lineWidth=8;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText("にじいろ！",0,0);
-        g.fillStyle=col;g.fillText("にじいろ！",0,0);
+        const rbt=goldMode?"きんいろ！":"にじいろ！";
+        g.save();g.globalCompositeOperation="lighter";g.globalAlpha=clamp(p,0,1)*0.5;g.shadowColor=col;g.shadowBlur=26;g.fillStyle=col;g.fillText(rbt,0,0);g.restore();
+        g.lineWidth=8;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText(rbt,0,0);
+        g.fillStyle=col;g.fillText(rbt,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(rbMsgT<0)rbMsgT=0;}
       // ② きょうのラッキー色は◯！ 中央上のヒント(初回だけ)
       if(luckyMsgT>0){luckyMsgT-=dt;
         const p=clamp(luckyMsgT/150,0,1);
         g.save();g.translate(api.W/2,api.H*0.26);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(p*1.6,0,1);g.font="800 "+clamp(api.W*0.052,20,28)+"px 'Hiragino Maru Gothic ProN',system-ui";
-        const t2="きょうのラッキー色は "+luckyName+"！";
+        const t2="きょうのラッキーいろは "+luckyName+"！";
         g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText(t2,0,0);
         g.fillStyle=hsl(luckyHue,85,66);g.fillText(t2,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(luckyMsgT<0)luckyMsgT=0;}
@@ -453,12 +511,12 @@ function buildDomino(api){
   };
   function rrect(x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
   // filled 5-point star (for rating)
-  function star5(x,y,R,rot,fill,stroke){
+  function star5(x,y,R,rot,fill,stroke,lw){
     g.save();g.translate(x,y);g.rotate(rot);g.beginPath();
     for(let i=0;i<5;i++){const a=-Math.PI/2+i*(TAU/5);
       g.lineTo(Math.cos(a)*R,Math.sin(a)*R);
       const a2=a+TAU/10;g.lineTo(Math.cos(a2)*R*0.45,Math.sin(a2)*R*0.45);}
-    g.closePath();if(fill){g.fillStyle=fill;g.fill();}if(stroke){g.lineWidth=3;g.strokeStyle=stroke;g.stroke();}
+    g.closePath();if(fill){g.fillStyle=fill;g.fill();}if(stroke){g.lineWidth=lw||3;g.strokeStyle=stroke;g.stroke();}
     g.restore();
   }
   // small bomb-cluster icons showing how many remain this stage
@@ -470,16 +528,32 @@ function buildDomino(api){
     const tint=STAGE_TINT[(stage-1)%STAGE_TINT.length];
     g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText("ステージ "+stage,api.W/2,y);
     g.fillStyle=tint;g.fillText("ステージ "+stage,api.W/2,y);
-    // remaining bombs as tiny dots (centered row, top-center = 衝突しない安全帯)
-    // 軸5補助: stageBombsで頭打ちにせず実際のremainを見せる(増えたことが子どもにも分かるように、
-    // 想定数を超えた分は赤いドットにする)。描画幅だけ安全のため上限をかける(実プレイでは上限44がもう無いので念のため)。
+    // 残りの爆弾=小さな点(左そろえ・横幅は固定) + ★の目標 + きろく を同じ行に並べる(HUDは2段のまま)
+    // 軸5補助: stageBombsで頭打ちにせず実際のremainを見せる(想定数を超えた分は赤いドット)。
     const remain=bombs.filter(b=>b.state!=="boom").length;
     const shown=Math.min(remain,30);
-    const dotY=y+clamp(api.W*0.045,18,26)+10,dr=5,gap=14,sx=api.W/2-(shown*gap)/2+dr;
+    const fs=clamp(api.W*0.045,18,26);
+    const dotY=y+fs+10,dr=5,gap=14,sr=10,sgap=24;
+    const dotsN=Math.min(Math.max(stageBombs,shown),30),dotsW=dotsN*gap,starsW=3*sgap;
+    const live=Math.max(bestChain,maxChain);
+    g.font="800 "+clamp(api.W*0.032,13,16)+"px 'Hiragino Maru Gothic ProN',system-ui";
+    const rec="きろく "+live+"れんさ";let recW=live>=2?g.measureText(rec).width+12:0;
+    let total=dotsW+10+starsW+recW;if(total>api.W-24){recW=0;total=dotsW+10+starsW;}
+    const x0=api.W/2-total/2;
     for(let i=0;i<shown;i++){
-      g.fillStyle=i>=stageBombs?"#ff6b5b":"#ffd23f";g.beginPath();g.arc(sx+i*gap,dotY+dr,dr,0,TAU);g.fill();
+      g.fillStyle=i>=stageBombs?"#ff6b5b":"#ffd23f";g.beginPath();g.arc(x0+dr+i*gap,dotY+dr,dr,0,TAU);g.fill();
       g.strokeStyle="rgba(0,0,0,.4)";g.lineWidth=1.5;g.stroke();
     }
+    // ★3つ(その面のクリア目標): 今の さいだいれんさ が条件に届いた分だけ塗る
+    const sx0=x0+dotsW+10+sgap/2-2;
+    for(let i=0;i<3;i++){
+      const on=i<hudStars,pp=starPop[i];if(pp>0)starPop[i]=Math.max(0,pp-0.03);
+      const R=sr*(1+pp*0.6);
+      star5(sx0+i*sgap,dotY+dr,R,0,on?"#ffd23f":"rgba(0,0,0,.35)",on?"rgba(0,0,0,.55)":"rgba(255,226,122,.85)",on?2.5:2);
+    }
+    if(recW>0){g.textAlign="left";g.textBaseline="middle";
+      const rx=x0+dotsW+10+starsW+8,ry2=dotY+dr;
+      g.lineWidth=4;g.strokeStyle="rgba(0,0,0,.55)";g.strokeText(rec,rx,ry2);g.fillStyle="#c9b8ff";g.fillText(rec,rx,ry2);}
     g.restore();g.textAlign="left";g.textBaseline="alphabetic";
   }
   function drawBanner(now){
@@ -492,6 +566,11 @@ function buildDomino(api){
     g.shadowColor=tint;g.shadowBlur=30;g.fillStyle=tint;g.fillText("ステージ "+stage,0,0);g.restore();
     g.lineWidth=8;g.strokeStyle="rgba(0,0,0,.55)";g.strokeText("ステージ "+stage,0,0);
     g.fillStyle=tint;g.fillText("ステージ "+stage,0,0);
+    // 2しゅうめ以降(5面ぜんぶ★3の次の周は きんいろ)
+    if(lap>0){const lt=(lap+1)+"しゅうめ"+(goldMode?"　きんいろ！":"");
+      g.font="900 "+clamp(api.W*0.05,24,40)+"px 'Hiragino Maru Gothic ProN',system-ui";
+      g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.55)";g.strokeText(lt,0,clamp(api.W*0.07,34,56));
+      g.fillStyle=goldMode?"#ffd23f":"#ffffff";g.fillText(lt,0,clamp(api.W*0.07,34,56));}
     g.restore();g.globalAlpha=1;g.textAlign="left";
   }
   function drawClear(now){
@@ -535,6 +614,8 @@ function buildDomino(api){
     // ③ パーフェクト(ワンチェイン)達成のごほうび表示
     if(clearPerfect){const py2=ry+step*3;
       g.strokeText("パーフェクト！＋5",cx,py2);g.fillStyle="#9bff9b";g.fillText("パーフェクト！＋5",cx,py2);}
+    if(allClear){const ny=ry+step*(clearPerfect?4:3),nt=nextGold?"つぎは きんいろの "+(lap+2)+"しゅうめ！":"つぎは "+(lap+2)+"しゅうめ！";
+      g.strokeText(nt,cx,ny);g.fillStyle=nextGold?"#ffd23f":"#ffffff";g.fillText(nt,cx,ny);}
     g.restore();g.textAlign="left";g.globalAlpha=1;
   }
   // little bomb icon for the hint panel
@@ -686,6 +767,59 @@ function buildDomino(api){
     g.closePath();g.fill();
     g.restore();
   }
+  // 導火線の火(row/car共通)
+  function drawFlame(fx,fy,fl){
+    g.save();g.globalCompositeOperation="lighter";
+    g.fillStyle="rgba(255,120,30,.55)";g.beginPath();g.arc(fx,fy,Math.max(0,11+fl*3),0,TAU);g.fill();
+    g.fillStyle="rgba(255,180,60,.8)";g.beginPath();g.arc(fx,fy,7,0,TAU);g.fill();
+    g.fillStyle="#fff2c0";g.beginPath();g.arc(fx,fy,Math.max(0,3.5+fl*1.5),0,TAU);g.fill();
+    g.restore();
+  }
+  // ドミノのタイル1枚(白地・黒ふち・黒い点2つ)。x,y は左上
+  function drawTile(x,y,w,h,rad){
+    g.fillStyle="#f6f6fa";rrect(x,y,w,h,Math.max(0,rad));g.fill();
+    g.lineWidth=Math.max(1.5,w*0.12);g.strokeStyle="#1d1d28";rrect(x,y,w,h,Math.max(0,rad));g.stroke();
+    g.beginPath();g.moveTo(x+w*0.12,y+h/2);g.lineTo(x+w*0.88,y+h/2);g.lineWidth=Math.max(1,w*0.07);g.stroke();
+    g.fillStyle="#1d1d28";
+    g.beginPath();g.arc(x+w/2,y+h*0.27,Math.max(0,w*0.16),0,TAU);g.fill();
+    g.beginPath();g.arc(x+w/2,y+h*0.73,Math.max(0,w*0.16),0,TAU);g.fill();
+  }
+  // ドミノの列: 細長いタイル4枚(点火すると ゆらゆら傾く)
+  function drawDominoRow(r,lit,fuse){
+    const w=r*0.4,h=r*1.7;
+    g.save();
+    for(let i=0;i<4;i++){
+      const x=(i-1.5)*r*0.52,lean=lit?Math.sin(fuse*5+i*0.9)*0.07:0;
+      g.save();g.translate(x,h/2);g.rotate(lean);
+      if(lit){g.save();g.globalCompositeOperation="lighter";g.globalAlpha=0.25;g.fillStyle="#ff9b3a";rrect(-w/2-3,-h-3,w+6,h+6,w*0.5);g.fill();g.restore();}
+      drawTile(-w/2,-h,w,h,w*0.5);g.restore();
+    }
+    g.restore();
+  }
+  // くるま: 赤い車体+窓+ライト+タイヤ2つ
+  function drawCar(r,lit){
+    g.save();
+    // 車体の屋根(キャビン)
+    g.fillStyle=lit?"#ee6a52":"#c43a28";
+    g.beginPath();g.moveTo(-0.62*r,-0.2*r);g.lineTo(-0.36*r,-0.72*r);g.lineTo(0.4*r,-0.72*r);g.lineTo(0.72*r,-0.2*r);g.closePath();g.fill();
+    g.lineWidth=Math.max(1.5,r*0.07);g.strokeStyle="#2a1410";g.stroke();
+    g.fillStyle="#bfe6ff";
+    g.beginPath();g.moveTo(-0.46*r,-0.24*r);g.lineTo(-0.28*r,-0.6*r);g.lineTo(0.3*r,-0.6*r);g.lineTo(0.54*r,-0.24*r);g.closePath();g.fill();
+    g.strokeStyle="#2a1410";g.lineWidth=Math.max(1,r*0.05);g.beginPath();g.moveTo(0.02*r,-0.6*r);g.lineTo(0.02*r,-0.24*r);g.stroke();
+    // 本体
+    const grd=g.createLinearGradient(0,-0.2*r,0,0.5*r);grd.addColorStop(0,lit?"#ff8a6a":"#f0604a");grd.addColorStop(1,lit?"#d8503a":"#b8321f");
+    g.fillStyle=grd;rrect(-1.15*r,-0.22*r,2.3*r,0.72*r,Math.max(0,r*0.22));g.fill();
+    g.lineWidth=Math.max(1.5,r*0.07);g.strokeStyle="#2a1410";rrect(-1.15*r,-0.22*r,2.3*r,0.72*r,Math.max(0,r*0.22));g.stroke();
+    // ライト・ドアの線
+    g.fillStyle="#ffe27a";g.beginPath();g.arc(1.0*r,0.06*r,Math.max(0,r*0.12),0,TAU);g.fill();
+    g.fillStyle="#fff";g.fillRect(-1.12*r,0.02*r,r*0.1,r*0.16);
+    // タイヤ
+    for(const sx of[-0.68,0.68]){
+      g.fillStyle="#26262c";g.beginPath();g.arc(sx*r,0.5*r,Math.max(0,r*0.34),0,TAU);g.fill();
+      g.lineWidth=Math.max(1,r*0.05);g.strokeStyle="rgba(255,255,255,.5)";g.stroke();
+      g.fillStyle="#b9bcc8";g.beginPath();g.arc(sx*r,0.5*r,Math.max(0,r*0.13),0,TAU);g.fill();}
+    g.restore();
+  }
   // 積み木箱: 木箱3段(少しずつ横にずれて「積んである」感じ)。真ん中の段に赤い帯=危険の合図
   function drawStack(r,lit,fuse){
     const w=Math.max(0,r*1.35),h=Math.max(0,r*1.02);
@@ -716,12 +850,12 @@ function buildDomino(api){
     g.scale(sxx,syy);
     // contact shadow (画像ばくだんは足が生えているので少し下に落とす)
     const useImg=b.type==="normal"&&api.asset("bomb.png").ready;
-    g.save();g.globalAlpha=0.35;g.fillStyle="#000";g.beginPath();g.ellipse(0,b.r*(b.type==="stack"?1.62:useImg?1.32:1.05),Math.max(0,b.r*0.85),Math.max(0,b.r*0.3),0,0,TAU);g.fill();g.restore();
+    g.save();g.globalAlpha=0.35;g.fillStyle="#000";g.beginPath();g.ellipse(0,b.r*(b.type==="stack"?1.62:b.type==="row"?0.95:b.type==="car"?0.85:useImg?1.32:1.05),Math.max(0,b.r*(b.type==="car"?1.25:b.type==="row"?1.15:0.85)),Math.max(0,b.r*0.3),0,0,TAU);g.fill();g.restore();
     // type cue: color bomb radiates a soft colored halo; big bomb a warm one
     if(b.type==="color"){g.save();g.globalCompositeOperation="lighter";
       g.globalAlpha=0.16;g.fillStyle=hsl(b.hue,90,60);g.beginPath();g.arc(0,0,b.r*1.5,0,TAU);g.fill();g.restore();}
     // ① にじいろばくだん: 虹色に脈打つオーラ(=「なにか特別なのが居る」ドキドキの予告)
-    const rbHue=(bgT*3+b.x*0.7)%360;
+    const rbHue=goldMode?45:(bgT*3+b.x*0.7)%360;
     if(b.type==="rainbow"){g.save();g.globalCompositeOperation="lighter";
       const rp=0.55+0.45*Math.sin(b.fuse+bgT*0.06);
       g.globalAlpha=0.18*rp;g.fillStyle=hsl(rbHue,95,62);g.beginPath();g.arc(0,0,b.r*1.7,0,TAU);g.fill();g.restore();}
@@ -743,6 +877,22 @@ function buildDomino(api){
         g.fillStyle="#fff2c0";g.beginPath();g.arc(fx,fy,Math.max(0,3.5+fl*1.5),0,TAU);g.fill();
         g.restore();
         g.globalAlpha=0.5+fl*0.3;g.fillStyle="#ffd23f";g.beginPath();g.arc(fx+fl*2,fy-8-fl*3,Math.max(0,1.6),0,TAU);g.fill();g.globalAlpha=1;}
+      g.restore();return;
+    }
+    // ドミノの列(row): 細長い白いタイル4枚が並ぶ。壊れる時は順にバタバタ倒れる(軸7)
+    if(b.type==="row"){
+      drawDominoRow(b.r,lit,b.fuse);
+      const fx=-b.r*0.78+b.r*0.3,fy=-b.r*1.55;
+      g.strokeStyle="#8a5a2a";g.lineWidth=3;g.lineCap="round";g.beginPath();g.moveTo(-b.r*0.78,-b.r*0.85);g.quadraticCurveTo(-b.r*0.5,-b.r*1.4,fx,fy);g.stroke();
+      if(lit)drawFlame(fx,fy,Math.sin(b.fuse*5));
+      g.restore();return;
+    }
+    // くるま(car): 横長の車体と丸いタイヤ2つ。壊れる時はタイヤが飛んで地面ではねる(軸7)
+    if(b.type==="car"){
+      drawCar(b.r,lit);
+      const fx=b.r*0.3,fy=-b.r*1.3;
+      g.strokeStyle="#8a5a2a";g.lineWidth=3;g.lineCap="round";g.beginPath();g.moveTo(0,-b.r*0.72);g.quadraticCurveTo(b.r*0.5,-b.r*1.0,fx,fy);g.stroke();
+      if(lit)drawFlame(fx,fy,Math.sin(b.fuse*5));
       g.restore();return;
     }
     // 積み木箱(stack): 木箱を3段積んだ背の高い形。壊れる時は段ごとに時間差で崩れる(軸7)

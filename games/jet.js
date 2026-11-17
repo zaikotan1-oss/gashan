@@ -3,7 +3,7 @@ function buildJet(api){
   api.preload(["bg.jpg","planet.png"]);   // 画像アセット(無ければ従来の手描きにフォールバック)。ロケット/いんせきは生成不良(傾き・床)のため手描きのまま
   let obs=[],puffs=[],sparks=[],floats=[],stars=[],rings=[],glints=[],trail=[],motes=[],shards=[],feathers=[],chunks=[];
   let playerY,px,aimX,vy,alt,maxGenAlt,thrusting,thrustViz,grav,count,combo,comboT,bestAlt,tk,flash,jetTilt,wash,boost,lastHS;
-  let slow=0;
+  let slow=0,pfQ=[],lastPt=0;
   let stage,nextGate,banner,bannerT,clearBurst,clearBurstT,meteors;
   // ---- 隠し発見レイヤー(クレーン/パンチ/ハンマー/トラックと同じ思想) ----
   let luckyColor,luckySeen,luckyMsgT,rbMsgT,clusterId,clusters;
@@ -15,32 +15,34 @@ function buildJet(api){
   const BCOL=["#ff6b8b","#4cc6e8","#7be08a","#ffd23f","#b58bff","#ff7bd0"];
   const BHI={"#ff6b8b":"#ffd0db","#4cc6e8":"#cdf2ff","#7be08a":"#d6ffdc","#ffd23f":"#fff3c2","#b58bff":"#e7d6ff","#ff7bd0":"#ffd6ef"};
   // ⑦ とり用の色(バルーンのBCOLとは別パレット=同じ色違いの丸に見せないため)
-  const BIRDCOL=["#8a5a3a","#6b7a8f","#c9995a","#4a90d9"];
+  const BIRDCOL=["#8a5a3a","#3a3f5c","#c9995a","#4a90d9"];
   // ② きょうのラッキー色: バルーンの色から毎プレイ1色を秘密に選ぶ(色名で一度だけ教える)
   const CNAME={"#ff6b8b":"ピンク","#4cc6e8":"みずいろ","#7be08a":"みどり","#ffd23f":"きいろ","#b58bff":"むらさき","#ff7bd0":"ももいろ"};
   const SLOWV=3,SLOWF=40;   // ふつうの雲に つっこむと SLOWF フレームだけ 上昇が SLOWV まで おそくなる
+  // まん中だけを連打しても取れすぎないよう、ひとつだけの的は まん中の帯をよけて出やすくする(ねらって動くと得をする)
+  function rx(lo,hi){let x=rnd(api.W*lo,api.W*hi);if(Math.abs(x-api.W*0.5)<api.W*0.13&&Math.random()<0.65)x=rnd(api.W*lo,api.W*hi);if(Math.abs(x-api.W*0.5)<api.W*0.13&&Math.random()<0.5)x=Math.random()<0.5?rnd(api.W*lo,api.W*0.37):rnd(api.W*0.63,api.W*hi);return x;}
   function layout(){playerY=api.H*0.46;if(px==null)px=api.W/2;aimX=px;grav=clamp(api.H*0.0004,0.22,0.36);}
   function reset(){obs=[];puffs=[];sparks=[];floats=[];rings=[];glints=[];trail=[];meteors=[];shards=[];feathers=[];chunks=[];px=null;vy=0;alt=0;maxGenAlt=0;thrusting=false;thrustViz=0;count=0;combo=0;comboT=0;bestAlt=0;tk=0;flash=0;jetTilt=0;wash=0;boost=0;lastHS=-99;
     stage=0;nextGate=0;banner="";bannerT=0;clearBurst=[];clearBurstT=0;
     luckyColor=pick(BCOL);luckySeen=false;luckyMsgT=0;rbMsgT=0;clusterId=0;clusters={};
     moonX=0;moonY=0;moonR=0;moonOn=false;moonWink=0;
     motes=[];for(let i=0;i<16;i++)motes.push({x:rnd(0,api.W),y:rnd(0,api.H),r:rnd(1.2,3.4),sp:rnd(0.15,0.55),ph:rnd(0,TAU),drift:rnd(0.2,0.6)});
-    slow=0;layout();ensure();
-    // さいしょの1こ: まん中あたりに ふうせんを3こ(さわってすぐ最初の成功が来る)
-    [[0.22,0.5],[0.4,0.38],[0.56,0.62]].forEach(a=>obs.push({alt:api.H*a[0],x:api.W*a[1]+rnd(-api.W*0.05,api.W*0.05),r:api.W*0.055,type:"balloon",color:pick(BCOL),dead:false}));}
+    slow=0;pfQ=[];lastPt=-170;layout();ensure(); // lastPt=-170: さいしょの成功だけは 約2秒でたすけ舟が出る
+    // さいしょの数こ: まん中あたりに ふうせんを7こ(ゆっくり寄るので、すこし横にずれても1つは取れる)(さわってすぐ最初の成功が来る)
+    [[0.2,0.5],[0.32,0.34],[0.44,0.66],[0.56,0.3],[0.68,0.7],[0.8,0.42],[0.92,0.58]].forEach(a=>obs.push({alt:api.H*a[0],x:api.W*a[1]+rnd(-api.W*0.02,api.W*0.02),r:api.W*0.058,hw:api.W*0.075,type:"balloon",color:pick(BCOL),dead:false}));}
   function ensure(){
     while(maxGenAlt<alt+api.H*1.4){
-      maxGenAlt+=rnd(60,120);
+      maxGenAlt+=rnd(100,180);
       // ZONE depends on current generation altitude (alt-units = meters*10)
       // use raw maxGenAlt: 0-6000 low, 6000-16000 mid, 16000-32000 high, 32000+ space (GATES[0]/[1]短縮に合わせてゾーン境界も同じ値に更新。ズレるとゲート通過後もzone0の敵しか出ない)
       const z=maxGenAlt<GATES[0].alt?0:maxGenAlt<GATES[1].alt?1:maxGenAlt<GATES[2].alt?2:3;
       // ① にじいろバルーン: 約4%の激レア。虹色に光り、つらぬくと大量得点＋虹の大盤振る舞い。
       if(Math.random()<0.04){
-        obs.push({alt:maxGenAlt,x:rnd(api.W*0.2,api.W*0.8),r:rnd(api.W*0.062,api.W*0.078),type:"balloon",color:pick(BCOL),rainbow:true,dead:false});
+        obs.push({alt:maxGenAlt,x:rx(0.2,0.8),r:rnd(api.W*0.062,api.W*0.078),type:"balloon",color:pick(BCOL),rainbow:true,dead:false});
         continue;
       }
       // every so often drop a BONUS cluster (dense balloon house) as a combo-reward target
-      if(Math.random()<0.18){
+      if(Math.random()<0.14){
         const cx=rnd(api.W*0.25,api.W*0.75),col=pick(BCOL),cid=++clusterId,n=rint(4,6);
         clusters[cid]=n;   // ③ パーフェクト判定: このかたまりを1つも逃さず全部つぶすとボーナス
         for(let i=0;i<n;i++)obs.push({alt:maxGenAlt+rnd(-26,26),x:cx+rnd(-api.W*0.12,api.W*0.12),r:rnd(api.W*0.035,api.W*0.05),type:"balloon",color:Math.random()<0.5?col:pick(BCOL),bonus:true,cid,dead:false});
@@ -48,59 +50,60 @@ function buildJet(api){
       }
       if(z===0){ // LOW: sparse balloons, occasional small cloud, たまに たこ(凧)ととり
         const r0=Math.random();
-        if(r0<0.22){const n=rint(1,2);for(let i=0;i<n;i++)obs.push({alt:maxGenAlt+rnd(-20,20),x:rnd(api.W*0.1,api.W*0.9),r:rnd(api.W*0.05,api.W*0.09),type:"cloud",dead:false});}
+        if(r0<0.22){const n=rint(1,2);for(let i=0;i<n;i++)obs.push({alt:maxGenAlt+rnd(-20,20),x:rx(0.1,0.9),r:rnd(api.W*0.05,api.W*0.09),type:"cloud",dead:false});}
         else if(r0<0.36){ // ⑤ たこ(凧): 横長のひし形+しっぽ。当てると紙ふぶきに壊れる(風船とは違う壊れ方)
-          obs.push({alt:maxGenAlt,x:rnd(api.W*0.15,api.W*0.85),r:rnd(api.W*0.06,api.W*0.085),type:"kite",color:pick(BCOL),vx:rnd(-0.4,0.4),dead:false});
+          obs.push({alt:maxGenAlt,x:rx(0.15,0.85),r:rnd(api.W*0.06,api.W*0.085),type:"kite",color:pick(BCOL),vx:rnd(-0.4,0.4),dead:false});
         }
         else if(r0<0.55){ // ⑦ とり: 横長のW字翼シルエット。丸系(風船・雲)/ひし形(凧)とは違う形で当たり判定も横長
           const bw=rnd(api.W*0.05,api.W*0.065);
-          obs.push({alt:maxGenAlt,x:rnd(api.W*0.15,api.W*0.85),r:bw,hw:bw*1.5,hh:bw*0.55,type:"bird",color:pick(BIRDCOL),vx:rnd(-0.7,0.7),ph:rnd(0,TAU),dead:false});
+          obs.push({alt:maxGenAlt,x:rx(0.15,0.85),r:bw,hw:bw*1.5,hh:bw*0.55,type:"bird",color:pick(BIRDCOL),vx:rnd(-0.7,0.7),ph:rnd(0,TAU),dead:false});
         }
-        else obs.push({alt:maxGenAlt,x:rnd(api.W*0.12,api.W*0.88),r:rnd(api.W*0.04,api.W*0.06),type:"balloon",color:pick(BCOL),dead:false});
+        else obs.push({alt:maxGenAlt,x:rx(0.12,0.88),r:rnd(api.W*0.04,api.W*0.06),type:"balloon",color:pick(BCOL),dead:false});
       }else if(z===1){ // MID: cloud walls with a gap to thread + some balloons + たまに大きな入道雲(数回ヒットで壊れる)・とり
         const r1=Math.random();
         if(r1<0.09){ // ⑥ 大きな入道雲: 3回当てて壊す的。壊れ方・大きさが他と違う
-          obs.push({alt:maxGenAlt,x:rnd(api.W*0.25,api.W*0.75),r:rnd(api.W*0.13,api.W*0.16),type:"bigcloud",hp:3,maxHp:3,dead:false});
-        }else if(r1<0.09+0.56){const gap=rnd(api.W*0.28,api.W*0.72),gw=api.W*0.22;   // くもの壁を少し多めに(7〜8歳向け)
+          obs.push({alt:maxGenAlt,x:rx(0.25,0.75),r:rnd(api.W*0.13,api.W*0.16),type:"bigcloud",hp:3,maxHp:3,dead:false});
+        }else if(r1<0.09+0.42){const gap=rnd(api.W*0.28,api.W*0.72),gw=api.W*0.22;   // くもの壁を少し多めに(7〜8歳向け)
           for(let i=0;i<5;i++){const cxw=api.W*0.1+i*api.W*0.2;if(Math.abs(cxw-gap)<gw)continue;obs.push({alt:maxGenAlt+rnd(-16,16),x:cxw,r:rnd(api.W*0.07,api.W*0.1),type:"cloud",dead:false});}
-        }else if(r1<0.09+0.56+0.13){ // ⑦ とり: 雲の壁の合間を飛ぶ1〜2羽(丸・ひし形以外の形のバリエーション)
+          if(Math.random()<0.75)obs.push({alt:maxGenAlt+rnd(-6,6),x:gap,r:rnd(api.W*0.05,api.W*0.06),type:"balloon",color:pick(BCOL),dead:false}); // 雲のかべの すきまに ふうせん=すきまをねらうと得
+        }else if(r1<0.09+0.42+0.13){ // ⑦ とり: 雲の壁の合間を飛ぶ1〜2羽(丸・ひし形以外の形のバリエーション)
           const n=rint(1,2);for(let i=0;i<n;i++){const bw=rnd(api.W*0.05,api.W*0.065);
-            obs.push({alt:maxGenAlt+rnd(-16,16),x:rnd(api.W*0.15,api.W*0.85),r:bw,hw:bw*1.5,hh:bw*0.55,type:"bird",color:pick(BIRDCOL),vx:rnd(-0.7,0.7),ph:rnd(0,TAU),dead:false});}
-        }else for(let i=0;i<rint(1,2);i++)obs.push({alt:maxGenAlt+rnd(-20,20),x:rnd(api.W*0.12,api.W*0.88),r:rnd(api.W*0.045,api.W*0.06),type:"balloon",color:pick(BCOL),dead:false});
+            obs.push({alt:maxGenAlt+rnd(-16,16),x:rx(0.15,0.85),r:bw,hw:bw*1.5,hh:bw*0.55,type:"bird",color:pick(BIRDCOL),vx:rnd(-0.7,0.7),ph:rnd(0,TAU),dead:false});}
+        }else for(let i=0;i<rint(1,2);i++)obs.push({alt:maxGenAlt+rnd(-20,20),x:rx(0.12,0.88),r:rnd(api.W*0.045,api.W*0.06),type:"balloon",color:pick(BCOL),dead:false});
       }else if(z===2){ // HIGH: side-drifting balloons + clouds + とり + まれにひこうせん(大きい物)
         const r2=Math.random();
         if(r2<0.07){ // ⑤ たこ(凧): 最初の空だけで終わらせず、高いところにも少し混ぜる
-          obs.push({alt:maxGenAlt,x:rnd(api.W*0.15,api.W*0.85),r:rnd(api.W*0.06,api.W*0.085),type:"kite",color:pick(BCOL),vx:rnd(-0.6,0.6),dead:false});
+          obs.push({alt:maxGenAlt,x:rx(0.15,0.85),r:rnd(api.W*0.06,api.W*0.085),type:"kite",color:pick(BCOL),vx:rnd(-0.6,0.6),dead:false});
         }else if(r2<0.07+0.05){ // ⑧ ひこうせん/UFO: 横長・大きい・矩形寄りの当たり判定(丸系・ひし形とは違う『大きい乗り物』)
           const dir=Math.random()<0.5?-1:1,bw2=api.W*0.15;
           obs.push({alt:maxGenAlt,x:dir<0?api.W*0.8:api.W*0.2,r:bw2,hw:bw2,hh:bw2*0.42,type:"blimp",color:pick(BCOL),vx:dir*rnd(0.5,0.9),dead:false});
         }else if(r2<0.07+0.05+0.18){const n=rint(1,2);for(let i=0;i<n;i++){const bw=rnd(api.W*0.05,api.W*0.065);
-            obs.push({alt:maxGenAlt+rnd(-18,18),x:rnd(api.W*0.15,api.W*0.85),r:bw,hw:bw*1.5,hh:bw*0.55,type:"bird",color:pick(BIRDCOL),vx:rnd(-0.8,0.8),ph:rnd(0,TAU),dead:false});}
+            obs.push({alt:maxGenAlt+rnd(-18,18),x:rx(0.15,0.85),r:bw,hw:bw*1.5,hh:bw*0.55,type:"bird",color:pick(BIRDCOL),vx:rnd(-0.8,0.8),ph:rnd(0,TAU),dead:false});}
         }else if(r2<0.07+0.05+0.18+0.4){const dir=Math.random()<0.5?-1:1;obs.push({alt:maxGenAlt,x:dir<0?api.W*0.85:api.W*0.15,r:rnd(api.W*0.045,api.W*0.06),type:"balloon",color:pick(BCOL),vx:dir*rnd(0.8,1.6),dead:false});}
-        else{const n=rint(1,3);for(let i=0;i<n;i++)obs.push({alt:maxGenAlt+rnd(-18,18),x:rnd(api.W*0.1,api.W*0.9),r:rnd(api.W*0.05,api.W*0.09),type:"cloud",dead:false});}
+        else{const n=rint(1,3);for(let i=0;i<n;i++)obs.push({alt:maxGenAlt+rnd(-18,18),x:rx(0.1,0.9),r:rnd(api.W*0.05,api.W*0.09),type:"cloud",dead:false});}
       }else{ // SPACE: drifting balloons + meteors to dodge + まれにひこうせん + 終盤の隕石シャワー
         if(maxGenAlt>46000&&Math.random()<0.3){ // 【軸4】最終ゲート(52000)直前でもう一段の盛り上がり: 隕石を1個ではなく3〜4個まとめて出す
-          const n=rint(3,4);for(let i=0;i<n;i++)meteors.push({alt:maxGenAlt+rnd(-40,40)+i*16,x:rnd(api.W*0.12,api.W*0.88),r:rnd(api.W*0.028,api.W*0.042),vx:rnd(-2.8,2.8)*(Math.random()<0.5?1:-1),sp:rnd(0.2,0.5),ph:rnd(0,TAU),dead:false});
+          const n=rint(3,4);for(let i=0;i<n;i++)meteors.push({alt:maxGenAlt+rnd(-40,40)+i*16,x:rx(0.12,0.88),r:rnd(api.W*0.028,api.W*0.042),vx:rnd(-2.8,2.8)*(Math.random()<0.5?1:-1),sp:rnd(0.2,0.5),ph:rnd(0,TAU),dead:false});
         }else{
           const r3=Math.random();
           if(r3<0.07){ // ⑥ 大きな入道雲: 宇宙にも「ふわふわ岩雲」として混ぜる(3回ヒット)
-            obs.push({alt:maxGenAlt,x:rnd(api.W*0.25,api.W*0.75),r:rnd(api.W*0.13,api.W*0.15),type:"bigcloud",hp:3,maxHp:3,dead:false});
+            obs.push({alt:maxGenAlt,x:rx(0.25,0.75),r:rnd(api.W*0.13,api.W*0.15),type:"bigcloud",hp:3,maxHp:3,dead:false});
           }else if(r3<0.07+0.06){ // ⑧ ひこうせん/UFO: 宇宙ゾーンにも大きい物を混ぜる
             const dir=Math.random()<0.5?-1:1,bw3=api.W*0.16;
             obs.push({alt:maxGenAlt,x:dir<0?api.W*0.78:api.W*0.22,r:bw3,hw:bw3,hh:bw3*0.42,type:"blimp",color:pick(BCOL),vx:dir*rnd(0.5,0.9),dead:false});
-          }else if(r3<0.07+0.06+0.44)meteors.push({alt:maxGenAlt+rnd(-30,30),x:rnd(api.W*0.1,api.W*0.9),r:rnd(api.W*0.03,api.W*0.045),vx:rnd(-2.6,2.6)*(Math.random()<0.5?1:-1),sp:rnd(0.2,0.5),ph:rnd(0,TAU),dead:false});   // いんせき少し多め・少し速め(7〜8歳向け)
+          }else if(r3<0.07+0.06+0.44)meteors.push({alt:maxGenAlt+rnd(-30,30),x:rx(0.1,0.9),r:rnd(api.W*0.03,api.W*0.045),vx:rnd(-2.6,2.6)*(Math.random()<0.5?1:-1),sp:rnd(0.2,0.5),ph:rnd(0,TAU),dead:false});   // いんせき少し多め・少し速め(7〜8歳向け)
           else{const dir=Math.random()<0.5?-1:1;obs.push({alt:maxGenAlt,x:dir<0?api.W*0.85:api.W*0.15,r:rnd(api.W*0.045,api.W*0.06),type:"balloon",color:pick(BCOL),vx:dir*rnd(1,2),dead:false});}
         }
       }
     }
     // 落下などで視界内の的が完全に尽きたときだけの保険(=完全な空振りゾーンを防ぐが、常時3個は供給しない)
     let near=0;
-    for(const o of obs){if(!o.dead&&o.alt>alt&&o.alt<alt+api.H*1.1)near++;}
+    for(const o of obs){if(!o.dead&&o.alt>alt&&o.alt<alt+api.H*0.85)near++;}
     while(near<1){
       // 今ねらっている場所(px)からは離れた場所に置く=適当に飛んでも当たらない
       let bx=rnd(api.W*0.15,api.W*0.85),tries=0;
       while(Math.abs(bx-px)<api.W*0.3&&tries<8){bx=rnd(api.W*0.15,api.W*0.85);tries++;}
-      obs.push({alt:alt+rnd(api.H*0.25,api.H*1.0),x:bx,r:rnd(api.W*0.05,api.W*0.07),type:"balloon",color:pick(BCOL),dead:false});
+      obs.push({alt:alt+rnd(api.H*0.25,api.H*0.8),x:bx,r:rnd(api.W*0.05,api.W*0.07),type:"balloon",color:pick(BCOL),dead:false});
       near++;
     }
   }
@@ -130,7 +133,7 @@ function buildJet(api){
     if(isRainbow)val+=8;
     if(isLucky){val+=1;if(!luckySeen){luckyMsgT=1.6;luckySeen=true;}} // 初回だけ中央上に色を教える
     if(wash>0.2)val*=2; // FEVER: x6 wash doubles score
-    count+=val;api.setScore(count);combo++;comboT=0.6;
+    count+=val;api.setScore(count);combo++;comboT=0.6;if(val>0)lastPt=tk; // 点が入った時だけ たすけ舟のタイマーをもどす(雲は0点)
     // low-end "ズドン" that thickens with combo
     api.boom(clamp(0.3+combo*0.04,0.3,0.6));
     if(o.type==="balloon"){api.slide(700,300,0.08,0.16,"square");api.noise(0.06,0.12,2000);api.tone(880+combo*40,0.08,"triangle",0.06);
@@ -164,8 +167,8 @@ function buildJet(api){
       rings.push({x:o.x,y:oy,r:Math.max(0,o.r*0.4),vr:rnd(3,4.5),life:0.8,decay:0.05,col:"#ffffff"});
       for(let k=rint(8,12);k>0;k--)puffs.push({x:o.x+rnd(-o.r,o.r),y:oy+rnd(-o.r,o.r),r:Math.max(0,rnd(o.r*0.3,o.r*0.6)),vx:rnd(-3,3),vy:rnd(-2,2),life:1,decay:rnd(0.02,0.035)});}
     api.shake(2+Math.min(combo*0.3,5));vy+=1.2; // push-through accel
-    if(o.type==="cloud"&&alt>GATES[0].alt)slow=Math.max(slow,SLOWF);vy=Math.min(vy,SLOWV); // 【軸3】ふつうの雲に つっこむと ぐっと おそくなる(得点0・失敗にはしない)=雲のかべの すきまを ねらう意味
-    if(combo>2&&combo%3===0){flash=Math.min(1,flash+0.35);floats.push({x:o.x,y:oy-20,txt:"x"+combo,life:1,vy:-1.1,col:combo>=9?"#ff3b3b":"#ffd23f",size:32});}
+    if(o.type==="cloud"){if(alt>GATES[0].alt)slow=Math.max(slow,SLOWF);vy=Math.min(vy,SLOWV);} // 【軸3】ふつうの雲に つっこむと ぐっと おそくなる(得点0・失敗にはしない)=雲のかべの すきまを ねらう意味
+    if(combo>2&&combo%3===0){flash=Math.min(1,flash+0.35);floats.push({x:clamp(o.x+o.r+34,50,api.W-50),y:oy-20,txt:"x"+combo,life:1,vy:-1.1,col:combo>=9?"#ff3b3b":"#ffd23f",size:32});}
     if(combo>=6&&combo%3===0){ // climax: full-screen color wash + burst
       wash=1;api.shake(7);if(tk-lastHS>14){api.hitStop(3);lastHS=tk;}api.boom(1);api.tone(440+combo*18,0.18,"sawtooth",0.05);api.slide(300,1200,0.05,0.22,"triangle");
       for(let k=rint(20,28);k>0;k--){const a=rnd(0,TAU),s=rnd(4,11);sparks.push({x:o.x,y:oy,vx:Math.cos(a)*s,vy:Math.sin(a)*s,r:rnd(2,5.5),life:1,decay:rnd(0.015,0.03),col:pick(BCOL)});}
@@ -194,14 +197,14 @@ function buildJet(api){
     // ② ラッキー色 命中: きらっと小さめの祝福(白飛びしないよう控えめ)。頭上に星のヒント。
     api.tone(1046,0.12,"triangle",0.1);api.tone(1568,0.14,"triangle",0.07);
     for(let k=0;k<3;k++)glints.push({x:x+rnd(-14,14),y:y-rnd(6,26),r:rnd(5,9),life:1,decay:rnd(0.025,0.04)});
-    floats.push({x,y:y-24,txt:"ラッキー",life:1,vy:-1,col:luckyColor,size:24});
+    if(!floats.some(f=>f.txt==="ラッキー"&&f.life>0.5))floats.push({x,y:y-54,txt:"ラッキー",life:1,vy:-1,col:luckyColor,size:24});
   }
   function perfectBonus(x,y){
     // ③ パーフェクト: かたまり全消しの祝福(減点なし・気づくと得する)
     count+=3;api.setScore(count);
     api.tone(1318,0.12,"triangle",0.1);api.tone(1976,0.14,"triangle",0.08);
     api.shake(6);flash=Math.min(1,flash+0.3);
-    floats.push({x:api.W/2,y:api.H*0.32,txt:"パーフェクト！＋3",life:1,vy:-0.8,col:"#7be08a",size:34});
+    pfQ.push({t:bannerT>0?30:0,txt:"パーフェクト！＋3"}); // ステージ帯(H*0.4)・ラッキー案内と重ならない低い位置に出す。帯の最中は少し待つ
     for(let k=rint(16,20);k>0;k--){const a=rnd(0,TAU),s=rnd(3,8);sparks.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,r:rnd(2,5),life:1,decay:rnd(0.015,0.03),col:pick(["#7be08a","#ffd23f","#4cc6e8"])});}
   }
   function secretMoon(){
@@ -227,7 +230,7 @@ function buildJet(api){
       // physics (gravity grows gently with altitude -> steering matters more up high)
       if(boost>0)boost=Math.max(0,boost-dt);
       const thr=thrusting||boost>0;
-      if(thr){vy+=(alt<GATES[0].alt?0.8:0.62)*dt;px+=(aimX-px)*0.12*dt;} // 【軸4改善】最初のゲートに届くまでだけ推進力を強め、序盤の到達を早める(上位ゾーンの難度はそのまま)
+      if(thr){vy+=(alt<GATES[0].alt?0.8:0.62)*dt;px+=(aimX-px)*0.08*dt;} // 【軸4改善】最初のゲートに届くまでだけ推進力を強め、序盤の到達を早める(上位ゾーンの難度はそのまま)
       const gNow=grav*(1+clamp(alt/52000,0,1)*0.65);   // 高空ほど重力を強めに(7〜8歳向け・操作は同じ)
       vy-=gNow*dt;vy=clamp(vy,-9,12);
       if(slow>0){slow-=dt;vy=Math.min(vy,SLOWV);}
@@ -239,6 +242,9 @@ function buildJet(api){
       if(flash>0)flash=Math.max(0,flash-0.06*dt);
       if(wash>0)wash=Math.max(0,wash-0.022*dt);
       ensure();
+      // こまった子の たすけ舟: しばらく何も つぶせていないとき、すぐ手の届く所に ふうせんを1こ出す(ゲームオーバーは無し・やさしい救済)
+      if(tk-lastPt>300){lastPt=tk-150;const rx2=clamp(px+(Math.random()<0.5?-1:1)*rnd(api.W*0.03,api.W*0.09),api.W*0.12,api.W*0.88);
+        obs.push({alt:alt+api.H*rnd(0.4,0.5),x:rx2,r:api.W*0.058,type:"balloon",color:pick(BCOL),dead:false});}
       // sky gradient shifts with altitude (day -> space)
       const hi=clamp(alt/8000,0,1);
       let imgBg=false;
@@ -332,7 +338,8 @@ function buildJet(api){
         if(o.vx){o.x+=o.vx*dt;if(o.x<api.W*0.08||o.x>api.W*0.92)o.vx*=-1;}
         if(o.hitCd>0)o.hitCd-=dt;   // ⑥ 大きな入道雲の連続ヒット防止(1回通り抜ける間に一気に壊れないように)
         const y=sy(o);
-        const chw=o.hw!=null?o.hw:o.r*0.72,chh=o.hh!=null?o.hh:o.r*0.72; // ⑦⑧ とり/ひこうせんは横長の矩形寄り判定
+        const hk=(o.type==="balloon"||o.type==="cloud")?0.6:0.72; // 風船・雲だけ少し せまく(ねらう意味)。指幅(約44px)より小さくならない範囲
+        const chw=o.hw!=null?o.hw:o.r*hk,chh=o.hh!=null?o.hh:o.r*hk; // ⑦⑧ とり/ひこうせんは横長の矩形寄り判定
         const rr=Math.max(o.r,o.hw||0,o.hh||0);
         if(!o.dead&&!(o.hitCd>0)&&Math.abs(o.x-px)<chw&&Math.abs(y-playerY)<chh)pierce(o);
         if(!o.dead&&y>-rr&&y<api.H+rr)drawOb(o,y);}
@@ -447,6 +454,8 @@ function buildJet(api){
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(luckyMsgT<0)luckyMsgT=0;}
       // stage clear banner + final celebration
       drawBanner(dt);
+      for(const pq of pfQ){if(bannerT>0&&pq.t<=0)pq.t=1;pq.t-=dt;if(pq.t<=0&&bannerT<=0){pq.done=true;floats.push({x:api.W/2,y:api.H*0.58,txt:pq.txt,life:1,vy:-0.8,col:"#7be08a",size:34});}}
+      pfQ=pfQ.filter(pq=>!pq.done);
       // ===== cute rounded HUD =====
       drawHUD();
     }
@@ -513,7 +522,7 @@ function buildJet(api){
       g.beginPath();g.arc(o.x-o.r*0.5,y,o.r*0.6,0,TAU);g.arc(o.x,y-o.r*0.3,o.r*0.7,0,TAU);g.arc(o.x+o.r*0.5,y,o.r*0.6,0,TAU);g.arc(o.x,y+o.r*0.25,o.r*0.6,0,TAU);g.fill();
       g.shadowBlur=0;
       // soft shaded underside
-      g.fillStyle="rgba(190,205,230,.4)";g.beginPath();g.arc(o.x,y+o.r*0.25,o.r*0.5,0,TAU);g.fill();
+      g.fillStyle="rgba(190,205,230,.25)";g.beginPath();g.ellipse(o.x,y+o.r*0.45,Math.max(0,o.r*0.85),Math.max(0,o.r*0.28),0,0,TAU);g.fill();
       g.restore();
     }else if(o.type==="bigcloud"){
       // ⑥ 大きな入道雲: 他の的よりずっと大きく、3回当てないと壊れない(大きさ・壊れ方の違い)
@@ -557,14 +566,14 @@ function buildJet(api){
       const flap=Math.sin(tk*0.25+(o.ph||0))*0.5+0.5,wspan=o.hw||o.r*1.5,bodyR=Math.max(0,o.r*0.35);
       g.save();g.translate(o.x,y);
       g.strokeStyle=o.color;g.lineWidth=Math.max(2,o.r*0.22);g.lineCap="round";g.lineJoin="round";
-      g.shadowColor=o.color;g.shadowBlur=8;
+      g.shadowColor="#ffffff";g.shadowBlur=10;
       const wy=-2-flap*6;
       g.beginPath();
       g.moveTo(-wspan,wy+8-flap*4);
       g.quadraticCurveTo(-wspan*0.5,wy-6,0,wy+2);
       g.quadraticCurveTo(wspan*0.5,wy-6,wspan,wy+8-flap*4);
-      g.stroke();g.shadowBlur=0;g.lineWidth=1;
-      g.fillStyle=o.color;g.beginPath();g.ellipse(0,4,bodyR*1.3,bodyR,0,0,TAU);g.fill();
+      g.stroke();g.lineWidth=1;
+      g.fillStyle=o.color;g.beginPath();g.ellipse(0,4,bodyR*1.3,bodyR,0,0,TAU);g.fill();g.shadowBlur=0;
       g.fillStyle="#ffb84d";g.beginPath();g.moveTo(bodyR*1.1,3);g.lineTo(bodyR*1.9,5);g.lineTo(bodyR*1.1,7);g.closePath();g.fill();
       g.restore();
     }else if(o.type==="blimp"){

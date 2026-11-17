@@ -29,15 +29,19 @@ function build_ashbomb(api){
   layout();
   function craterX(){return api.W/2;}
   function craterY(){return api.H*0.94;}
-  function spawn(){
+  function spawn(first){
     // ① 長く無反応なら同時に飛ぶ岩の上限も少し増やす(画面が寂しくならないように)
     const cap=fever>0?14:stage===1?(dryT>3?12:10):(dryT>3?10:8);   // 画面中が的だらけで連打でも当たる状況を減らす
     if(bombs.length>=cap)return;
     const cx=craterX(),cy=craterY();
     // launch from crater up into the air, arcs back down (gravity)
-    const peak=clamp(api.H*(0.18+rnd(0,0.16))-(stage*4),api.H*0.1,api.H*0.5);
-    const vy=-Math.sqrt(2*0.26*(cy-peak));   // velocity to reach peak height
-    const vx=rnd(-api.W*0.012,api.W*0.012);
+    // 開始直後と、無反応が4秒以上続いた時だけ「やさしい岩」(ほぼまっすぐ上がり、画面中ほどで止まる)を出す救済
+    const calm=first||dryT>4;
+    const peak=first?api.H*0.35:calm?api.H*rnd(0.3,0.42):clamp(api.H*(0.18+rnd(0,0.16))-(stage*4),api.H*0.1,api.H*0.5);
+    // ステージ3以降は「はやくなる！」の予告どおり、同じ高さまで上がって落ちるまでの時間を縮める(重力を岩ごとに強める)
+    const spd=stage>=3?1+Math.min(stage-2,4)*0.04:1,bg=0.26*spd*spd;
+    const vy=-Math.sqrt(2*bg*(cy-peak));   // velocity to reach peak height
+    const vx=calm?rnd(-api.W*0.004,api.W*0.004):rnd(-api.W*0.012,api.W*0.012);
     const big=stage>=2&&fever<=0&&Math.random()<0.28;  // tougher 2-tap molten boulder（少し多め）
     // ① 激レア にじいろばくだん: stage2以降 ごくまれ(約3%)。虹色に光り 撃つと大量得点+虹演出。
     const rainbow=!big&&stage>=2&&Math.random()<0.03;
@@ -50,7 +54,7 @@ function build_ashbomb(api){
     const shapeMul=shape==="ball"?0.75:shape==="pillar"?1.15:shape==="stack"?1.05:1;
     // 軸3(b): ステージ1だけ的をひとまわり大きくして最初の数秒を当てやすくする(stage2以降は元のRに戻り歯ごたえは変えない)
     const R1=stage===1?R*1.12:R;
-    bombs.push({x:cx+rnd(-R1,R1),y:cy,vx,vy,r:gold?R1*1.15:big?R1*1.3:rainbow?R1*1.2:R1*shapeMul,big,gold,rainbow,hp:big?2:1,
+    bombs.push({x:cx+rnd(-R1,R1),y:cy,vx:vx*spd,vy,gv:bg,r:gold?R1*1.15:big?R1*1.3:rainbow?R1*1.2:R1*shapeMul,big,gold,rainbow,hp:big?2:1,
       rot:rnd(0,TAU),vr:rnd(-0.12,0.12),spin:rnd(0,TAU),baseCol,shape,
       col:gold?"#ffd23f":rainbow?"#ff5b5b":baseCol,trail:0,dead:false,landed:false});
     api.slide(160,420,0.18,0.16,"sawtooth");
@@ -63,6 +67,7 @@ function build_ashbomb(api){
           len:rnd(8,18),life:1,decay:rnd(0.02,0.04),col:pick(RAINBOW)});}}
   }
   spawnT=20;
+  spawn(true);   // 開始直後から岩を2つ(1つ目は中央寄りの低め)にして最初の得点を早める
   function blast(b,px,py){
     dryT=0;   // ① 得点したので無反応タイマーをリセット
     const high=clamp((groundY-b.y)/groundY,0,1);          // 0 ground .. 1 top
@@ -125,7 +130,6 @@ function build_ashbomb(api){
       [0,4,7,12].forEach((semi,i)=>setTimeout(()=>api.tone(880*Math.pow(2,semi/12),0.16,"triangle",0.12),i*70));
       rings.push({x:px,y:py,r:b.r*0.3,vr:b.r*0.9,life:1,decay:0.04,col:"#ffd23f"});
       rings.push({x:px,y:py,r:b.r*0.1,vr:b.r*0.6,life:1,decay:0.035,col:pick(RAINBOW)});
-      floats.push({x:px,y:py-b.r*1.4,txt:"ゴールド！ +"+gain,life:1,vy:-1,col:"#ffd23f",size:32});
     }
     // ① にじいろ撃破: 虹の輪が5色ぶわっと + ファンファーレ + 大量得点(激レアの爽快ごほうび)
     if(b.rainbow){
@@ -137,13 +141,11 @@ function build_ashbomb(api){
       for(let i=0;i<24;i++){const a=rnd(0,TAU),s=rnd(3,10);
         sparks.push({x:px,y:py,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,len:rnd(10,22),
           life:1,decay:rnd(0.02,0.04),col:RAINBOW[i%RAINBOW.length]});}
-      floats.push({x:px,y:py-b.r*1.5,txt:"にじいろ！ +"+gain,life:1,vy:-1,col:"#ff7bd0",size:34});
     }
     // ② ラッキー色命中: 小さめの祝福(白飛びしないよう控えめ)+頭上に星のキラッ
     if(isLucky){
       if(!luckySeen){luckyMsgT=1.6;luckySeen=true;}
       api.tone(1046,0.14,"triangle",0.11);api.tone(1568,0.16,"triangle",0.08);
-      floats.push({x:px,y:py-b.r*1.3,txt:"ラッキー！",life:1,vy:-1,col:luckyColor,size:26});
       for(let i=0;i<7;i++){const a=rnd(-Math.PI,0),s=rnd(2,6);
         sparks.push({x:px,y:py-b.r*0.5,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1.5,len:rnd(6,12),
           life:1,decay:rnd(0.03,0.05),col:luckyColor});}
@@ -157,10 +159,13 @@ function build_ashbomb(api){
       r:rnd(b.r*0.4,b.r*0.8),vr:rnd(0.5,1.2),vy:rnd(-0.6,-1.4),
       life:1,decay:rnd(0.01,0.018)});
     // height bonus float
-    if(tier>=2)floats.push({x:px,y:py-b.r,txt:tier>=3?"たかい！ x"+gain:"+"+gain,
-      life:1,vy:-1.1,col:tier>=3?"#ff3b3b":"#ffd23f",size:tier>=3?34:26});
-    if(combo>1&&combo%5===0)floats.push({x:api.W/2,y:api.H*0.22,txt:"コンボ x"+combo,
-      life:1,vy:-0.6,col:"#ffe14a",size:30});
+    // 文字は下から積み上げ式(同じ瞬間に出る文字どうしが重ならないよう size+8 px ずつ離す)。順番: たかい→ラッキー→ゴールド→にじいろ
+    let fy=py-b.r*1.0;
+    const addF=(txt,col,size)=>{floats.push({x:px,y:fy,txt,life:1,vy:-1,col,size});fy-=size+8;};
+    if(tier>=2)addF(tier>=3?"たかい！ x"+gain:"+"+gain,tier>=3?"#ff3b3b":"#ffd23f",tier>=3?34:26);
+    if(isLucky)addF("ラッキー！",luckyColor,26);
+    if(b.gold)addF("ゴールド！ +"+gain,"#ffd23f",32);
+    if(b.rainbow)addF("にじいろ！ +"+gain,"#ff7bd0",34);
     checkStage();
   }
   function landMiss(b){
@@ -219,12 +224,12 @@ function build_ashbomb(api){
       // 軸3(b)対策: 無反応0秒目から緩やかに当たり判定を広げる(1秒待たずに効き始め、firstScoreSecの遅いテールを縮める)。
       // すぐ当たっている試行はdryTが小さいままなのでassistもほぼ0→scorePerTap(軸3a)は悪化しない。
       // ステージ1は広いまま(firstScoreSecを支える)。ステージ2以降は判定と救済の上限を絞って「狙う」手応えを出す
-      const assist=stage===1?clamp(dryT*0.12,0,0.55):clamp(dryT*0.2,0,0.55);   // 2以降は普段の判定は狭く、無反応が続くと素早く広がる
+      const assist=stage===1?clamp(dryT*0.2,0,0.7):clamp(dryT*0.25,0,0.7);   // 2以降は普段の判定は狭く、無反応が続くと素早く広がる
       const hitBase=stage===1?1.45:1.2;
       for(let i=bombs.length-1;i>=0;i--){const b=bombs[i];
         if(b.dead)continue;
         if(Math.hypot(px-b.x,py-b.y)<b.r*(hitBase+assist)){
-          if(b.big&&b.hp>1){
+          if(b.big&&b.hp>1&&dryT<=4){   // 無反応が4秒以上続いたら、でっかい岩も1回で割れる(得点が取れない時間を縮める救済)
             b.hp--;b.col="#ff8a3a";flash=Math.min(1,flash+0.18);
             api.noise(0.08,0.16,1800,"highpass",0.9);api.tone(300,0.08,"square",0.12);
             api.shake(4);
@@ -262,7 +267,7 @@ function build_ashbomb(api){
       if(fever>0){fever-=0.016*dt;
         if(fever<=0){fever=0;
           api.tone(523,0.2,"triangle",0.12);api.tone(392,0.28,"triangle",0.1);
-          floats.push({x:api.W/2,y:api.H*0.3,txt:"ふんか おわり！",life:1,vy:-0.5,col:"#fff",size:26});}}
+          floats.push({x:api.W/2,y:api.H*0.33,txt:"ふんか おわり！",life:1,vy:-0.5,col:"#ffe14a",size:30});}}
       // ---- background: volcanic dusk sky ----
       // 画像背景があればそれを使い、絵と喧嘩する平坦な手描き(空グラデ・太陽・遠景の山・山体)はスキップ
       const imgBg=api.drawCover("bg.jpg");
@@ -358,14 +363,14 @@ function build_ashbomb(api){
         // ① 出現間隔を少し縮め、さらに無反応が続くほど早く追加する(軸1・軸3の待たされ対策)
         const baseSpawn=clamp(42-(stage-1)*4,20,42);
         // 軸1/軸3(b): 開始直後(dryT=0)から前倒しで効かせ、2本目以降の岩を早く出して最初の成功を早める
-        const dryBoost=clamp(dryT*28,0,40);
+        const dryBoost=clamp(dryT*30,0,42);
         // 軸3(b): ゲーム開始直後(tsec<2)だけ2本目の岩をすぐ足し、画面に岩が2つ以上ある時間を増やす
         // (ランダムタップでも早く当たりやすくして firstScoreSec の遅いテールを縮める。開始直後限定なので歯ごたえは変えない)
-        spawnT=fever>0?rint(10,16):(tsec<2?24:Math.max(16,baseSpawn-dryBoost));}}
+        spawnT=fever>0?rint(10,16):(tsec<3?16:Math.max(16,baseSpawn-dryBoost));}}
       // ---- update + draw bombs ----
       for(const b of bombs){
         if(b.dead)continue;
-        b.vy+=0.26*dt;b.x+=b.vx*dt;b.y+=b.vy*dt;b.spin+=b.vr*dt;b.trail+=dt;
+        b.vy+=b.gv*dt;b.x+=b.vx*dt;b.y+=b.vy*dt;b.spin+=b.vr*dt;b.trail+=dt;
         if(b.y>=groundY&&b.vy>0){landMiss(b);continue;}
         // fire trail behind the rising/falling rock
         if(b.trail>1.5){b.trail=0;

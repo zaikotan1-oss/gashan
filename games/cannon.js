@@ -103,7 +103,7 @@ function buildCannon(api){
     // ① にじいろブロック撃破: 虹色にはじけて大盤振る舞い(白飛び防止に flashWash は上限つき)
     rbMsgT=1.3;count+=8;api.setScore(count);
     for(let k=0;k<RCOLS.length;k++)burst(x,y,RCOLS[k],7,9);
-    floats.push({x:x,y:y-10,txt:"にじいろ！",col:"#ff5fae",life:1.2,vy:-0.7,size:40});
+    // (「にじいろ！」のfloatは中央バナー「にじいろブロック！」と二重になるので出さない)
     api.boom(0.55);api.shake(12);
     api.tone(880,0.12,"triangle",0.1);api.tone(1320,0.14,"triangle",0.09);api.tone(1760,0.16,"triangle",0.07);
     if(hsCool<=0){api.hitStop(4);hsCool=32;}
@@ -139,7 +139,7 @@ function buildCannon(api){
     // ⑦ やぐら(2倍サイズ)崩壊: 普段より大きいburst/shakeで「大きい物が倒れた」手応えを別枠で出す
     if(b.kind==="yagura"){
       count+=6;api.setScore(count);
-      floats.push({x:b.x+b.w/2,y:b.y-S*0.8,txt:"どしーん！",col:"#ffb36a",life:1.2,vy:-0.7,size:32});
+      floats.push({x:b.x+b.w/2,y:b.y-S*0.8,txt:"どしーん！",col:"#fff3b0",life:1.2,vy:-0.7,size:32});
       burst(b.x+b.w/2,b.y+b.h/2,"#c98b52",26,11);burst(b.x+b.w/2,b.y+b.h/2,"#8a5a34",18,9);
       api.boom(0.6);api.shake(12);
       api.tone(140,0.18,"square",0.12);api.slide(220,80,0.22,0.12,"sine");
@@ -147,7 +147,7 @@ function buildCannon(api){
     // KING block down: big bonus burst + "どっかんクリア！" + crown souvenir
     if(b.kind==="king"){
       count+=10;api.setScore(count);
-      floats.push({x:b.x+b.w/2,y:Math.max(b.y-S*1.4,200),txt:"どっかんクリア！",col:"#ffe14a",life:1.2,vy:-0.7,size:34});
+      floats.push({x:b.x+b.w/2,y:Math.max(api.H*0.36,250),txt:"どっかんクリア！",col:"#ffe14a",life:1.2,vy:-0.7,size:34});
       burst(b.x+b.w/2,b.y+b.h/2,"#fff3b0",24,9);burst(b.x+b.w/2,b.y+b.h/2,"#ffd23f",18,8);
       api.boom(0.55);api.shake(9);api.tone(880,0.16,"square",0.12);api.slide(660,1320,0.2,0.1,"sine");
       crowns.push({x:b.x+b.w/2,y:b.y,vy:-2.4,vx:rnd(-1,1),rot:0,vr:rnd(-0.1,0.1),life:1});
@@ -193,11 +193,20 @@ function buildCannon(api){
     const R=S*(0.44+0.31*pow+0.85*(shotPower||0)); // 第6R: 溜めた一撃ほど横にも広く崩れる(0.5→0.85)
     api.shake(3+4*pow);api.noise(0.1,0.25,320,"lowpass");
     for(let i=0;i<8;i++)dust.push({x:x+rnd(-R*0.6,R*0.6),y:groundY-rnd(0,6),r:rnd(5,11),vr:rnd(0.7,1.4),life:1,decay:0.05});
+    // ③ 第7ラウンド: 雑な弾(shotPower<0.2)は着地点にいちばん近い2個だけ倒す。ちょん押し連打で
+    //  毎回1本分(4〜8個)が得点になっていた「何も狙わなくても勝てる」状態をやめ、狙って溜めた弾(>=0.2)は
+    //  今まで通り全段が崩れる。無反応が伸びる分は frame 内の救済(360フレーム)で ぐらぐら〜 と補う。
+    const sp0=shotPower||0;let cap=sp0<0.3?2:sp0<0.65?4:99;
+    const cand=[];
     for(const b of blocks){
       if(b.loose)continue;
       const cx=b.x+b.w/2,d=Math.abs(cx-x);
-      // ③ 第6ラウンドで「雑な着地は下の段だけ」を試したが、上の段が宙に残って無反応が26秒に伸びたため戻した(縦は全段のまま)。
-      if(d<R)loosen(b,cx>x?1:-1,-0.5,clamp(8*(1-d/R)+3,3,10));
+      if(d<R)cand.push({b:b,cx:cx,d:d});
+    }
+    cand.sort((p,q)=>(p.d-q.d)||(p.b.y-q.b.y));
+    for(const c of cand){
+      if(cap<=0)break;
+      loosen(c.b,c.cx>x?1:-1,-0.5,clamp(8*(1-c.d/R)+3,3,10));cap--;
     }
   }
   const COOL_WEAK=100,COOL_STRONG=14; // 約1.7秒(雑なタップ)〜0.23秒(しっかり溜めた弾)
@@ -472,10 +481,10 @@ function buildCannon(api){
           calmT=0;
         }
       }else calmT=0;
-      // ③ 救済(第6ラウンド): ちょん押しの連打が増えても、9秒なにも倒れなければ手前の3こが ぐらぐら〜 と自分で倒れる
+      // ③ 救済(第6ラウンド): ちょん押しの連打が増えても、6秒なにも倒れなければ手前の3こが ぐらぐら〜 と自分で倒れる
       //  (奥の列に届かず固まるのを防ぐ。力は弱いので連鎖はしない)
       if(count!==lastCnt){lastCnt=count;idleT=0;}else idleT+=dt;
-      if(idleT>=540&&standing>3&&!rebuilding){
+      if(idleT>=360&&standing>3&&!rebuilding){
         const front=standArr.slice().sort((a,b)=>(a.x-b.x)||(b.y-a.y)).slice(0,3);
         floats.push({x:front[0].x+front[0].w/2,y:front[0].y-S*0.8,txt:"ぐらぐら〜！",col:"#fff",life:1,vy:-0.7,size:24});
         for(const b of front)loosen(b,rnd(-0.3,1),-0.6,rnd(5,8));
@@ -490,6 +499,9 @@ function buildCannon(api){
         // star rating by shots used (fewer = better)
         const stars=shotsThisCastle<=2?3:shotsThisCastle<=4?2:1;
         const perfect=shotsThisCastle<=2;
+        // 城クリアの瞬間は、残っている float/バナーを畳んで「ぜんかい！」と重ならないようにする
+        for(const f of floats)f.life=Math.min(f.life,0.25);
+        rbMsgT=Math.min(rbMsgT,0.3);luckyMsgT=0;
         floats.push({x:api.W*0.6,y:api.H*0.32,txt:"ぜんかい！",col:"#ffd23f",life:1.1,vy:-0.6,size:46});
         starRating=stars;starTimer=1.3;   // canvas手描きの星でレーティング表示
         burst(api.W*0.6,api.H*0.4,"#fff3b0",26,9);burst(api.W*0.6,api.H*0.4,"#ff9bd2",20,8);

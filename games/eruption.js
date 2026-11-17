@@ -10,7 +10,7 @@ function build_eruption(api){
   // ⑤ タイミングボーナス: 空てきが中央付近に集まった瞬間に「いまだ!」を出し、そのタイミングでタップすると加点(失敗しても無罰)
   let bonusReadyT=0,bonusHintCd=6;
   // stage progression: clear a quota of targets per stage, then "ステージ クリア!"; endless harder loop
-  let stage=1,stageKill=0,stageGoal=14,clearT=0,clearStage=0,endingT=0,megaT=0;
+  let stage=1,stageKill=0,stageGoal=12,clearT=0,clearStage=0,endingT=0,megaT=0;
   const STAGES=5;
   const TC=["#ff5b2e","#ffb73f","#ff3b6b","#ffd23f","#ff7a2e","#ff4d4d"];
   // per-stage sky palette so each stage looks different (dusk -> deep night -> dawn)
@@ -22,7 +22,7 @@ function build_eruption(api){
     {top:"#401040",mid:"#8a2a3a",low:"#d2602a",glow:"#ffd23f"}
   ];
   function curBg(){return STAGE_BG[(stage-1)%STAGE_BG.length];}
-  function stageGoalFor(s){return 14+(s-1)*5;}   // 14,19,24,29,34（連打でステージ1が10秒で終わらないよう12〜15秒に）
+  function stageGoalFor(s){return 12+(s-1)*4;}   // 12,16,20,24,28（的の出現を間引いた分、ステージが進むテンポを保つ。90秒で新しい的が2〜3回は出る）
   // 火口の位置: 画像火山はコーンが高いので火口も上へ(岩・火の粉の出どころを揃える)
   function craterY(){return volImg?groundY-volR*1.15:volY-volR*0.7;}
   // stage unlocks: each new stage introduces a brand-new sky target ("next is what?" hook)
@@ -65,7 +65,7 @@ function build_eruption(api){
 
   // spawn a flying rock from the volcano mouth
   // aimX: タップx座標(火山との左右位置)。あれば飛ぶ向きをそちらへ寄せる(狙う操作)。無ければ従来の広い乱数(megaEruptのご褒美演出用)
-  function spawnRock(power,aimX){
+  function spawnRock(power,aimX,aimK){
     const big=power>0.7;
     // 軸3 指摘1(狙いバイアスを±0.2→±0.35〜0.4に広げる)は実測の結果 見送り。
     // N=20実測: ±0.38まで広げるとタップ計測のmissRateはむしろ下がり(28%→26%=当たりやすくなる)、
@@ -74,7 +74,7 @@ function build_eruption(api){
     // 横に伸びて的の先まで飛び越えやすくなり、狙いの効果より「素通り/的中の両方が増減する」ノイズが勝った。
     // 代わりに buildBuildings/hitBuilding 側の「ステージ2以降だけ遠ざけて狭める」方式で歯ごたえを作る。
     const ang=(aimX==null)?(-TAU/4+rnd(-0.55,0.55))
-      :(-TAU/4+clamp((aimX-volX)/(api.W*0.5),-0.2,0.2)+rnd(-0.06,0.06));
+      :(-TAU/4+clamp((aimX-volX)/(api.W*0.5),-0.2,0.2)*(aimK||1)+rnd(-0.06,0.06));   // ゆっくり狙って押した時(aimK=1.6)だけ向きを強める。連打は従来の浅い角度
     const spd=rnd(9,15)*(0.7+power*0.9);
     rocks.push({x:volX+rnd(-volR*0.25,volR*0.25),y:craterY(),
       vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,
@@ -83,7 +83,7 @@ function build_eruption(api){
   }
   // floating sky targets (clouds/balloons/buildings to smash)
   function spawnSky(){
-    if(sky.length>=7+stage)return;   // 7〜8歳向け: 空の的を1つ多く
+    if(sky.length>=5+stage)return;   // 7〜8歳向け: 空の的を1つ多く
     const types=["balloon","cloud","ufo"];
     if(stage>=2)types.push("blimp");
     if(stage>=3)types.push("star");
@@ -99,7 +99,7 @@ function build_eruption(api){
     const gold=!rainbow&&Math.random()<0.08;
     const fromLeft=Math.random()<0.5;
     const y=rnd(api.H*0.14,groundY*0.55);
-    const r=rainbow?rnd(24,32):type==="blimp"?rnd(30,44):type==="dragon"?rnd(24,32):rnd(20,32);
+    const r=rainbow?rnd(24,32):type==="blimp"?rnd(30,44):type==="dragon"?rnd(24,32):type==="cloud"?rnd(26,38):type==="balloon"?rnd(18,26):type==="ufo"?rnd(22,30):rnd(20,32);
     let sp=rnd(0.6,1.5)*(1+(stage-1)*0.15);   // 7〜8歳向け: 少し速く
     if(rainbow)sp*=1.05; else if(type==="star")sp*=1.5; else if(type==="rocket")sp*=2.1; else if(type==="dragon")sp*=0.7;
     const hp=rainbow?1:type==="blimp"?2:type==="dragon"?4:1; // にじいろは一撃で パッと ごほうび / ドラゴンは4発
@@ -128,7 +128,7 @@ function build_eruption(api){
     // 軸3 指摘3: ステージ1だけは低学年がすぐ当てられる近さを残し(軸1のfirstScoreSecを守る)、
     // ステージ2以降は火山まわりの空き半径を1.4→1.9に広げてビルを遠ざけ、狙いのない連打では届きにくくする。
     // (2.0以上はスマホ縦幅375〜480px相当でビルが0棟になり軸7が崩れるため1.9止まり)
-    const hard=stage>=2, kc=hard?1.9:1.4;
+    const hard=stage>=2, kc=hard?1.9:1.2;
     for(let i=0;i<n;i++){
       const bx=api.W*((i+0.5)/n);
       if(Math.abs(bx-volX)<volR*kc)continue; // keep clear of volcano
@@ -307,9 +307,10 @@ function build_eruption(api){
   // big eruption: many rocks at once
   // aimX: タップx(火山との左右位置)。狙った側へ岩が飛ぶ(軸3: 連打一辺倒からの脱却)
   function erupt(power,aimX,rapid){
+    const aimK=rapid?1:1.6;
     fume=1;shakeMouth=1;
-    const n=rapid?2:Math.round(3+power*10);   // 連打(rapid)は2個だけ
-    for(let i=0;i<n;i++)spawnRock(power,aimX);
+    const n=rapid?1:Math.round(3+power*10);   // 連打(rapid)は1個だけ(狙ってゆっくり押すと3〜12個)
+    for(let i=0;i<n;i++)spawnRock(power,aimX,aimK);
     api.slide(160,40,0.4+0.3*power,0.5,"sine");
     api.noise(0.4+0.4*power,0.35,500,"lowpass",0.7);
     api.boom(0.4+0.3*power);api.shake(8+power*14);
@@ -331,6 +332,7 @@ function build_eruption(api){
       vr:rnd(1,2.4),vy:-rnd(1.4,3),life:1,decay:0.008});
   }
 
+  const RAPID_CHARGE=0.07;
   let spawnSkyT=40,tapPulse=0,lastTapT=-9;
   return{
     resize:layout,
@@ -341,15 +343,15 @@ function build_eruption(api){
       if(armed){ megaErupt(); return; }
       // ⑤ タイミングボーナス: 「いまだ!」の直後のタップは追加ボーナス(失敗しても現状通り無罰)
       if(bonusReadyT>0){
-        bonusReadyT=0;count+=2;api.setScore(count);
+        bonusReadyT=0;count+=3;api.setScore(count);
         api.tone(1046,0.12,"triangle",0.12);api.tone(1568,0.12,"triangle",0.09);
-        floats.push({x:clamp(x,70,api.W-70),y:clamp(y,60,api.H*0.5)-30,txt:"ナイス！ +2",life:1,vy:-0.8,col:"#7be0ff",size:24});
+        floats.push({x:clamp(x,70,api.W-70),y:clamp(y,60,api.H*0.5)-30,txt:"ナイス！ +3",life:1,vy:-0.8,col:"#7be0ff",size:24});
       }
       // each tap charges the volcano and triggers a small eruption
-      charge=clamp(charge+0.16,0,1);
+      // 連打ペナルティ: 前のタップから0.7秒未満の連打は岩1個＋チャージもゆっくり(ゆっくり狙って押す子と1回目のタップは今まで通り)
+      const rapid=count>0&&(tsec-lastTapT)<0.7;lastTapT=tsec;   // 最初の得点が入るまでは必ず全力(最初の成功を守る)
+      charge=clamp(charge+(rapid?RAPID_CHARGE:0.16),0,1);
       const pwr=0.25+charge*0.6;
-      // 連打ペナルティ: 前のタップから0.4秒未満の連打は岩を半分に(ゆっくり狙って押す子と1回目のタップは今まで通り)
-      const rapid=count>0&&(tsec-lastTapT)<0.4;lastTapT=tsec;   // 最初の得点が入るまでは必ず全力(最初の成功を守る)
       erupt(rapid?0.1:pwr,x,rapid);   // 軸3: タップx(火山との左右位置)に岩の飛ぶ向きを寄せる → 狙う操作が生まれる
       if(charge>=1){ armed=true; }
       // ④ ひみつ: お月さまタップ = ふんかはそのまま + ウインクして きんの こな(減点なしのごほうび)
@@ -454,7 +456,7 @@ function build_eruption(api){
       debris=debris.filter(b=>!b._dead);
 
       // sky targets
-      if(!paused){spawnSkyT-=dt;if(spawnSkyT<=0){spawnSky();spawnSkyT=clamp(74-(stage-1)*7,40,74);}}   // 7〜8歳向け: 少し速く出る
+      if(!paused){spawnSkyT-=dt;if(spawnSkyT<=0){spawnSky();spawnSkyT=clamp(112-(stage-1)*9,60,112);}}   // 7〜8歳向け: 少し速く出る
       for(const s of sky){
         if(s.hit>0)s.hit=Math.max(0,s.hit-0.08*dt);
         if(!paused){
@@ -474,9 +476,10 @@ function build_eruption(api){
       if(!paused&&bonusReadyT<=0&&bonusHintCd<=0){
         const near=sky.filter(s=>!s.rainbow&&Math.abs(s.x-volX)<api.W*0.26);
         if(near.length>=1){
-          bonusReadyT=0.9;bonusHintCd=rnd(6,10);
+          bonusReadyT=1.2;bonusHintCd=rnd(6,10);
           const hx=near.reduce((a,s2)=>a+s2.x,0)/near.length;
-          floats.push({x:clamp(hx,70,api.W-70),y:api.H*0.3,txt:"いまだ！",life:0.9,vy:-0.4,col:"#7be0ff",size:22});
+          const hy=near.reduce((a,s2)=>a+s2.y,0)/near.length;   // 的の真上に出して「ここを狙う」と伝える
+          floats.push({x:clamp(hx,70,api.W-70),y:clamp(hy-45,api.H*0.1,api.H*0.5),txt:"いまだ！",life:1.2,vy:-0.3,col:"#7be0ff",size:26});
           api.tone(988,0.08,"triangle",0.08);
         }
       }
@@ -495,7 +498,7 @@ function build_eruption(api){
       // ---- flying rocks: check collisions with sky + buildings ----
       for(const r of rocks){
         r.vy+=0.32*dt;r.x+=r.vx*dt;r.y+=r.vy*dt;r.rot+=r.vr*dt;
-        if(r.hot>0)r.hot=Math.max(0,r.hot-0.01*dt);
+        if(r.hot>0)r.hot=Math.max(0,r.hot-0.02*dt);
         // hit sky targets
         for(const s of sky){
           if(s._dead)continue;
@@ -605,8 +608,8 @@ function build_eruption(api){
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
         g.save();g.translate(api.W/2,api.H*0.28);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
-        const t2="きょうのラッキー色は "+(COLNAME[luckyColor]||"")+"！";
-        g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText(t2,0,0);
+        const t2="きょうのラッキーいろは "+(COLNAME[luckyColor]||"")+"！";
+        g.lineWidth=7;g.lineJoin="round";g.strokeStyle="rgba(20,8,6,.85)";g.strokeText(t2,0,0);
         g.fillStyle=luckyColor;g.fillText(t2,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(luckyMsgT<0)luckyMsgT=0;}
 

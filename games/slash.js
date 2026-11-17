@@ -8,7 +8,7 @@ function buildSlash(api){
   let lastNow=0;   // 直近フレームの now(ms)。にじいろフルーツ画像の色巡回に使う
   const RB_COLS=["#ff5aa0","#ff9d2e","#ffe14d","#7dff9a","#5ad6ff","#c07dff"];   // にじいろフルーツ画像の着色巡回(return後に置くとTDZになるので先頭で宣言)
   // stage/progression + fever + lives + boss
-  let stage,stageCut,stageQuota,banner,fever,feverT,lives,hurtT,boss,winT,confetti;
+  let hintDone,stage,stageCut,stageQuota,banner,fever,feverT,lives,hurtT,boss,winT,confetti;
   // 軸1(さわって分かるか)向け: 開始直後のステージバナー中にスポーンが完全停止しないよう、最初の1体だけは例外で出す為のフラグ
   let openedOnce;
   // ---- 隠し発見レイヤー(クレーン/ハンマー/トラックと同じ思想) ----
@@ -47,13 +47,13 @@ function buildSlash(api){
     vx:rnd(-0.18,0.18),vy:-rnd(0.18,0.5),r:rnd(0.8,2.6),ph:rnd(0,TAU),sp:rnd(0.8,2.2),
     hue:pick([[150,210,255],[180,160,255],[255,210,150],[170,255,220]])};}
   function reset(){objs=[];halves=[];shards=[];trail=[];juice=[];floats=[];sparks=[];flashes=[];wisps=[];twinkles=[];spawnT=0;count=0;combo=0;comboT=0;slow=0;down=false;elapsed=0;flashT=0;charge=0;auraPh=0;bgPh=0;
-    stage=0;stageCut=0;stageQuota=STAGES[0].need;banner=null;fever=0;feverT=0;lives=3;hurtT=0;boss=null;winT=0;confetti=[];
+    hintDone=false;stage=0;stageCut=0;stageQuota=STAGES[0].need;banner=null;fever=0;feverT=0;lives=3;hurtT=0;boss=null;winT=0;confetti=[];
     luckyColor=pick(FRUIT_COLS)[0];luckyName=LUCKY_NAMES[luckyColor]||"";luckySeen=false;luckyMsgT=0;rbMsgT=0;
     stageClean=true;perfectT=0;rbTele=null;shootStar=null;shootT=rnd(4,9);openedOnce=false;layout();
     // 軸3(歯ごたえ)向け: バナーの滞在(hold)を1.4→1.0に短縮し、開始直後の無スポーン区間を縮める
     spawnBanner("ステージ1 "+STAGES[0].name,1.0);}
   function curStage(){return STAGES[Math.min(stage,STAGES.length-1)];}
-  function spawnBanner(txt,hold,big){banner={txt,life:1,hold:hold||1.2,t:0,big:!!big,scl:0};}
+  function spawnBanner(txt,hold,big){luckyMsgT=0;rbMsgT=Math.min(rbMsgT,0.3);perfectT=Math.min(perfectT,0.3);banner={txt,life:1,hold:hold||1.2,t:0,big:!!big,scl:0};}
   // advance to next stage with a short celebration; loops on final
   function nextStage(){
     // ③ パーフェクト: この面をバレル(あぶない樽)被弾なしでクリアしたら +5 & 中央下に祝福
@@ -133,7 +133,7 @@ function buildSlash(api){
   // 7. だんご(dango): 積み重なった3つの丸が串に刺さった的。1つの当たり判定だが斬ると3つの丸へバラける(halvesの真っ二つとは違う崩れ方)
   function pushDango(x){
     const cols=[pick(DANGO_COLS),pick(DANGO_COLS),pick(DANGO_COLS)].map(c=>c[0]);
-    const r=randR(rnd(0.75,1.05));
+    const r=randR(rnd(0.9,1.15));
     const vy=-Math.sqrt(2*grav*(api.H*rnd(0.5,0.75)));
     objs.push({x,y:api.H+r,vx:rnd(-1.6,1.6)+(api.W/2-x)*0.004,vy,r,
       t:"dango",skin:cols[0],flesh:cols[1],dcols:cols,rot:rnd(0,TAU),vr:rnd(-0.1,0.1)});
@@ -199,6 +199,7 @@ function buildSlash(api){
     if(o.big)gain+=6;                                    // 4. 序盤の巨大フルーツボーナス
     if(isGem)gain+=4;                                    // 軸3: 小さい的ほど得点効率を上げる
     count+=gain;api.setScore(count);
+    if(count>=8)hintDone=true;   // 軸6: 説明の帯は最初の8点まで(以後は下ふちから出る的を隠さない)
     stageCut++;
     // build the fever gauge with each cut (faster on big combos)
     feverGain(0.05+combo*0.006);
@@ -259,7 +260,7 @@ function buildSlash(api){
         sparks.push({x:o.x,y:o.y-o.r*0.5,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1,life:1,decay:rnd(0.03,0.05),len:rnd(6,12),col:luckyColor});}
       floats.push({x:o.x,y:o.y-40,txt:"ラッキー！",life:1,vy:-1.1,col:luckyColor,size:30,scl:0});
       // 軸6(見やすさ)向け: にじいろメッセージ(rbMsgT)表示中は同時発火させず、1テンポ遅らせて文字の重なりを防ぐ
-      if(!luckySeen&&rbMsgT<=0&&banner==null&&stageCut<stageQuota){luckyMsgT=1.9;luckySeen=true;}
+      if(!luckySeen&&rbMsgT<=0&&banner==null&&stageQuota-stageCut>3&&feverT<=0&&fever<0.8){luckyMsgT=1.9;luckySeen=true;}
     }
     // 3. 安全な樽 命中: 木の香りのする低めの心地よい音＋緑のごほうび表示(危険な樽との違いを音でも明示)
     if(isSafeBarrel){
@@ -305,7 +306,7 @@ function buildSlash(api){
     for(let i=0;i<3;i++){
       const a=ang+Math.PI/2*offs[i]*0.6+rnd(-0.35,0.35),s=rnd(2,4.2);
       halves.push({x:o.x,y:o.y+offs[i]*o.r*0.7,vx:o.vx*0.4+Math.cos(a)*s,vy:o.vy*0.4+Math.sin(a)*s-1.4,
-        r:o.r*0.62,skin:cols[i],flesh:tint(cols[i],0.3),t:"dango",cut:0,side:1,rot:rnd(0,TAU),vr:rnd(-0.2,0.2),
+        r:o.r*0.7,skin:cols[i],flesh:tint(cols[i],0.3),t:"dango",cut:0,side:1,rot:rnd(0,TAU),vr:rnd(-0.2,0.2),
         life:1,sx:1,sy:1,full:true});
     }
   }
@@ -393,7 +394,7 @@ function buildSlash(api){
     const sx=shootStar.x,sy=shootStar.y;shootStar.hit=true;shootStar=null;
     count+=3;api.setScore(count);
     api.tone(1318,0.1,"triangle",0.09);api.tone(1976,0.12,"triangle",0.07);
-    floats.push({x:sx,y:sy-20,txt:"ながれ星！",life:1,vy:-1.1,col:"#fff2a0",size:30,scl:0});
+    floats.push({x:sx,y:sy-20,txt:"ながれぼし！",life:1,vy:-1.1,col:"#fff2a0",size:30,scl:0});
     for(let k=10;k>0;k--){const a=rnd(0,TAU),s=rnd(2,6);
       sparks.push({x:sx,y:sy,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,decay:rnd(0.03,0.05),len:rnd(6,12),col:"#fff2a0"});}
     for(let k=6;k>0;k--)twinkles.push({x:sx+rnd(-14,14),y:sy+rnd(-10,10),r:clamp(api.W*0.03,10,16),life:1,col:"#fff2a0"});
@@ -628,7 +629,7 @@ function buildSlash(api){
         g.save();g.translate(fl.x,fl.y);g.scale(0.6+pop*0.5,0.6+pop*0.5);g.globalAlpha=a;
         g.font="800 "+fl.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.shadowColor=fl.col;g.shadowBlur=18;
-        g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText(fl.txt,0,0);
+        g.lineWidth=8;g.lineJoin="round";g.strokeStyle="rgba(0,0,0,.75)";g.strokeText(fl.txt,0,0);
         g.fillStyle=fl.col;g.fillText(fl.txt,0,0);g.shadowBlur=0;g.restore();}
       g.globalAlpha=1;g.textAlign="left";floats=floats.filter(f=>f.life>0);
       // brief whole-screen flash on a cut
@@ -682,7 +683,7 @@ function buildSlash(api){
         if(banner.t>banner.hold)banner.life-=0.04*dt;
         if(banner.life<=0)banner=null;else drawBanner(banner,now);}
       // hint: cute rounded glowing panel with a tiny ninja-blade mascot (hide during banners/boss)
-      if(banner==null&&!boss&&winT<=0)drawHint(now);
+      if(!hintDone&&banner==null&&!boss&&winT<=0)drawHint(now);
       if(winT>0)winT-=dt/60;
     }
   };
@@ -873,7 +874,7 @@ function buildSlash(api){
   function drawWhole(o){
     g.save();g.translate(o.x,o.y);g.rotate(o.rot);
     // soft drop shadow
-    g.fillStyle="rgba(0,0,0,.22)";g.beginPath();g.arc(3,4,Math.max(0,o.r),0,TAU);g.fill();
+    if(o.t!=="dango"){g.fillStyle="rgba(0,0,0,.22)";g.beginPath();g.arc(3,4,Math.max(0,o.r),0,TAU);g.fill();}   // だんごは玉ごとの影を下で描く
     // 4. 巨大フルーツの金色ハロー(画像/手描きどちらの経路でも見える位置に先に描く)
     if(o.big){g.globalCompositeOperation="lighter";g.strokeStyle="rgba(255,214,79,.55)";g.lineWidth=3;
       g.beginPath();g.arc(0,0,Math.max(0,o.r+4),0,TAU);g.stroke();g.globalCompositeOperation="source-over";}
@@ -932,9 +933,10 @@ function buildSlash(api){
     }else if(o.t==="dango"){
       // 7. だんご: 串に刺さった3色の丸(積み重ね物)。斬ると spawnDangoBalls で3つの丸へバラける
       const cols=o.dcols||["#ffb6c1","#fff4e0","#8bd23a"];
-      const rr=Math.max(2,o.r*0.6),ys=[-o.r*0.82,0,o.r*0.82];
+      const rr=Math.max(2,o.r*0.7),ys=[-o.r*0.95,0,o.r*0.95];
       g.fillStyle="#c9915a";g.fillRect(-Math.max(1,o.r*0.06),-o.r*1.3,Math.max(2,o.r*0.12),o.r*2.7);
       for(let i=0;i<3;i++){
+        g.fillStyle="rgba(0,0,0,.2)";g.beginPath();g.arc(2,ys[i]+3,rr,0,TAU);g.fill();
         const gr=g.createRadialGradient(-rr*0.3,ys[i]-rr*0.3,Math.max(0.1,rr*0.1),0,ys[i],rr);
         gr.addColorStop(0,tint(cols[i],0.3));gr.addColorStop(1,cols[i]);
         g.fillStyle=gr;g.beginPath();g.arc(0,ys[i],rr,0,TAU);g.fill();

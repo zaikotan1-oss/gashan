@@ -18,7 +18,8 @@ function buildRockfall(api){
   let rbMsgT=0,rbHintT=0;                                            // ① にじいろいわ 発見/予告
   let stageMiss=0,noMissT=0;                                         // ③ ノーミス(いわを ようがんに おとさない)
   let meteor=null,meteorT=rnd(300,600);                             // ④ ながれ星 ひみつ発見
-  let initBurst=6;   // 軸3: 開始直後は画面上端からの落下待ちなしで最初から見えている位置に出す(4→6、最初のどれかに当たる確率を底上げ)
+  let quietT=0,helpT=0;      // 軸3: 最後に得点してからの秒数(5秒当たらなければ吸着を広げ、近い岩に光の輪で教える)
+  let initBurst=8;   // 軸3: 開始直後は画面上端からの落下待ちなしで最初から見えている位置に出す(4→6、最初のどれかに当たる確率を底上げ)
   let earlyBoost=5;  // 軸3: 開始直後だけ次の出現間隔を短くし、定常時の密度は上げすぎない
   // hitStop discipline: big-hit only + cooldown so freezes never chain
   function hstop(n){if(hsCool<=0){api.hitStop(n);hsCool=34;}}
@@ -47,11 +48,11 @@ function buildRockfall(api){
     if(boss){boss.ty=api.H*0.3;boss.size=R*2.3;}
   }
   layout();
-  spawn();spawn();spawn();spawn();spawn();   // 軸3: 開始した瞬間から複数のいわが画面にある状態にする(6個目はframe内でspawnT=0により即時)
+  spawn();spawn();spawn();spawn();spawn();spawn();   // 軸3: 開始した瞬間から複数のいわが画面にある状態にする(6個目はframe内でspawnT=0により即時)
   function spawn(){
     // 軸3: 画面内の生きている岩が多すぎる時は出さない(重なって連打で当たる・見づらい状態を防ぐ)。初期の連続spawnは対象外。
     if(initBurst<=0){let alive=0;for(const r of rocks)if(!r._dead)alive++;
-      if(alive>=24)return false;}
+      if(alive>=Math.min(9,6+stage))return false;}   // 軸3: 狙わない連打の当たり面積を減らす(出現間隔は変えず上限で密度を決める)
     // ① にじいろいわ: ステージ1以降、ときどき(約3%)だけ落ちてくる激レア。ゆっくり落ちて虹色に光る。
     const rainbow=!boss&&stage>=1&&Math.random()<0.03;
     // rare golden king rock: slower, sparkling, worth +5 with a fanfare
@@ -64,8 +65,8 @@ function buildRockfall(api){
     const sz=rainbow?R*1.2:gold?R*1.12:big?R*2.0:R*(0.85+Math.random()*0.4);
     const margin=Math.max(R*1.4,sz*0.75);
     // 軸3: 開始直後のいわは画面中央寄りに出す(低学年は最初 画面中央を連打しがちなので、その手が届く位置に的を置く)
-    const x=initBurst>0?rnd(api.W*0.32,api.W*0.68):rnd(margin,api.W-margin);
-    const fallV=clamp(1.7+stage*0.22,1.7,5.0)*(big?0.78:gold?0.68:rainbow?0.58:1);   // 落下速度 約2割増
+    const x=initBurst>0?rnd(api.W*0.3,api.W*0.7):rnd(margin,api.W-margin);
+    const fallV=clamp(1.7+stage*0.22,1.7,5.0)*(big?0.78:gold?0.68:rainbow?0.58:initBurst>0?0.6:1);   // 軸3: 開始直後のいわはゆっくり落とし、最初の数秒 手の届く位置に居続ける   // 落下速度 約2割増
     // ② 宝石いわ: ふつうのいわの一部(約22%)が色つきの宝石を抱いて落ちてくる。ラッキー色なら得。
     const gem=(!gold&&!big&&!rainbow&&Math.random()<0.22)?pick(GEMS):null;
     const pts=shape==="round"?roundPts():shape==="tower"?stackPts():rockPts();
@@ -156,7 +157,7 @@ function buildRockfall(api){
     // ② ラッキー色: きょうの秘密の宝石色を割ると +1 の隠しボーナス。気づくと得する。
     const isLucky=rk.gem&&rk.gem===luckyColor;
     if(isLucky){gain+=1;if(!luckySeen){luckySeen=true;luckyBigT=2.0;}else luckyMsgT=Math.max(luckyMsgT,0.9);}
-    count+=gain;stageKill+=1;api.setScore(count);
+    count+=gain;stageKill+=1;api.setScore(count);quietT=0;
     combo++;comboT=0.9;
     api.slide(340-Math.min(combo*8,120),120,0.14,0.32,"square");
     api.noise(0.12,0.2,1600);
@@ -209,7 +210,7 @@ function buildRockfall(api){
   }
   function bossHit(){
     boss.hp--;boss.hurt=1;
-    count++;api.setScore(count);combo++;comboT=0.9;
+    count++;api.setScore(count);quietT=0;combo++;comboT=0.9;
     api.noise(0.08,0.2,900);api.slide(240,140,0.1,0.25,"square");api.shake(5);
     ring(boss.x,boss.y,"#ff6a2a",true);
     burst(boss.x+rnd(-R,R),boss.y+rnd(-R,R),"#6e4f42",6,7);
@@ -302,7 +303,7 @@ function buildRockfall(api){
       // hit-test topmost rock first
       // 軸3: まだ一度も得点していない間だけ的を大きく取り、最初の成功を早める。得点後は通常判定に戻すので
       // 以降の連打耐性(scorePerTap)には影響しない。
-      const hitMul=count===0?1.6:(stage===1?1.15:1.05);
+      const hitMul=(count===0||quietT>4)?(quietT>6?2.4:1.9):(stage===1?0.95:0.9);
       for(let i=rocks.length-1;i>=0;i--){const rk=rocks[i];
         if(rk._dead)continue;
         if(Math.hypot(x-rk.x,y-rk.y)<rk.size*hitMul){
@@ -310,7 +311,7 @@ function buildRockfall(api){
           smash(rk);return;}}
       // ④ ながれ星タップ: いわに 当たらなかった タップが ながれ星に届いたら ごほうび(減点なし)
       if(meteor&&Math.hypot(x-meteor.x,y-meteor.y)<meteor.r*1.7){
-        count+=1;api.setScore(count);
+        count+=1;api.setScore(count);quietT=0;
         api.tone(1318,0.12,"triangle",0.1);api.tone(1976,0.14,"triangle",0.08);
         for(let i=0;i<9;i++){const a=rnd(0,TAU),s=rnd(2,6);
           sparks.push({x:meteor.x,y:meteor.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1,r:rnd(2,3.5),
@@ -326,6 +327,14 @@ function buildRockfall(api){
     },
     frame(dt,now){
       tsec+=0.016*dt;
+      if(clearT<=0){quietT+=0.016*dt;helpT-=dt;}
+      // 軸3: 4秒あたらない時は、画面の中ほどに「たすけいわ」をポンと出す(叱らず、次の1個に必ず手が届く)
+      if(quietT>(count===0?1.5:4)&&helpT<=0&&!boss&&bossWarn<=0&&!pendingBoss&&clearT<=0){
+        helpT=130;
+        for(let hk=0;hk<(count===0||quietT>5.5?2:1);hk++){initBurst++;const n0=rocks.length;spawn();
+          const hr=rocks[rocks.length-1];
+          if(rocks.length>n0&&hr){ring(hr.x,hr.y,"#fff2a0",false);if(hk===0)api.tone(988,0.08,"triangle",0.06);}}
+      }
       // ---- background: 画像(bg.jpg)があれば cover 描画。無ければ従来の手描き火山グラデ ----
       const imgBg=api.drawCover("bg.jpg");
       if(!imgBg){
@@ -431,6 +440,17 @@ function buildRockfall(api){
         drawRock(rk);
       }
       rocks=rocks.filter(r=>!r._dead);
+      // 軸3: 5秒当たらない時は、いちばん近い(画面の中で一番見えている)岩に細い光の輪を出して探しやすくする
+      if(quietT>3&&!boss&&!paused){
+        let best=null,bd=1e9;
+        for(const rk of rocks){if(rk._dead||rk.y<R*0.5||rk.y>groundY-R)continue;
+          const d=Math.hypot(rk.x-api.W/2,rk.y-api.H*0.45);if(d<bd){bd=d;best=rk;}}
+        if(best){const pu=0.5+0.5*Math.sin(tsec*8);
+          g.save();g.globalAlpha=0.55+0.35*pu;g.strokeStyle="#fff2a0";g.lineWidth=3;
+          g.shadowColor="#ffd23f";g.shadowBlur=10;
+          g.beginPath();g.arc(best.x,best.y,Math.max(0,best.size*(1.45+0.12*pu)),0,TAU);g.stroke();
+          g.restore();g.globalAlpha=1;g.shadowBlur=0;}
+      }
       // ---- boss update & draw (in front of falling rocks) ----
       if(boss){
         boss.wob+=0.05*dt;

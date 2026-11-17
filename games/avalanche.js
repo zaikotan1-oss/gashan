@@ -8,6 +8,7 @@ function buildAvalanche(api){
   // ⑥ 同フレーム内で複数のfloatが同じ場所に出て重ならないよう、frame()の先頭で0に戻し
   //   floats.pushのたびに積み上げる縦オフセット(コンボ/キラキラ/にじいろ/ラッキー/ジャストヒットが対象)
   let floatStack=0;
+  let lastScoreT=0; // 最後に的を壊した時刻。5秒あたりが無い時は、どこを押しても近い的にあたる(投げ出し・無反応防止)
   let lastJustT=-9; // ⑥ 「ジャストヒット!」を最後に文字で出した時刻(0.5秒に1回まで)
   // ⑥ 同時に画面に出る浮かぶ文字は最大3個(古い順に消す)。重なって読めなくなるのを防ぐ。
   function pushFloat(f){floats.push(f);while(floats.length>3)floats.shift();}
@@ -62,7 +63,7 @@ function buildAvalanche(api){
     slopeX0=api.W*0.06; slopeTop=api.H*0.30;
     slopeX1=api.W*0.78; slopeBot=api.H*0.74;
     // re-seat existing obstacles on the (possibly moved) surface
-    for(const o of obstacles){o.x=clamp(o.x,0,api.W*0.94);o.by=surfYAt(o.x);o.lane=laneOfX(o.x);}
+    for(const o of obstacles){o.x=clamp(o.x,0,api.W*0.94);o.by=surfYAt(o.x);o.lane=Math.max(0,laneOfX(o.x));}
     // ④ 太陽/月ひみつタップの当たり判定(描画位置に一致・寛容に大きめ)
     sunPos.x=api.W*0.82;sunPos.y=api.H*0.14;sunPos.r=Math.max(42,api.W*0.10);
     buildBg();
@@ -88,7 +89,8 @@ function buildAvalanche(api){
   const HARD_KINDS=["tower","house","snowman"]; // ⑦ hp2(かたい)に使ってよい見るからに硬そうな種類
   // 的の帯(spawnObstacleと同じ式)。タップ位置→レーンも必ずこの帯で数える(狙いが報われる)
   function laneBand(){const minX=lerp(slopeX0,slopeX1,0.35),maxX=api.W*0.94;return{minX,maxX,laneW:(maxX-minX)/LANE_N};}
-  function laneOfX(x){const L=laneBand();return clamp(Math.floor((x-L.minX)/L.laneW),0,LANE_N-1);}
+  // 的の帯より左(坂の入口側)は -1 =どの的も狙っていない(左の3割を押しても得点になる穴をふさぐ)
+  function laneOfX(x){const L=laneBand();if(x<L.minX)return -1;return clamp(Math.floor((x-L.minX)/L.laneW),0,LANE_N-1);}
   // 見た目の横幅(重なり避け用)
   function extW(o){return o.w*(o.kind==="car"?1.7:o.kind==="wall"?1.6:1.15);}
   function spawnObstacle(){
@@ -142,7 +144,7 @@ function buildAvalanche(api){
   }
   function ensureObstacles(){
     // fever floods the field with extra targets so every ball plows a long chain
-    const want=clamp(4+Math.floor(stage/2),4,8)+(fever>0?3:0);
+    const want=clamp(3+Math.floor(stage/3),3,6)+(fever>0?3:0);
     let guard=0;
     while(obstacles.length<want&&guard++<20) spawnObstacle();
   }
@@ -150,7 +152,7 @@ function buildAvalanche(api){
   // 一瞬で次が出ると、玉の通り道に的が湧き続けて「連打しなくても点が増える」状態になるため。
   let spawnCd=0;
   function refill(dt){
-    const want=clamp(4+Math.floor(stage/2),4,8)+(fever>0?3:0);
+    const want=clamp(3+Math.floor(stage/3),3,6)+(fever>0?3:0);
     if(spawnCd>0){spawnCd-=0.016*dt;return;}
     if(obstacles.length<want&&spawnObstacle())spawnCd=fever>0?0.22:0.45;
   }
@@ -165,8 +167,22 @@ function buildAvalanche(api){
     // (発射位置そのものは坂の入口付近から少しだけ振る程度に留め、密度/粘り強さの数字を崩さない。
     //  「狙い」の主効果はレーン一致ボーナス側=hitObstacle()の得点調整で受け持つ)
     //    ※的の帯(laneBand)と同じ区切りで数える。的の真上を押せば必ずジャストヒットになる。
-    const lane=laneOfX(px);
-    const laneNudge=(lane-(LANE_N-1)/2)*unit*0.9;
+    // ねらい成功の判定: 押した所のそばに生きている的があればそのレーン、無ければ -1(どの的にも当てない)。
+    let lane=-1,bestD=1e9;
+    for(const o of obstacles){
+      if(o.dead||o.lane===undefined)continue;
+      const d=Math.abs(o.x-px);
+      if(d<o.w*1.0+unit*0.4&&d<bestD){bestD=d;lane=o.lane;}
+    }
+    if(lane<0&&(count===0||tsec-lastScoreT>5)){ // さいしょの1回は必ず的にあたる // 5秒つづけて外した時のたすけ: いちばん近い的へ
+      for(const o of obstacles){
+        if(o.dead||o.lane===undefined)continue;
+        const d=Math.abs(o.x-px);
+        if(d<bestD){bestD=d;lane=o.lane;}
+      }
+    }
+    const nudgeLane=lane>=0?lane:clamp(laneOfX(px),0,LANE_N-1);
+    const laneNudge=(nudgeLane-(LANE_N-1)/2)*unit*0.9;
     const sx=slopeX0+laneNudge+rnd(-unit*0.3,unit*0.6);
     balls.push({x:sx,y:slopeYAt(sx)-unit*0.6,vx:rnd(2.2,3.4),vy:0,
       r:unit*rnd(0.5,0.7),grew:0,spin:0,onGround:false,life:1,lane});
@@ -177,6 +193,9 @@ function buildAvalanche(api){
     api.slide(420,180,0.18,0.16,"sine");
     api.noise(0.22,0.18,900,"lowpass",0.7);
     api.shake(3);
+    // ねらいが外れた時は叱らず、玉の頭上に小さく「ころころ」(得点は0でも雪けむりと音は残す)
+    if(lane<0&&fever<=0)feverGauge=Math.max(0,feverGauge-0.06); // ねらわず外すとフィーバーゲージが少し減る(狙いが報われる)
+    if(lane<0&&floats.length<2)pushFloat({x:sx,y:slopeYAt(sx)-unit*1.8,txt:"ころころ",life:0.8,vy:-0.6,col:"#ffffff",size:18});
   }
 
   function hitObstacle(b,o){
@@ -207,7 +226,7 @@ function buildAvalanche(api){
     if(isJustHit){
       if(tsec-lastJustT>0.5){
         lastJustT=tsec;
-        pushFloat({x:o.x,y:oy-o.w-16-floatStack*26,txt:"ジャストヒット!",life:1,vy:-1.0,col:"#ffe14d",size:22});
+        pushFloat({x:o.x,y:oy-o.w-16-floatStack*26,txt:"ねらいどおり!",life:1,vy:-1.0,col:"#ffe14d",size:22});
         floatStack++;
       }
       api.tone(1760,0.05,"triangle",0.05);
@@ -225,6 +244,7 @@ function buildAvalanche(api){
       return;
     }
     // destroyed!
+    lastScoreT=tsec;
     count+=gain;if(countsStage)stageKill++;combo++;comboT=1;
     api.setScore(count);
     const big=b.r>unit*1.1;
@@ -495,16 +515,15 @@ function buildAvalanche(api){
         g.fillStyle="rgba(255,255,255,.7)";g.fillRect(0,groundY,api.W,4);
       }
 
-      // ③ レーン帯: どこを狙うと得点が伸びるか(hitObstacle()の隠しレーン倍率)を画面に出す。
-      //   spawnObstacle()と同じ式でレーン3本分の帯を描き、直近に発射した玉が狙っているレーンだけ明るくする。
+      // ③ レーン帯: 狙っているレーンだけ、坂の表面に沿った細い帯で見せる(非狙いレーンは描かない=四角いむらを出さない)
       {
-        const laneMinX=lerp(slopeX0,slopeX1,0.35),laneMaxX=api.W*0.94;
-        const laneW=(laneMaxX-laneMinX)/LANE_N;
+        const {minX:laneMinX,laneW}=laneBand();
         const aimLane=balls.length?balls[balls.length-1].lane:-1;
-        for(let li=0;li<LANE_N;li++){
-          const lx=laneMinX+laneW*li;
-          g.fillStyle=(li===aimLane)?"rgba(255,255,255,.22)":"rgba(255,255,255,.08)";
-          g.fillRect(lx,slopeTop,Math.max(0,laneW),Math.max(0,api.H-slopeTop));
+        if(aimLane>=0){
+          const lx=laneMinX+laneW*aimLane,rx=lx+laneW,th=unit*0.5;
+          g.fillStyle="rgba(255,255,255,.22)";
+          g.beginPath();g.moveTo(lx,surfYAt(lx));g.lineTo(rx,surfYAt(rx));
+          g.lineTo(rx,surfYAt(rx)+th);g.lineTo(lx,surfYAt(lx)+th);g.closePath();g.fill();
         }
       }
       // ---- obstacles (snowmen-ish blocks down in the run-out) ----
@@ -543,7 +562,7 @@ function buildAvalanche(api){
           if(Math.abs(b.x-o.x)<b.r+o.w*0.7 && b.y>o.by-b.r-o.w*2.2){
             // ③ 狙ったレーン以外の的は 玉がぴょんと飛び越える(狙ってない的は壊れない=ただ連打では稼げない)。
             //   金/にじいろ/フィーバー中は どこでも当たる。
-            if(fever<=0&&!o.gold&&!o.rainbow&&b.lane!==undefined&&o.lane!==undefined&&Math.abs(b.lane-o.lane)>=1){
+            if(fever<=0&&!o.gold&&!o.rainbow&&b.lane!==undefined&&o.lane!==undefined&&(b.lane<0||Math.abs(b.lane-o.lane)>=1)){
               if(b.hopO!==o){b.hopO=o;b.vy=Math.min(b.vy,-5);
                 for(let i=0;i<3;i++)puffs.push({x:b.x,y:b.y+b.r,vx:rnd(-1,1),vy:rnd(-2,-0.5),r:rnd(unit*0.15,unit*0.3),life:1,decay:0.04});}
               continue;
@@ -622,8 +641,8 @@ function buildAvalanche(api){
       //   floatsはこの後に描くので暗幕の上に乗り、コンボ数字が薄れて消えることがなくなる。
       //   帯の高さも0.2H→0.13Hに縮め、テキスト本体の周りだけを暗くする。
       if(clearT>0){
-        g.save();g.globalAlpha=clamp(clearT*1.4,0,1)*0.4;g.fillStyle="#1a2a44";
-        g.fillRect(0,api.H*0.36,api.W,api.H*0.13);g.restore();
+        g.save();g.globalAlpha=clamp(clearT*1.4,0,1)*0.55;g.fillStyle="#1a2a44";
+        g.fillRect(0,api.H*0.35,api.W,api.H*0.17);g.restore();
       }
       // ---- floating combo numbers ----
       if(combo>0){comboT-=0.016*dt;if(comboT<=0){combo=0;comboKept=false;}} // ③ 連鎖が切れたらノンストップ失敗
@@ -694,8 +713,8 @@ function buildAvalanche(api){
         g.save();g.translate(api.W/2,api.H*0.60);g.scale(pop,pop);g.textAlign="center";
         g.globalAlpha=clamp(nonstopT*1.3,0,1);g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor="rgba(63,255,176,.9)";g.shadowBlur=16;g.fillStyle="#c7ffe0";
-        g.fillText("ノンストップ ボーナス!",0,0);
-        g.shadowBlur=0;g.lineWidth=1.5;g.strokeStyle="rgba(30,110,80,.7)";g.strokeText("ノンストップ ボーナス!",0,0);
+        g.fillText("ずっと つづいた! ボーナス",0,0);
+        g.shadowBlur=0;g.lineWidth=1.5;g.strokeStyle="rgba(30,110,80,.7)";g.strokeText("ずっと つづいた! ボーナス",0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";if(nonstopT<0)nonstopT=0;}
 
       // ---- STAGE CLEAR banner (暗幕はfloatsより前で既に塗ってある) ----
@@ -709,6 +728,7 @@ function buildAvalanche(api){
         g.shadowBlur=0;g.lineWidth=2;g.strokeStyle="#fff";
         g.strokeText("ステージ"+clearStage+" クリア!",0,0);
         g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";g.fillStyle="#fff";
+        g.lineWidth=6;g.lineJoin="round";g.strokeStyle="rgba(30,40,70,.85)";g.strokeText(previewTxt(),0,40);
         g.fillText(previewTxt(),0,40);
         g.restore();g.globalAlpha=1;g.textAlign="left";
         if(clearT<=0){clearT=0;ensureObstacles();}
@@ -738,7 +758,7 @@ function buildAvalanche(api){
         g.beginPath();g.arc(Math.cos(a)*r*0.5,Math.sin(a)*r*0.5,r*0.1,0,TAU);g.fill();}
       g.restore();
       // rim + highlight
-      g.strokeStyle="rgba(255,255,255,.7)";g.lineWidth=2;g.beginPath();g.arc(0,0,r,0,TAU);g.stroke();
+      g.strokeStyle="rgba(70,110,160,.8)";g.lineWidth=3;g.beginPath();g.arc(0,0,r,0,TAU);g.stroke();
       g.fillStyle="rgba(255,255,255,.85)";
       g.beginPath();g.arc(-r*0.35,-r*0.38,r*0.2,0,TAU);g.fill();
     }

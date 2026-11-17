@@ -20,6 +20,9 @@ function build_fireball(api){
   let rbMsgT=0;                 // ① にじいろいんせき 発見バナー
   let stageMiss=0,perfectT=0;   // ③ パーフェクト判定(いわを 1つも にがさない)
   let shootStar=null;           // ④ ながれ星ひみつ (撃つとごほうび)
+  let firstLeft=true,spawnN=0,lastPityT=-999,lastType="",giantSeen=false,stageSpawns=0,falls=[];   // 軸7: 直前と同じ形の連続を避ける/giantを2面から必ず1回/ufoの落ちる破片
+  // 軸3の調整値: 狙わない連打は伸びにくく、救済は少し遅らせる(ドラッグでも12秒を超えない範囲)
+  const PITY_T=7,RESCUE_T=5,SPAM_GAP=1.0,SPAM_POW=0.6,TIGHT_K=0.25;
   let firstSpawnDone=false;     // 軸3: 開始直後の1個目だけ近く速く出して最初の成功を早める
   let lastGainT=0,lastCountSeen=0;   // 軸3: 6秒以上 得点が止まったら、次の岩をゆっくり画面中央に出して助ける(失敗しても叱らない)
   let lastFireT=-999;           // 軸3: 直前の発射時刻(間を置かないマッシュ連打の検出用)
@@ -48,23 +51,31 @@ function build_fireball(api){
     // ⑦(壊す物のバラエティ): 丸い隕石(orb)と小さい生き物(imp)を追加し、全部ジグザグ岩の色違いで
     // 終わらないようにする(orbは形が違う/impは生き物枠。詳細はdrawRock参照)。
     // 1面から 岩・まる・いきもの(imp) の3つの形を混ぜる。2面からでかい岩とUFO、4面から3段の giant
-    const bag=["rock","orb","imp"];
-    if(stage>=2){bag.push("big");bag.push("ufo");}
+    // 軸7: 1面から 岩・まる・いきもの・円盤 の4つの形。2面からでかい岩、3面から はやい岩、
+    // 2面から3段の giant も低確率(10%・同時に1体まで)で混ぜ、2面で6個出ても見えていなければ必ず1回出す
+    const bag=["rock","orb","imp","ufo"];
+    if(stage>=2){bag.push("big");}
     if(stage>=3)bag.push("fast");
-    if(stage>=4){bag.push("big");bag.push("fast");bag.push("giant");}
+    if(stage>=4){bag.push("big");bag.push("fast");}
+    if(stage>=2){
+      stageSpawns++;
+      if(!rocks.some(r=>r.type==="giant")&&(Math.random()<0.1||(!giantSeen&&stageSpawns>=6))){giantSeen=true;return "giant";}   // 画面に giant は1体まで(重なって弾を食わない)
+    }
     return pick(bag);
   }
   function spawnRock(){
     // 軸3(最初の成功を早める): ゲーム開始直後の1個目だけ、出現位置を画面内寄り・速度を1.3倍にする。
     // 抽選ロジック自体(乱数を消費する順序)は変えず、生成された岩を最後に上書きするだけにして、
     // このフラグの有無でその後のプレイ全体の乱数列がずれてしまわないようにする。
-    const isFirst=!firstSpawnDone;firstSpawnDone=true;
-    const pity=!isFirst&&!boss&&bossWarnT<=0&&(tsec-lastGainT)>6;
-    if(pity)lastGainT=tsec;   // 助けの岩は 6秒おきまで
+    firstSpawnDone=true;spawnN++;
+    // 軸3: 最初の2個(まだ0点の間)は中央にゆっくり出し、反対側から1個ずつ(狙いが外れても2個目で拾える)
+    const isFirst=spawnN<=2&&count===0;
+    const pity=!isFirst&&!boss&&bossWarnT<=0&&(tsec-lastGainT)>PITY_T&&(tsec-lastPityT)>PITY_T;
+    if(pity)lastPityT=tsec;   // 助けの岩は PITY_T秒おきまで(判定を広げる rescue とは別に数える)
     function boostFirst(rk,fromLeft){
       if(!isFirst&&!pity)return rk;
       // 画面の中に最初から見える場所で、ゆっくり漂う(迷わず狙える・最初の成功を早める)
-      rk.x=fromLeft?api.W*0.32:api.W*0.68;
+      rk.x=fromLeft?api.W*0.4:api.W*0.6;rk.r*=1.2;   // 最初の成功・助けの岩は ひとまわり大きく
       rk.y=api.H*0.5;
       rk.vx*=pity?0.6:0.55;rk.vy=0.05;if(pity)rk.y=api.H*rnd(0.35,0.5);
       return rk;
@@ -90,17 +101,21 @@ function build_fireball(api){
       floats.push({x:api.W/2,y:api.H*0.26,txt:"ゴールドいんせき！",life:1,vy:-0.6,col:"#ffd23f",size:26});
       return;
     }
-    const type=rockType();
-    const fromLeft=Math.random()<0.5;
+    let type=rockType();
+    if(type===lastType&&type!=="giant")type=rockType();
+    if(isFirst||pity)type=pick(["rock","orb"]);   // 最初の成功・助けの岩は 1発で壊れる形にする   // 軸7: 直前と同じ形なら1回だけ引き直す(全部ギザギザ岩の瞬間を減らす)
+    lastType=type;
+    let fromLeft=Math.random()<0.5;
+    if(isFirst&&spawnN===2)fromLeft=!firstLeft;if(isFirst&&spawnN===1)firstLeft=fromLeft;
     const x=fromLeft?-baseR:api.W+baseR;
     const y=rnd(api.H*0.18,api.H*0.6);
     let hp=1,r=baseR*0.85,spd=rnd(1.1,2.0)+(stage-1)*0.2;   // 7〜8歳向け: 少し速め
     if(type==="big"){hp=2;r=baseR*1.25;spd*=0.7;}
     else if(type==="fast"){r=baseR*0.66;spd*=1.7;}
     else if(type==="orb"){r=baseR*0.8;spd*=1.1;}          // ⑦ まん丸い隕石(ジグザグ多角形とは違う形の枠)
-    else if(type==="imp"){hp=1;r=baseR*0.72;spd*=0.85;}   // ⑦ 小さい生き物(顔つき・ジグザグ移動で岩と区別)
+    else if(type==="imp"){hp=2;r=baseR*0.78;spd*=0.85;}   // ⑦ 小さい生き物(顔つき・ジグザグ移動で岩と区別)
     else if(type==="ufo"){hp=1;r=baseR*0.9;spd=rnd(0.8,1.3);}   // 円盤: 横にゆっくり・上下にゆれる(隕石以外)
-    else if(type==="giant"){hp=3;r=baseR*1.7;spd*=0.5;}          // 3段重ねの特大: 1発ごとに上の段から崩れる
+    else if(type==="giant"){hp=3;r=baseR*1.7;spd*=0.65;}          // 3段重ねの特大: 1発ごとに上の段から崩れる
     // gentle arc toward cannon side, drifting downward
     const dir=fromLeft?1:-1;
     // ② いわには宝石のコアが埋まっている。色は毎回ランダム(そのうち1色が今日のラッキー)。impは生き物なので宝石なし。
@@ -111,7 +126,20 @@ function build_fireball(api){
   }
   function fire(tx,ty,power){
     aimX=tx;aimY=ty;
-    const ang=Math.atan2(ty-(cannonY-baseR),tx-cannonX);
+    let ang=Math.atan2(ty-(cannonY-baseR),tx-cannonX);
+    // 軸3: 最初の1点がまだ取れていない間(と、5秒 点が止まった時)だけ、一番近い岩の向きへ少し引き寄せる
+    // (指がずれても最初の成功は来る/救済)。2点目以降の ふだんの狙いはそのまま。
+    const stuck=(tsec-lastGainT)>RESCUE_T;
+    if(count===0||stuck){
+      let best=null,bd=1e9;
+      for(const rk of rocks){
+        if(rk._dead||rk.type==="rainbow"||rk.hp>1)continue;   // 1発で壊れる岩だけ引き寄せる(giant/bigの1発目は点にならない)
+        const ra=Math.atan2(rk.y-(cannonY-baseR),rk.x-cannonX);
+        let d=ra-ang;while(d>Math.PI)d-=TAU;while(d<-Math.PI)d+=TAU;
+        if(Math.abs(d)<bd&&Math.abs(d)<1.2){bd=Math.abs(d);best={d};}
+      }
+      if(best)ang+=best.d*(count===0?0.7:0.85);
+    }
     const big=power>0.5;
     const speed=12+power*6;
     // 置いてすぐ離す「瞬間打ち」(power低め)は火だまを小さく=当てにくく、
@@ -121,9 +149,9 @@ function build_fireball(api){
     // 弾だけ当たり判定を絞る(狙わないマッシュ連打を狙い撃ち)。ゲーム開始いちばん最初の1発や、
     // 間隔をあけて撃つ・しっかり溜めて撃つ弾はこれまで通り当てやすいまま(最初の成功を遅らせない)。
     // 最初の成功が決まるまでは(count<2)絞らない。間隔0.7秒以内・溜めなしの連打だけ当たり判定を絞る
-    const rescue=(tsec-lastGainT)>4.5;   // 4.5秒以上 得点が止まっている間は、判定を広げて あと少しを助ける
-    const spamTap=(tsec-lastFireT)<0.7&&power<0.45&&count>=2&&!rescue;
-    const firstShot=(count===0&&stageKill===0)?1.15:(rescue?1.0:0);   // 最初の成功だけは判定を広げる
+    const rescue=(tsec-lastGainT)>RESCUE_T;   // 4.5秒以上 得点が止まっている間は、判定を広げて あと少しを助ける
+    const spamTap=(tsec-lastFireT)<SPAM_GAP&&power<SPAM_POW&&count>=2&&!rescue;
+    const firstShot=(count<3&&stage===1)?1.4:(rescue?1.2:0);   // 最初の3点までは判定を広めに   // 最初の成功だけは判定を広げる
     lastFireT=tsec;
     balls.push({x:cannonX,y:cannonY-baseR*0.7,
       vx:Math.cos(ang)*speed,vy:Math.sin(ang)*speed,
@@ -182,6 +210,8 @@ function build_fireball(api){
       for(let i=0;i<14;i++){const a=rnd(0,TAU),s=rnd(3,10);
         shards.push({x:rk.x,y:rk.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,r:rnd(3,6),
           rot:rnd(0,TAU),vr:rnd(-0.5,0.5),life:1,decay:rnd(0.012,0.022),col:i%2?"#9ad0ff":"#ffffff"});}
+      // ⑦「落ちる」: こわれた円盤のかけらがくるくる落ち、地面でぽんとはねてから消える
+      falls.push({x:rk.x,y:rk.y,vx:rk.vx*0.4,vy:-3.5,r:rk.r*0.7,rot:0,vr:(rk.vx>=0?1:-1)*rnd(0.12,0.2),b:0});
     }else if(rk.type==="giant"){
       // 最後に残った一番下の段が くずれる(上の段は hitRock で崩し済み)
       burst(rk.x,rk.y+rk.r*0.5,rk.r*0.5,"#ff5a2a",true);
@@ -192,6 +222,26 @@ function build_fireball(api){
       // drawRockの積み重ね描画オフセットに合わせる)。fastの吹っ飛ぶ・normalの砕けるとは違う3つ目の壊れ方。
       burst(rk.x-rk.r*0.14,rk.y-rk.r*0.52,rk.r*0.7,"#ff5a2a",true);
       burst(rk.x+rk.r*0.14,rk.y+rk.r*0.1,rk.r*0.9,"#ff5a2a",true);
+    }else if(rk.type==="orb"){
+      // ⑦「ぱしゃっ」: 水滴がはじけるように 青白い丸いしずくが放射状に飛び、波紋の輪が2重に広がる
+      rings.push({x:rk.x,y:rk.y,r:rk.r*0.3,vr:rk.r*0.5,life:1,decay:0.045,col:"#bfe0ff"});
+      rings.push({x:rk.x,y:rk.y,r:rk.r*0.15,vr:rk.r*0.85,life:1,decay:0.06,col:"#ffffff"});
+      for(let i=0;i<18;i++){const a=i/18*TAU+rnd(-0.12,0.12),s=rnd(3,9);
+        shards.push({x:rk.x,y:rk.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1.5,r:rnd(6,12),rd:true,
+          rot:0,vr:0,life:1,decay:rnd(0.014,0.026),col:i%2?"#bfe0ff":"#ffffff"});}
+      flash=Math.min(1,flash+0.2);
+    }else if(rk.type==="imp"){
+      // ⑦「ぽんっ」: けむりの輪がふくらみ、星のかけらが上へ飛ぶ。「ぴえ〜」と言って消える
+      rings.push({x:rk.x,y:rk.y,r:rk.r*0.3,vr:rk.r*0.45,life:1,decay:0.04,col:"#d9ccff"});
+      rings.push({x:rk.x,y:rk.y,r:rk.r*0.15,vr:rk.r*0.7,life:1,decay:0.05,col:"#ffe27a"});
+      for(let i=0;i<5;i++){const a=rnd(0,TAU),s=rnd(1,3);
+        shards.push({x:rk.x+Math.cos(a)*rk.r*0.4,y:rk.y+Math.sin(a)*rk.r*0.4,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,r:rnd(14,22),rd:true,
+          rot:0,vr:0,life:1,decay:rnd(0.018,0.026),col:"#b8aedd"});}
+      for(let i=0;i<9;i++){const a=-Math.PI/2+rnd(-0.9,0.9),s=rnd(5,11);
+        shards.push({x:rk.x,y:rk.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,r:rnd(9,15),star:true,
+          rot:rnd(0,TAU),vr:rnd(-0.3,0.3),life:1,decay:rnd(0.014,0.02),col:i%2?"#ffe27a":"#c9a0ff"});}
+      floats.push({x:clamp(rk.x,60,api.W-60),y:rk.y-rk.r*1.3,txt:"ぴえ〜",life:1,vy:-0.9,col:"#e8d0ff",size:28});
+      flash=Math.min(1,flash+0.15);
     }else{
       burst(rk.x,rk.y,rk.r,"#ff5a2a",rk.type==="big");
     }
@@ -262,6 +312,7 @@ function build_fireball(api){
   }
   function hitBoss(bx,by,big){
     boss.hp-=big?2:1;boss.hit=1;
+    count+=1;api.setScore(count);   // ボス戦も当てるたびに +1(ボスをけずっている間に点が止まって見えない)
     burst(bx,by,boss.r*0.5,"#ff5a2a",big);
     boss.y-=boss.r*0.12; // knockback flinch
     combo++;comboT=1.0;
@@ -294,6 +345,16 @@ function build_fireball(api){
       rk.dent=1; // ⑤「へこむ」演出: 次の描画から色が暗く沈む
       api.slide(300,200,0.08,0.18,"square");api.noise(0.06,0.12,1400);api.shake(4);
       burst(bx,by,rk.r*0.6,"#cfa080",false);
+      return false;
+    }
+    if(rk.type==="imp"&&rk.hp>1){
+      // ⑦ imp 1発目: 目が > < になって ぴょんとはね、ひとまわり小さくなる(まだ倒れない)
+      rk.hp--;rk.ouch=1;rk.r*=0.85;rk.vy=-3;
+      api.slide(520,820,0.1,0.2,"square");api.noise(0.05,0.1,1800);api.shake(3);
+      floats.push({x:clamp(rk.x,60,api.W-60),y:rk.y-rk.r*1.2,txt:"あうち",life:1,vy:-0.8,col:"#e8d0ff",size:26});
+      for(let i=0;i<5;i++){const a=-Math.PI/2+rnd(-1,1),s=rnd(3,6);
+        shards.push({x:bx,y:by,vx:Math.cos(a)*s,vy:Math.sin(a)*s,r:rnd(8,12),star:true,
+          rot:rnd(0,TAU),vr:rnd(-0.3,0.3),life:1,decay:rnd(0.02,0.03),col:"#ffe27a"});}
       return false;
     }
     if(rk.type==="giant"&&rk.hp>1){
@@ -407,7 +468,7 @@ function build_fireball(api){
       for(const rk of rocks){
         if(!paused){
           rk.x+=rk.vx*dt;rk.y+=rk.vy*dt;
-          if(rk.type==="imp")rk.y+=Math.sin(tsec*5+rk.wob)*0.9*dt; // ⑦ imp: vyにsin波を足してジグザグに飛ばす(いわと区別)
+          if(rk.type==="imp"){rk.y+=Math.sin(tsec*5+rk.wob)*0.9*dt;if(rk.vy<0.15)rk.vy+=0.1*dt;if(rk.ouch>0)rk.ouch=Math.max(0,rk.ouch-0.03*dt);} // ⑦ imp: vyにsin波を足してジグザグに飛ばす(いわと区別)
           if(rk.type==="ufo")rk.y+=Math.sin(tsec*3+rk.wob)*0.7*dt;   // ufo: 上下にふわふわ
           rk.rot+=rk.vr*dt;rk.wob+=0.08*dt;
         }
@@ -420,6 +481,31 @@ function build_fireball(api){
         drawRock(rk);
       }
       rocks=rocks.filter(rk=>!rk._dead);
+      // ---- ufoのかけら: 落ちて 地面で1回はねて ぽふっと消える ----
+      for(const f of falls){
+        if(!paused){f.vy+=0.5*dt;f.x+=f.vx*dt;f.y+=f.vy*dt;f.rot+=f.vr*dt;
+          const gy=groundY-f.r*0.3;
+          if(f.y>gy&&f.vy>0){
+            if(f.b<1){f.y=gy;f.vy=-f.vy*0.5;f.b++;api.noise(0.06,0.1,900);api.shake(2);
+              rings.push({x:f.x,y:groundY,r:f.r*0.3,vr:f.r*0.4,life:1,decay:0.06,col:"#ffd9a0"});
+              for(let i=0;i<6;i++){const a=-Math.PI/2+rnd(-1.2,1.2),s=rnd(2,6);
+                shards.push({x:f.x,y:groundY,vx:Math.cos(a)*s,vy:Math.sin(a)*s,r:rnd(3,6),rot:rnd(0,TAU),vr:rnd(-0.4,0.4),life:1,decay:rnd(0.02,0.03),col:"#ffb060"});}
+            }else{f._dead=true;
+              api.noise(0.1,0.14,700);api.tone(180,0.1,"triangle",0.1);
+              rings.push({x:f.x,y:groundY,r:f.r*0.3,vr:f.r*0.7,life:1,decay:0.05,col:"#9ad0ff"});
+              for(let i=0;i<10;i++){const a=-Math.PI/2+rnd(-1.3,1.3),s=rnd(3,8);
+                shards.push({x:f.x,y:groundY,vx:Math.cos(a)*s,vy:Math.sin(a)*s,r:rnd(3,7),rot:rnd(0,TAU),vr:rnd(-0.4,0.4),life:1,decay:rnd(0.016,0.026),col:i%2?"#9ad0ff":"#ff9a3a"});}
+            }
+          }
+        }
+        g.save();g.translate(f.x,f.y);g.rotate(f.rot);
+        const fr=Math.max(0,f.r);
+        g.fillStyle="#7a3208";g.beginPath();g.ellipse(0,fr*0.1,fr*0.9,fr*0.3,0,0,TAU);g.fill();
+        g.fillStyle="#ff8a2a";g.beginPath();g.ellipse(0,0,fr*0.9,fr*0.26,0,0,TAU);g.fill();
+        g.fillStyle="rgba(150,210,255,.9)";g.beginPath();g.ellipse(0,-fr*0.1,fr*0.4,fr*0.36,0,Math.PI,TAU);g.fill();
+        g.restore();
+      }
+      falls=falls.filter(f=>!f._dead);
       if(boss)drawBoss();
       // ---- ④ ながれ星: たまに空の高いところを流れる。ファイアボールで撃つとひみつのごほうび(減点なし)。
       if(!paused&&!shootStar&&Math.random()<0.004){
@@ -442,7 +528,7 @@ function build_fireball(api){
           // collide with rocks
           for(const rk of rocks){
             if(rk._dead)continue;
-            if(Math.hypot(ba.x-rk.x,ba.y-rk.y)<ba.r+rk.r*(ba.tightHit?0.45:(ba.firstShot||0.7))){
+            if(Math.hypot(ba.x-rk.x,ba.y-rk.y)<ba.r+rk.r*(ba.tightHit?TIGHT_K:(ba.firstShot||0.7))){
               const killed=hitRock(rk,ba.x,ba.y);
               if(!ba.big||killed||rk.type==="giant"){ba._dead=true;}
               if(!ba.big||rk.type==="giant")break;
@@ -471,7 +557,13 @@ function build_fireball(api){
       for(const p of shards){p.vy+=0.3*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.rot+=p.vr*dt;p.life-=p.decay*dt;
         g.save();g.globalAlpha=Math.max(0,p.life);g.translate(p.x,p.y);g.rotate(p.rot);
         g.shadowColor=p.col;g.shadowBlur=8;g.fillStyle=p.col;
-        g.fillRect(-p.r*0.5,-p.r*0.5,p.r,p.r);g.restore();}
+        if(p.rd){g.beginPath();g.arc(0,0,Math.max(0,p.r*0.5),0,TAU);g.fill();}
+        else if(p.star){const sr=p.r*0.6;g.beginPath();
+          for(let i=0;i<5;i++){const a=-Math.PI/2+i*TAU/5;g.lineTo(Math.cos(a)*sr,Math.sin(a)*sr);
+            const a2=a+TAU/10;g.lineTo(Math.cos(a2)*sr*0.45,Math.sin(a2)*sr*0.45);}
+          g.closePath();g.fill();}
+        else g.fillRect(-p.r*0.5,-p.r*0.5,p.r,p.r);
+        g.restore();}
       g.shadowBlur=0;g.globalAlpha=1;shards=shards.filter(p=>p.life>0);
       // ---- sparks (additive lines) ----
       g.save();g.globalCompositeOperation="lighter";g.lineCap="round";
@@ -514,7 +606,7 @@ function build_fireball(api){
       // ---- floats (combo text) ----
       if(combo>0){comboT-=0.016*dt;if(comboT<=0)combo=0;}
       for(const f of floats){f.y+=f.vy*dt;f.life-=0.018*dt;
-        g.save();g.globalAlpha=Math.max(0,f.life);
+        g.save();g.globalAlpha=f.life>0.15?Math.max(0.6,Math.min(1,f.life*2.5)):Math.max(0,f.life/0.15*0.6);   // 消えかけでも背景に同化しない下限
         g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.lineWidth=6;g.strokeStyle="rgba(40,8,4,.6)";g.strokeText(f.txt,f.x,f.y);
         g.fillStyle=f.col;g.fillText(f.txt,f.x,f.y);g.restore();}
@@ -526,7 +618,7 @@ function build_fireball(api){
         const pop=1+Math.max(0,comboT-0.7)*1.2;
         g.save();g.translate(api.W/2,api.H*0.12);g.scale(pop,pop);
         g.font="800 32px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-        g.globalAlpha=clamp(comboT,0,1);g.shadowColor="rgba(255,90,30,.9)";g.shadowBlur=14;
+        g.globalAlpha=comboT>0.15?Math.max(0.6,clamp(comboT,0,1)):Math.max(0,comboT/0.15*0.6);g.shadowColor="rgba(255,90,30,.9)";g.shadowBlur=14;
         g.fillStyle="#ffd23f";g.fillText("コンボ x"+combo,0,0);
         g.shadowBlur=0;g.lineWidth=1.5;g.strokeStyle="rgba(255,255,255,.6)";
         g.strokeText("コンボ x"+combo,0,0);g.restore();g.globalAlpha=1;g.textAlign="left";
@@ -617,7 +709,7 @@ function build_fireball(api){
         g.font="800 26px 'Hiragino Maru Gothic ProN',system-ui";g.fillStyle="#fff";
         g.fillText("すごい！ もういちど あそべるよ",0,50);
         g.restore();g.globalAlpha=1;g.textAlign="left";
-        if(endingT<=0){endingT=0;stage=1;stageGoal=stageGoalFor(1);stageKill=0;stageMiss=0;combo=0;layout();spawnT=20;}
+        if(endingT<=0){endingT=0;stage=1;giantSeen=false;stageSpawns=0;stageGoal=stageGoalFor(1);stageKill=0;stageMiss=0;combo=0;layout();spawnT=20;}
       }
     },
     stop(){}
@@ -717,7 +809,13 @@ function build_fireball(api){
       g.beginPath();g.moveTo(r*0.55,bob-r*0.5);g.lineTo(r*0.82,bob-r*1.05);g.lineTo(r*0.2,bob-r*0.6);g.closePath();g.fill();
       // glowing eyes (drawCannonと同じ手法を流用)
       g.save();g.globalCompositeOperation="lighter";g.shadowColor="#ffe27a";g.shadowBlur=10;g.fillStyle="#fff6c8";
-      g.beginPath();g.arc(-r*0.26,bob-r*0.05,Math.max(0,r*0.13),0,TAU);g.arc(r*0.26,bob-r*0.05,Math.max(0,r*0.13),0,TAU);g.fill();
+      if(rk.ouch>0){ // 1発目のあと: 目が > < (あうち)
+        g.strokeStyle="#fff6c8";g.lineWidth=Math.max(2,r*0.08);g.lineCap="round";
+        g.beginPath();g.moveTo(-r*0.4,bob-r*0.2);g.lineTo(-r*0.16,bob-r*0.07);g.lineTo(-r*0.4,bob+r*0.06);g.stroke();
+        g.beginPath();g.moveTo(r*0.4,bob-r*0.2);g.lineTo(r*0.16,bob-r*0.07);g.lineTo(r*0.4,bob+r*0.06);g.stroke();
+      }else{
+        g.beginPath();g.arc(-r*0.26,bob-r*0.05,Math.max(0,r*0.13),0,TAU);g.arc(r*0.26,bob-r*0.05,Math.max(0,r*0.13),0,TAU);g.fill();
+      }
       g.restore();
       // grin (drawBossと同じ弧の手法を流用)
       g.strokeStyle="#ffe27a";g.lineWidth=Math.max(1,r*0.08);g.lineCap="round";

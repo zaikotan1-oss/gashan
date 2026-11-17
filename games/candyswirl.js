@@ -78,7 +78,7 @@ function build_candyswirl(api){
   }
 
   function fling(s,vx,vy){
-    s.caught=null; s.state="free"; s.vx=vx; s.vy=vy; s.squash=1.4;
+    s.caught=null; s.state="free"; s.vx=vx; s.vy=vy; s.squash=1.4; s.flungF=true;
   }
 
   function popSweet(s,vortCol){
@@ -336,7 +336,7 @@ function build_candyswirl(api){
       for(const v of vortices){
         v.t+=0.016*dt; v.spin+=0.34*dt;
         v.grow=Math.min(1,v.grow+0.04*dt);
-        v.held=Math.min(3,v.held); // count of currently caught
+        v.held=Math.min(2,v.held); // count of currently caught
         // life: lives ~2.6s, fades out
         if(v.t>2.0) v.life-=0.03*dt;
         v.pull=R*(2.0+v.grow*1.8+v.kills*0.4); // grows as it catches more(軸3: 吸引範囲を弱め、狙いを必要にする)
@@ -371,7 +371,10 @@ function build_candyswirl(api){
         }
         // free or flung: move + bounce, look for a vortex to be caught by
         s.x+=s.vx*dt; s.y+=s.vy*dt;
-        const flung=Math.hypot(s.vx,s.vy)>6;
+        const spd0=Math.hypot(s.vx,s.vy);
+        // 投げられたおかしは、壁に当たるまで「われる状態」を保つ(速度が落ちても漂いに戻さない)
+        if(s.flungF&&spd0<1.6)s.flungF=false;
+        const flung=!!s.flungF||spd0>6;
         // wall collision
         let hitWall=false;
         if(s.x<s.r){s.x=s.r;s.vx=Math.abs(s.vx);hitWall=true;}
@@ -379,12 +382,13 @@ function build_candyswirl(api){
         if(s.y<api.H*0.14+s.r){s.y=api.H*0.14+s.r;s.vy=Math.abs(s.vy);hitWall=true;}
         else if(s.y>api.H-s.r){s.y=api.H-s.r;s.vy=-Math.abs(s.vy);hitWall=true;}
         if(flung&&hitWall){ popSweet(s,null); continue; }
+        if(hitWall)s.flungF=false;
         if(!flung){
           // gentle drift slows down
           s.vx*=Math.pow(0.992,dt); s.vy*=Math.pow(0.992,dt);
           // try to get caught by the nearest vortex within pull radius
           for(const v of vortices){
-            if(v.held>=3)continue; // 軸3: 1うずまきが同時に捕まえられる数を絞る
+            if(v.held>=2)continue; // 軸3: 1うずまきが同時に捕まえられる数を絞る(3→2: 投げたおかしが割れやすくなった分を相殺)
             const d=Math.hypot(s.x-v.x,s.y-v.y);
             if(d<v.pull){
               s.state="caught"; s.caught=v; v.held++;
@@ -460,17 +464,17 @@ function build_candyswirl(api){
         g.save(); g.translate(api.W/2,api.H*0.12); g.scale(pop,pop);
         g.font="800 32px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
         g.globalAlpha=clamp(comboT,0,1);
-        g.shadowColor="rgba(255,123,208,.8)"; g.shadowBlur=14;
-        g.fillStyle="#ff7bd0"; g.fillText("コンボ x"+combo,0,0);
-        g.shadowBlur=0; g.lineWidth=1.5; g.strokeStyle="rgba(255,255,255,.7)";
-        g.strokeText("コンボ x"+combo,0,0);
+        const ctxt="コンボ x"+combo;
+        g.lineJoin="round"; g.lineWidth=7; g.strokeStyle="rgba(120,40,90,.85)"; g.shadowBlur=0;
+        g.strokeText(ctxt,0,0);
+        g.fillStyle=combo>=5?"#ffd23f":"#fff"; g.fillText(ctxt,0,0);
         g.restore(); g.globalAlpha=1; g.textAlign="left";
       }
 
       // ① にじいろキャンディ! 発見バナー(虹色に色替わり・top-center安全帯)
       if(rbMsgT>0){ rbMsgT-=0.016*dt; if(clearT<=0){
         const pop=1+Math.max(0,rbMsgT-1)*1.4, col=SWIRLCOL[Math.floor(tsec*6)%SWIRLCOL.length];
-        g.save(); g.translate(api.W/2,api.H*0.32); g.scale(pop,pop);
+        g.save(); g.translate(api.W/2,api.H*0.52); g.scale(pop,pop);
         g.font="900 34px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
         g.globalAlpha=clamp(rbMsgT*1.4,0,1); g.shadowColor=col; g.shadowBlur=18;
         g.fillStyle="#ffffff"; g.fillText("にじいろキャンディ!",0,0);
@@ -554,9 +558,11 @@ function build_candyswirl(api){
     const bw=Math.min(api.W*0.6,360),bh=16,bx=(api.W-bw)/2,by=api.H*0.045;
     g.save(); g.textAlign="center";
     g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
-    g.fillStyle="#fff"; g.shadowColor="rgba(120,40,90,.5)"; g.shadowBlur=6;
-    g.fillText("ステージ "+stage+"      あと "+left+" こ",api.W/2,by-8);
-    g.shadowBlur=0;
+    g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
+    const htxt="ステージ "+stage+"      あと "+left+" こ";
+    g.lineJoin="round"; g.lineWidth=4; g.strokeStyle="rgba(120,40,90,.75)"; g.shadowBlur=0;
+    g.strokeText(htxt,api.W/2,by-8);
+    g.fillStyle="#fff"; g.fillText(htxt,api.W/2,by-8);
     g.fillStyle="rgba(120,40,90,.3)"; rrect(bx,by,bw,bh,bh/2); g.fill();
     const fr=clamp(stageKill/stageGoal,0,1);
     if(fr>0){ const gg=g.createLinearGradient(bx,0,bx+bw,0);
@@ -565,11 +571,13 @@ function build_candyswirl(api){
     g.strokeStyle="rgba(255,255,255,.6)"; g.lineWidth=2; rrect(bx,by,bw,bh,bh/2); g.stroke();
     // フィーバーゲージ(ステージ帯の下の細い帯。たまる=金色、フィーバー中=虹色で減っていく)
     if(fever>0||feverOn>0){
-      const fy=by+bh+5, fh=7, ff=feverOn>0?clamp(feverOn/10,0,1):clamp(fever,0,1);
-      g.fillStyle="rgba(120,40,90,.3)"; rrect(bx,fy,bw,fh,fh/2); g.fill();
+      const fy=by+bh-5, fh=5, ff=feverOn>0?clamp(feverOn/10,0,1):clamp(fever,0,1);
+      g.globalAlpha=0.9;
+      g.fillStyle="rgba(120,40,90,.45)"; rrect(bx,fy,bw,fh,fh/2); g.fill();
       if(ff>0){ g.fillStyle=feverOn>0?SWIRLCOL[Math.floor(tsec*8)%SWIRLCOL.length]:"#ff9a3c";
         rrect(bx,fy,Math.max(fh,bw*ff),fh,fh/2); g.fill(); }
       g.strokeStyle="rgba(255,255,255,.6)"; g.lineWidth=1.5; rrect(bx,fy,bw,fh,fh/2); g.stroke();
+      g.globalAlpha=1;
     }
     g.restore(); g.textAlign="left";
   }
@@ -588,6 +596,8 @@ function build_candyswirl(api){
       const grd=g.createRadialGradient(-r*0.3,-r*0.3,r*0.1,0,0,r);
       grd.addColorStop(0,lighten(def.col,80)); grd.addColorStop(0.6,def.col); grd.addColorStop(1,shadec(def.col,-30));
       g.fillStyle=grd; g.beginPath(); g.arc(0,0,r*0.8,0,TAU); g.fill();
+      g.strokeStyle="rgba(120,40,90,.55)"; g.lineWidth=4;
+      g.beginPath(); g.arc(0,0,r*0.8,0,TAU); g.stroke();
       g.strokeStyle="rgba(255,255,255,.5)"; g.lineWidth=2;
       g.beginPath(); g.arc(0,0,r*0.8,0,TAU); g.stroke();
       g.fillStyle="rgba(255,255,255,.5)"; g.beginPath(); g.ellipse(-r*0.22,-r*0.28,r*0.22,r*0.13,-0.5,0,TAU); g.fill();
@@ -668,6 +678,7 @@ function build_candyswirl(api){
       g.beginPath(); g.arc(-r*0.5,-r*0.65,r*0.3,0,TAU); g.arc(r*0.5,-r*0.65,r*0.3,0,TAU); g.fill();
       g.beginPath(); g.ellipse(0,0,r*0.82,r*0.9,0,0,TAU); g.fill();
       g.globalAlpha=1;
+      g.strokeStyle="rgba(120,40,90,.55)"; g.lineWidth=4; g.beginPath(); g.ellipse(0,0,r*0.82,r*0.9,0,0,TAU); g.stroke();
       g.strokeStyle="rgba(255,255,255,.4)"; g.lineWidth=2; g.beginPath(); g.ellipse(0,0,r*0.82,r*0.9,0,0,TAU); g.stroke();
       g.fillStyle="rgba(255,255,255,.5)"; g.beginPath(); g.ellipse(-r*0.28,-r*0.3,r*0.2,r*0.28,-0.4,0,TAU); g.fill();
       drawFace(0,0,r*0.42);

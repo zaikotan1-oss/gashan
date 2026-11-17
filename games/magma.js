@@ -148,7 +148,7 @@ function buildMagma(api){
   function smash(t){
     if(t.type==="rock"&&t.hp>1&&fever<=0){
       t.hp--;t.flash=1;t.squash=0.82;combo++;comboT=0.9;
-      api.slide(220,150,0.08,0.2,"square");api.noise(0.07,0.14,1200);api.shake(4);
+      api.slide(220,150,0.08,0.2,"square");api.noise(0.07,0.14,1200);api.shake(4);api.tone(330,0.06,"triangle",0.08);
       hitFx(t.x,t.baseY-R*0.5,false,"#888",t.type);spawnEmbers(t.x,t.baseY-R*0.6,5);return;
     }
     t.state="smashed";t.squash=1;holes[t.hi].occ=false;
@@ -309,7 +309,7 @@ function buildMagma(api){
         const bob=t.state==="up"?Math.sin(t.bob+=0)*R*0.04:0;
         const ty=t.baseY-((t.state==="rise"?ee:t.up)*R*1.6)-bob;
         g.save();
-        g.beginPath();g.rect(t.x-R*1.5,0,R*3,t.baseY+R*0.7);g.clip();
+        g.beginPath();g.rect(t.x-R*2.4,0,R*4.8,t.baseY+R*0.7);g.clip();
         if(t.type==="rock")drawRock(t,t.x,ty,t.state==="smashed"?t.squash:1);
         else if(t.type==="critter")drawCritter(t,t.x,ty,t.state==="smashed"?t.squash:1);
         else drawBlob(t,t.x,ty,t.state==="smashed"?t.squash:1);

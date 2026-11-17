@@ -47,13 +47,15 @@ function buildCandyshoot(api){
     //  大砲のx・タップの重心に近いy=中央付近に据える)
     if(!firstSpawned&&stage===1&&count===0){
       firstSpawned=true;
-      const fromLeft=Math.random()<0.5,r=R*1.6,ty2=api.H*0.48,speed2=0.35;
-      const x0=api.W/2+(fromLeft?-1:1)*r*1.6;
+      const fromLeft=Math.random()<0.5,r=R*2.0,ty2=api.H*0.42,speed2=0.2;
+      const x0=api.W/2+(fromLeft?-1:1)*r*1.0;
       targets.push({x:x0,y:ty2,vx:(fromLeft?1:-1)*speed2,
         r,kind:"candy",hp:1,col:pick(PASTEL),col2:pick(PASTEL),bob:rnd(0,TAU),
         spin:rnd(0,TAU),vs:rnd(-0.03,0.03)*(fromLeft?1:-1),flash:0,dy:0,lucky:false});
       return;
     }
+    // 【軸3】同時に出る数の上限: 帯にお菓子がたまって、画面のどこをでたらめに触っても当たる状態をやめる
+    if(targets.filter(t=>!t._dead&&t.kind!=="rainbow").length>=6+Math.floor(stage/2))return;
     // ① にじいろキャンディ: stage2以降 低確率(約5%)。すぐには出さず、はしっこに虹の矢印で予告し、少し遅れて登場(ドキドキ)。
     if(stage>=2&&rbTele<=0&&!targets.some(t=>t.kind==="rainbow")&&Math.random()<0.05){
       rbTele=54;rbTeleSide=Math.random()<0.5?1:-1;rbTeleY=rnd(api.H*0.18,api.H*0.46);
@@ -212,6 +214,7 @@ function buildCandyshoot(api){
     api.boom(0.7);api.shake(16);api.slide(220,1760,0.5,0.22,"square");
     [0,4,7,12,16].forEach((s,i)=>setTimeout(()=>api.tone(523*Math.pow(2,s/12),0.14,"triangle",0.12),i*60));
     floats.push({x:api.W/2,y:api.H*0.3,txt:"フィーバー！！",life:1,vy:-0.3,col:"#ff2bff",size:46});
+    floats.push({x:api.W/2,y:api.H*0.3+44,txt:"とくてん 2ばい！",life:1,vy:-0.3,col:"#fff",size:28});
     for(let i=0;i<16;i++){const a=rnd(0,TAU),s2=rnd(3,9);
       shards.push({x:api.W/2,y:api.H*0.35,vx:Math.cos(a)*s2,vy:Math.sin(a)*s2-2,r:rnd(4,8),
         rot:rnd(0,TAU),vr:rnd(-0.3,0.3),life:1,decay:0.012,col:"hsl("+rint(0,360)+",95%,65%)",shape:rint(0,2)});}
@@ -321,7 +324,7 @@ function buildCandyshoot(api){
       g.globalAlpha=1;
       // ---- spawn flying candies ----
       if(!paused){spawnT-=dt;if(spawnT<=0){spawn();spawnT=clamp(64-(stage-1)*7,30,64);  // 7〜8歳向けに少し速く
-        if(feverT>0)spawnT*=0.45;}   // fever: candies pour in
+        if(feverT>0)spawnT*=0.7;}   // fever: candies pour in(画面が埋まりすぎない程度)
         // ① にじいろ 予告カウント。満了で本体登場
         if(rbTele>0){rbTele-=dt;if(rbTele<=0)spawnRainbow(rbTeleSide,rbTeleY);}
         // ④ ながれ星 出現タイマー(画面に無い時だけ数える)
@@ -423,8 +426,10 @@ function buildCandyshoot(api){
       for(const f of floats){f.y+=f.vy*dt;f.life-=0.018*dt;
         g.save();g.globalAlpha=Math.max(0,f.life);
         g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-        g.lineJoin="round";g.lineWidth=6;g.strokeStyle="rgba(120,40,90,.7)";g.strokeText(f.txt,f.x,f.y);
-        g.fillStyle=f.col;g.fillText(f.txt,f.x,f.y);g.restore();}
+        // 画面の端で文字が切れないよう、幅を測ってxを画面内に収める
+        const fw=g.measureText(f.txt).width,hw=fw/2+8,fxc=clamp(f.x,hw,Math.max(hw,api.W-hw));
+        g.lineJoin="round";g.lineWidth=6;g.strokeStyle="rgba(120,40,90,.7)";g.strokeText(f.txt,fxc,f.y);
+        g.fillStyle=f.col;g.fillText(f.txt,fxc,f.y);g.restore();}
       g.globalAlpha=1;g.textAlign="left";floats=floats.filter(f=>f.life>0);
       // ---- celebration color-wash ----
       if(celebrate>0){const ca=Math.min(1,celebrate);
@@ -472,9 +477,12 @@ function buildCandyshoot(api){
         g.save();g.translate(api.W/2,api.H*0.30);g.scale(pop,pop);g.textAlign="center";
         g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 24px 'Hiragino Maru Gothic ProN',system-ui";
         const txt="きょうの ラッキーいろは "+(PASTELNAME[luckyColor]||"")+"！";
+        // 白い雲の上でも薄い色が読めるよう、濃い帯を文字の下に敷く
+        const lw=g.measureText(txt).width+36;
+        g.fillStyle="rgba(120,40,90,.4)";rrect(-lw/2,-27,lw,42,14);g.fill();
+        g.lineJoin="round";g.lineWidth=7;g.strokeStyle="rgba(90,25,70,.9)";g.strokeText(txt,0,0);
         g.shadowColor=luckyColor;g.shadowBlur=12;
-        g.lineWidth=5;g.strokeStyle="rgba(120,40,90,.5)";g.strokeText(txt,0,0);
-        g.fillStyle=luckyColor;g.fillText(txt,0,0);
+        g.fillStyle=luckyColor;g.fillText(txt,0,0);g.shadowBlur=0;
         g.restore();g.globalAlpha=1;g.textAlign="left";if(luckyMsgT<0)luckyMsgT=0;}
       // ③ パーフェクト ボーナス！ バナー(下側=クリア文字と重ねない)
       if(noMissT>0){noMissT-=0.014*dt;
@@ -762,22 +770,21 @@ function buildCandyshoot(api){
   }
   function drawHUD(){
     const left=clamp(stageGoal-stageKill,0,stageGoal);
-    const bw=Math.min(api.W*0.6,360),bh=16,bx=(api.W-bw)/2,by=api.H*0.045;
+    // 【軸6】HUDは2段: 1段目=ステージバー(文字をバーの中に重ねる) / 2段目=フィーバーの細いバー
+    const bw=Math.min(api.W*0.6,360),bh=26,bx=(api.W-bw)/2,by=api.H*0.045;
     g.save();g.textAlign="center";
-    // 【軸6】HUD背板: 白い雲の上でも文字とバーが読めるよう濃い板を敷く
-    g.fillStyle="rgba(120,40,90,.45)";rrect(bx-12,by-30,bw+24,bh+68,14);g.fill();
-    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
-    const hudTxt="ステージ "+stage+" / "+STAGES+"      あと "+left+" こ";
-    g.lineJoin="round";g.lineWidth=5;g.strokeStyle="rgba(120,40,90,.7)";g.strokeText(hudTxt,api.W/2,by-8);
-    g.fillStyle="#fff";g.shadowColor="rgba(120,40,90,.6)";g.shadowBlur=6;
-    g.fillText(hudTxt,api.W/2,by-8);
-    g.shadowBlur=0;
+    // HUD背板: 白い雲の上でも文字とバーが読めるよう濃い板を敷く
+    g.fillStyle="rgba(120,40,90,.45)";rrect(bx-12,by-10,bw+24,bh+34,14);g.fill();
     g.fillStyle="rgba(120,40,90,.35)";rrect(bx,by,bw,bh,bh/2);g.fill();
     const fr=clamp(stageKill/stageGoal,0,1);
     if(fr>0){const gg=g.createLinearGradient(bx,0,bx+bw,0);
       gg.addColorStop(0,"#9be8ff");gg.addColorStop(1,"#ff9ec4");
       g.fillStyle=gg;rrect(bx,by,Math.max(bh,bw*fr),bh,bh/2);g.fill();}
     g.strokeStyle="rgba(255,255,255,.6)";g.lineWidth=2;rrect(bx,by,bw,bh,bh/2);g.stroke();
+    g.font="800 17px 'Hiragino Maru Gothic ProN',system-ui";
+    const hudTxt="ステージ "+stage+" / "+STAGES+"    あと "+left+" こ";
+    g.lineJoin="round";g.lineWidth=5;g.strokeStyle="rgba(120,40,90,.8)";g.strokeText(hudTxt,api.W/2,by+bh/2+6);
+    g.fillStyle="#fff";g.fillText(hudTxt,api.W/2,by+bh/2+6);
     // fever gauge (thin bar under stage bar, top-center)
     const fx2=bx+bw*0.15,fw0=bw*0.7,fy=by+bh+5,fh=8;
     g.fillStyle="rgba(120,40,90,.3)";rrect(fx2,fy,fw0,fh,fh/2);g.fill();
@@ -786,21 +793,14 @@ function buildCandyshoot(api){
       if(fw2>fh){const fg2=g.createLinearGradient(fx2,0,fx2+fw0,0);
         for(let i=0;i<=4;i++)fg2.addColorStop(i/4,"hsl("+((feverHue*3+i*70)%360)+",90%,62%)");
         g.fillStyle=fg2;rrect(fx2,fy,fw2,fh,fh/2);g.fill();}
-      g.font="800 15px 'Hiragino Maru Gothic ProN',system-ui";
-      g.lineJoin="round";g.lineWidth=5;g.strokeStyle="rgba(120,40,90,.7)";
-      g.strokeText("フィーバー！ とくてん 2ばい！",api.W/2,fy+fh+18);
-      g.fillStyle="#fff";g.shadowColor="#ff2bff";g.shadowBlur=8;
-      g.fillText("フィーバー！ とくてん 2ばい！",api.W/2,fy+fh+18);g.shadowBlur=0;
     }else if(fever>0.02){
       const fw2=fw0*fever;
       if(fw2>fh){const fg2=g.createLinearGradient(fx2,0,fx2+fw0,0);
         fg2.addColorStop(0,"#ffd23f");fg2.addColorStop(1,"#ff2bff");
         g.fillStyle=fg2;rrect(fx2,fy,fw2,fh,fh/2);g.fill();}
-      if(fever>0.85){g.font="800 14px 'Hiragino Maru Gothic ProN',system-ui";
-        g.lineJoin="round";g.lineWidth=5;g.strokeStyle="rgba(120,40,90,.7)";
-        g.strokeText("もうすぐ フィーバー！",api.W/2,fy+fh+16);
-        g.fillStyle="#fff";g.shadowColor="rgba(255,43,255,.7)";g.shadowBlur=6;
-        g.fillText("もうすぐ フィーバー！",api.W/2,fy+fh+16);g.shadowBlur=0;}
+      if(fever>0.85){ // もうすぐ: バーが白くまたたく(文字の3段目は出さない)
+        g.globalAlpha=0.35+0.35*Math.sin(tsec*14);g.strokeStyle="#fff";g.lineWidth=2;
+        rrect(fx2,fy,fw0,fh,fh/2);g.stroke();g.globalAlpha=1;}
     }
     g.restore();g.textAlign="left";
   }

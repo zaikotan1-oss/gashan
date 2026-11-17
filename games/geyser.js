@@ -10,7 +10,7 @@ function build_geyser(api){
   // stage progression
   const STAGES=5;
   let stage=1,stageKill=0,stageGoal=10,clearT=0,clearStage=0,endingT=0,climax=0;
-  let novaT=0;
+  let novaT=0,idleT=0; // idleT: 最後に岩を壊してからのフレーム数(おたすけ判定)
   // fever / gold / hitstop-cooldown state
   let feverG=0,feverT=0,hitCd=0;
   const RAINBOW=["#ff5b5b","#ffd23f","#7be08a","#4db8ff","#b58bff","#ff7bd0"];
@@ -62,7 +62,7 @@ function build_geyser(api){
 
   function spawnRock(){
     // 軸3: 同時出現の的を減らし、どこを叩いても当たる状態を無くす(16→10。9まで絞ると初得点が遅れすぎたため調整)
-    if(rocks.length>10)return;
+    if(rocks.length>6)return;
     // ① 激レアな にじいろいわ (ステージ2以降・約3%)。虹色に光り、倒すと虹の大盤振る舞い＋大量点。
     const rainbow=stage>=2&&Math.random()<0.035;
     // レアなゴールドいわ (壊すと大量点+虹色破片+ファンファーレ)
@@ -109,13 +109,16 @@ function build_geyser(api){
       sparks.push({x:hx,y:hy,vx:Math.cos(a)*s,vy:Math.sin(a)*s,len:rnd(10,20),life:1,decay:rnd(0.04,0.07)});}
     rings.push({x:hx,y:hy,r:rk.r*0.4,vr:rk.r*0.8,life:1,decay:0.04,col:"#ffd23f"});
     rings.push({x:hx,y:hy,r:rk.r*0.2,vr:rk.r*0.5,life:1,decay:0.05,col:"#ffffff"});
-    floats.push({x:hx,y:Math.max(hy-rk.r,api.H*0.36),txt:"ゴールド！+"+gain,life:1,vy:-1,col:"#ffd23f",size:34});
+    floats.push({x:hx,y:Math.max(hy-rk.r,api.H*0.30),txt:"ゴールド！+"+gain,life:1,vy:-1,col:"#ffd23f",size:34});
   }
 
   function jetAt(x){
+    if(jets.length>=5)jets.shift(); // 軸3/軸6: 同時に立つ柱は5本まで(柱の壁で当たるのを防ぐ)
     // erupt a magma geyser from the ground up
+    // おたすけ: 2.5秒 なにも壊せていないときの1回は、柱が太く当たりやすい(失敗が続いても叱らない)
+    const assist=idleT>150;
     jets.push({x:clamp(x,R,api.W-R), y:groundY, h:0, maxH:api.H*rnd(0.62,0.82),
-      w:R*0.52, life:1, vy:rnd(15,19), peaked:false, age:0}); // 軸3: 捕捉幅を狭めて狙いを要求(0.48まで絞ると初得点が遅れすぎたため調整)
+      w:R*(assist?0.68:0.52), assist, life:1, vy:rnd(15,19), peaked:false, age:0}); // 軸3: 捕捉幅を狭めて狙いを要求(0.48まで絞ると初得点が遅れすぎたため調整)
     api.slide(120,520,0.3,0.28,"sawtooth");
     api.noise(0.35,0.32,520,"lowpass",0.7);
     api.tone(90,0.3,"sine",0.18);
@@ -137,7 +140,7 @@ function build_geyser(api){
       return;
     }
     // destroyed: blast it upward and pop
-    rk._dead=true;
+    rk._dead=true;idleT=0;
     const base=rk.type==="rainbow"?7:rk.type==="gold"?5:rk.type==="big"?3:1;
     // ② きょうのラッキー色: ふつう/でかいわ が秘密の色なら +2 の隠しボーナス。気づくと得する。
     const isLucky=(rk.type==="rock"||rk.type==="big")&&rk.col===luckyColor;
@@ -195,7 +198,7 @@ function build_geyser(api){
         rot:rnd(0,TAU),vr:rnd(-0.4,0.4),life:1,decay:rnd(0.01,0.018),col:RAINBOW[i%RAINBOW.length]});}
     for(let i=0;i<10;i++){if(sparks.length>=80)break;const a=rnd(0,TAU),s=rnd(5,12);
       sparks.push({x:hx,y:hy,vx:Math.cos(a)*s,vy:Math.sin(a)*s,len:rnd(10,20),life:1,decay:rnd(0.04,0.07)});}
-    floats.push({x:hx,y:Math.max(hy-rk.r,api.H*0.36),txt:"にじいろ！+"+gain,life:1,vy:-1,col:"#ff7bd0",size:36});
+    floats.push({x:hx,y:Math.max(hy-rk.r,api.H*0.30),txt:"にじいろ！+"+gain,life:1,vy:-1,col:"#ff7bd0",size:36});
   }
 
   function luckySparkle(hx,hy){
@@ -223,8 +226,11 @@ function build_geyser(api){
     api.boom(0.8);api.shake(16);hstop(5);
     api.slide(392,1568,0.5,0.28,"sawtooth");
     [0,4,7,12,16].forEach((s,i)=>setTimeout(()=>api.tone(523*Math.pow(2,s/12),0.18,"triangle",0.14),i*80));
-    floats.push({x:api.W/2,y:api.H*0.42,txt:"フィーバータイム！",life:1,vy:-0.5,col:"#ffd23f",size:44});
-    floats.push({x:api.W/2,y:api.H*0.42+46,txt:"てんすう 2ばい！ ぜんぶ 1ぱつ！",life:1,vy:-0.5,col:"#fff",size:22});
+    // 軸6: ゴールド/にじいろの浮遊文字と同時に出て重ならないよう 0.65秒 遅らせる
+    setTimeout(()=>{
+      floats.push({x:api.W/2,y:api.H*0.42,txt:"フィーバータイム！",life:1,vy:-0.5,col:"#ffd23f",size:44});
+      floats.push({x:api.W/2,y:api.H*0.42+46,txt:"てんすう 2ばい！ ぜんぶ 1ぱつ！",life:1,vy:-0.5,col:"#fff",size:22});
+    },650);
     for(let i=0;i<3;i++)spawnRock(); // 的が増える(どこを押しても当たる過密は避ける)
   }
 
@@ -237,12 +243,13 @@ function build_geyser(api){
     for(const rk of rocks){
       if(killed>=4)break;
       if(rk._dead||rk.y>=api.H*0.5)continue;
-      rk._dead=true;killed++;count+=(rk.type==="rainbow"?7:rk.type==="gold"?5:1)*mul;stageKill++;
+      rk._dead=true;idleT=0;killed++;count+=(rk.type==="rainbow"?7:rk.type==="gold"?5:1)*mul;stageKill++;
       burst(rk.x,rk.y,rk.type==="rainbow"?pick(RAINBOW):rk.col,14,true);
     }
     api.setScore(count);
-    floats.push({x:api.W/2,y:api.H*0.5,txt:"だいふんか！",life:1,vy:-0.6,col:"#ffd23f",size:36});
     checkStage();
+    if(clearT<=0&&endingT<=0) // 軸6: ステージクリアのバナーと重ねない
+      floats.push({x:api.W/2,y:api.H*0.5,txt:"だいふんか！",life:1,vy:-0.6,col:"#ffd23f",size:36});
   }
 
   function burst(x,y,col,n,big){
@@ -337,6 +344,7 @@ function build_geyser(api){
     frame(dt,now){
       tsec+=0.016*dt;
       if(hitCd>0)hitCd-=dt;
+      if(clearT<=0&&endingT<=0)idleT+=dt;
       if(moonCd>0)moonCd-=dt;
       const bg=curBg();
       // ---- 背景: 画像(夜の火山)があれば cover-fit + ステージ色を薄く重ねる / 無ければ従来の手描きグラデ ----
@@ -458,17 +466,17 @@ function build_geyser(api){
       for(const j of jets){
         j.age+=dt;
         if(!j.peaked){
-          j.h+=j.vy*dt;j.vy=Math.max(2,j.vy-0.45*dt);
+          j.h+=j.vy*dt;j.vy=Math.max(9,j.vy-0.45*dt);
           if(j.h>=j.maxH){j.peaked=true;}
         }else{
           j.life-=0.06*dt; // 軸3: 噴火の居座り時間を短縮(漂ってきた岩まで拾わないように)
         }
         const topY=groundY-j.h;
         // collide: any rock whose body the column reaches gets launched
-        if(j.life>0){
+        if(j.life>0&&j.age<70){ // 軸3: 押した直後だけ当たる(柱が居座って漂う岩を拾わない)
           for(const rk of rocks){
             if(rk._dead)continue;
-            if(Math.abs(rk.x-j.x)<j.w*0.26+rk.r*0.29 && rk.y+rk.r>topY-R && rk.y<groundY){
+            if(Math.abs(rk.x-j.x)<(j.w*0.26+rk.r*0.30)*(j.assist?1.7:1) && rk.y+rk.r>topY-R && rk.y<groundY){
               // push upward strongly; register a hit when near the jet head
               rk.vy=Math.min(rk.vy,-rnd(7,11));
               rk.vx+=(rk.x-j.x)*0.04;
@@ -622,7 +630,7 @@ function build_geyser(api){
         g.save();g.translate(api.W/2,api.H*0.40);g.scale(pop,pop);
         g.font="800 24px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.globalAlpha=clamp(luckyMsgT*1.4,0,1);g.shadowColor="rgba(255,240,160,.9)";g.shadowBlur=12;
-        const t2=luckyIntro?"きょうのラッキー色は "+(LUCKYNAME[luckyColor]||"")+"！":"ラッキー！";
+        const t2=luckyIntro?"きょうの ラッキーいろは "+(LUCKYNAME[luckyColor]||"")+"！":"ラッキー！";
         g.lineWidth=5;g.strokeStyle="rgba(60,10,0,.5)";g.strokeText(t2,0,0);
         g.fillStyle="#fff0a0";g.fillText(t2,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";if(luckyMsgT<0)luckyMsgT=0;}

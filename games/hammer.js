@@ -47,7 +47,7 @@ function buildHammer(api){
   let cur={x:0,y:0,has:false,tx:0,ty:0};
   let trail=[];           // sparkle trail behind the hammer head
   let climax=0;           // full-screen color-wash flash on big hits
-  const TC=["#ff5b5b","#4db8ff","#ffd23f","#7be08a","#c78bff"];
+  const TC=["#ff5b5b","#4db8ff","#ffd23f","#1f9d4f","#c78bff"];
   const TCNAME=["あか","あお","きいろ","みどり","むらさき"];
   // ⑤⑥⑦ 壊す物のバラエティ: ロボ以外の新シルエット(いわ=丸くて小さい/きばこ=四角/やぐら=積み箱で大きい)。
   // 型ごとの倍率テーブル(未掲載の型=1)。0.62〜1.58まで一目で分かる大小差をつける。
@@ -109,8 +109,11 @@ function buildHammer(api){
     return pick(bag);
   }
   function spawn(){
-    const free=holes.map((h,i)=>i).filter(i=>!holes[i].occ);
-    if(!free.length)return;
+    const free0=holes.map((h,i)=>i).filter(i=>!holes[i].occ);
+    if(!free0.length)return;
+    // 同じ列のすぐ上/下の穴に出ている的があれば、その穴は避ける(縦に重なって足が隠れるのを防ぐ)
+    const free1=free0.filter(i=>!targets.some(t=>t.state!=="smashed"&&t.hi%3===i%3&&Math.abs(Math.floor(t.hi/3)-Math.floor(i/3))===1));
+    const free=free1.length?free1:free0;
     // 最初の1匹だけは中央の穴(holes[4])に確実に出す(低学年は まず真ん中を叩く癖があるので、最初の成功を逃さない)
     const hi=(count===0&&targets.length===0&&!holes[4].occ)?4:pick(free);holes[hi].occ=true;
     // life shrinks per STAGE (not elapsed): constant within a stage, harder across
@@ -460,8 +463,9 @@ function buildHammer(api){
       const paused=clearT>0||endingT>0;
       if(!paused){spawnT-=dt;if(spawnT<=0){spawn();spawnT=clamp(52-(stage-1)*6,26,52);}
         // 画面が空っぽなら待たずに即補充（連打が空振り続きにならないように）
-        if(!targets.some(t=>t.state!=="smashed")&&spawnT>8)spawnT=8;}
-      // targets
+        if(!targets.some(t=>t.state!=="smashed")&&spawnT>5)spawnT=5;}
+      // targets (奥=上の穴から先に描き、手前の的が奥の的の足を隠さない)
+      targets.sort((a,b)=>a.baseY-b.baseY);
       for(const t of targets){
         if(t.flash>0)t.flash-=0.08*dt;
         if(t.state==="rise"){t.up=Math.min(1,t.up+0.12*dt);if(t.up>=1)t.state="up";}
@@ -702,12 +706,12 @@ function buildHammer(api){
     const left=clamp(stageGoal-stageKill,0,stageGoal);
     const bw=Math.min(api.W*0.6,360),bh=16,bx=(api.W-bw)/2,by=api.H*0.045;
     g.save();g.textAlign="center";
-    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
-    g.fillStyle="#fff";g.shadowColor="rgba(0,0,0,.5)";g.shadowBlur=6;
+    g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
+    g.fillStyle="#fff";
     const top=bossFight?("ステージ "+stage+" / "+STAGES+"      ボスを たおせ!")
                        :("ステージ "+stage+" / "+STAGES+"      あと "+left+" ぴき");
+    g.lineWidth=5;g.lineJoin="round";g.strokeStyle="rgba(0,0,0,.65)";g.strokeText(top,api.W/2,by-8);
     g.fillText(top,api.W/2,by-8);
-    g.shadowBlur=0;
     if(!bossFight){
       // gauge track
       g.fillStyle="rgba(0,0,0,.35)";roundRect(bx,by,bw,bh,bh/2);g.fill();
@@ -762,9 +766,12 @@ function buildHammer(api){
       g.restore();g.shadowBlur=0;}
     g.fillStyle="rgba(0,0,0,.22)";g.beginPath();g.ellipse(0,r*0.72,r*0.82,r*0.3,0,0,TAU);g.fill();
     // 画像ロボ: 白ベースのスプライトを体色で着色(ラッキー色/にじいろの色替えを画像でも維持)
-    const spr=api.tinted("robot.png",baseCol,rainbow?0.6:0.55);
+    const spr=api.tinted("robot.png",baseCol,0.75);
     if(spr){
+      // 白い縁取り(ふちどり)で草原や岩の色から切り離す
+      g.save();g.shadowColor="rgba(255,255,255,.95)";g.shadowBlur=12;
       api.drawSrc(spr,0,-r*0.05,r*2.25,r*2.25,{center:true});
+      g.restore();
       if(t.flash>0){g.save();g.globalAlpha=t.flash*0.7;g.fillStyle="#fff";g.beginPath();g.arc(0,-r*0.05,r*0.95,0,TAU);g.fill();g.restore();}
       if(big&&t.hp<=1){g.strokeStyle="rgba(40,40,40,.65)";g.lineWidth=2.5;g.lineCap="round";
         g.beginPath();g.moveTo(-r*0.1,-r*0.7);g.lineTo(r*0.08,-r*0.25);g.lineTo(-r*0.12,r*0.1);g.lineTo(r*0.06,r*0.5);g.stroke();}
@@ -830,6 +837,7 @@ function buildHammer(api){
     const grd=g.createRadialGradient(-r*0.3,-r*0.4,r*0.1,0,0,r*1.2);
     grd.addColorStop(0,"#5a5a66");grd.addColorStop(0.6,"#2a2a33");grd.addColorStop(1,"#141419");
     g.fillStyle=grd;g.beginPath();g.arc(0,0,r*0.86,0,TAU);g.fill();
+    g.strokeStyle="rgba(255,255,255,.7)";g.lineWidth=3;g.stroke();
     g.fillStyle="rgba(255,255,255,.3)";g.beginPath();g.ellipse(-r*0.28,-r*0.34,r*0.2,r*0.12,-0.4,0,TAU);g.fill();
     // fuse cap + sparkling fuse (warns "don't hit!")
     g.fillStyle="#8a6a3a";g.fillRect(-r*0.16,-r*1.05,r*0.32,r*0.28);
@@ -856,7 +864,7 @@ function buildHammer(api){
     g.fillStyle=grd;
     g.beginPath();pts.forEach(([px,py],i)=>{const xx=px*r,yy=py*r;if(i===0)g.moveTo(xx,yy);else g.lineTo(xx,yy);});
     g.closePath();g.fill();
-    g.strokeStyle="rgba(255,255,255,.22)";g.lineWidth=2;g.stroke();
+    g.strokeStyle="rgba(255,255,255,.7)";g.lineWidth=3;g.stroke();
     // ひび割れ(いわの質感)
     g.strokeStyle="rgba(0,0,0,.28)";g.lineWidth=Math.max(1,r*0.05);g.lineCap="round";
     g.beginPath();g.moveTo(-r*0.2,-r*0.5);g.lineTo(r*0.05,-r*0.1);g.lineTo(-r*0.1,r*0.35);g.stroke();
@@ -885,7 +893,7 @@ function buildHammer(api){
     const grd=g.createLinearGradient(x0,y0,x0,y0+h);
     grd.addColorStop(0,shade(t.color,60));grd.addColorStop(0.55,t.color);grd.addColorStop(1,shade(t.color,-35));
     g.fillStyle=grd;roundRect(x0,y0,w,h,r*0.14);g.fill();
-    g.strokeStyle="rgba(255,255,255,.3)";g.lineWidth=2;roundRect(x0,y0,w,h,r*0.14);g.stroke();
+    g.strokeStyle="rgba(255,255,255,.7)";g.lineWidth=3;roundRect(x0,y0,w,h,r*0.14);g.stroke();
     // 木目の横板 + バッテン板(木箱らしさ)
     g.strokeStyle=shade(t.color,-55);g.lineWidth=Math.max(1.5,r*0.045);
     for(let i=1;i<4;i++){const yy=y0+h*i/4;g.beginPath();g.moveTo(x0+r*0.06,yy);g.lineTo(x0+w-r*0.06,yy);g.stroke();}
@@ -908,7 +916,7 @@ function buildHammer(api){
       const grd=g.createLinearGradient(x0,y0,x0,y0+segH);
       grd.addColorStop(0,shade(t.color,55));grd.addColorStop(0.55,t.color);grd.addColorStop(1,shade(t.color,-35));
       g.fillStyle=grd;roundRect(x0,y0,segW,segH,r*0.1);g.fill();
-      g.strokeStyle="rgba(255,255,255,.3)";g.lineWidth=2;roundRect(x0,y0,segW,segH,r*0.1);g.stroke();
+      g.strokeStyle="rgba(255,255,255,.7)";g.lineWidth=3;roundRect(x0,y0,segW,segH,r*0.1);g.stroke();
       g.strokeStyle="rgba(90,55,20,.5)";g.lineWidth=Math.max(1.5,r*0.045);
       g.beginPath();g.moveTo(x0+r*0.08,y0+segH*0.5);g.lineTo(x0+segW-r*0.08,y0+segH*0.5);g.stroke();
       if(i===t.hp-1&&t.flash>0){g.save();g.globalAlpha=t.flash*0.7;g.fillStyle="#fff";roundRect(x0,y0,segW,segH,r*0.1);g.fill();g.restore();}

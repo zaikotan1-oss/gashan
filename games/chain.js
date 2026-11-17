@@ -185,7 +185,7 @@ function buildChain(api){
     if(n>=2)stageScore+=n+bonus;
     // big-chain extra punch (no hitStop here, detonate already added a small one)
     if(n>=6){api.boom(clamp(0.4+n*0.03,0.4,0.7));}
-    if(n>=2)floats.push({x:api.W/2,y:api.H*0.38,txt:n+"れんさ！"+(bonus?" +"+bonus:"")+(isTarget?" おだいクリア!":""),
+    if(n>=2)floats.push({x:api.W/2,y:api.H*0.38,txt:n+"れんさ！"+(bonus?" +"+bonus:"")+((isTarget&&!(clearAnim<=0&&stageScore>=stageTarget))?" おだいクリア!":""),
       col:isTarget?"#ffe27a":n>=8?"#ff3b3b":n>=4?"#ff8c42":"#ffd23f",life:1,vy:-0.3,size:n>=6||isTarget?52:38,born:0});
     // ③ 軸3(c) maxQuietSec対策: 大きいチェインを割った直後で場が薄くなったときだけ、
     // spawnGapのタイマーを待たずに即補充する(判定半径・得点係数はそのまま)。
@@ -213,8 +213,8 @@ function buildChain(api){
       sparks.push({x:rnd(0,api.W),y:rnd(-20,api.H*0.2),vx:rnd(-2,2),vy:rnd(2,6),
         r:rnd(2,6),life:1,decay:rnd(0.008,0.016),col:pick(COLORS),glow:true});
     }
-    floats.push({x:api.W/2,y:api.H*0.47,txt:last?"ぜんステージ クリア！":"ステージ "+stage+" クリア！",
-      col:last?"#ffe27a":"#7be08a",life:1.4,vy:-0.4,size:54,born:0});
+    floats.push({x:api.W/2,y:api.H*0.5,txt:last?"ぜんステージ クリア！":"ステージ "+stage+" クリア！",
+      col:last?"#ffe27a":"#fff3c4",life:last?3.2:2.4,vy:-0.2,size:54,born:0,banner:true});
   }
   function nextStage(){
     if(clearWon){ // looped: restart from stage 1, keep score rolling
@@ -223,6 +223,7 @@ function buildChain(api){
       stage=Math.min(MAXSTAGE,stage+1);
     }
     setupStage();
+    floats=floats.filter(f=>!f.banner); // クリアのバナーは次の面の文字と重ねない
     // clear active orbs so the new stage's お題色 mix takes over
     // ③ 軸3(b)(c)対策: reset()と同じく、切り替え直後も薄くしない(13固定→orbCapまで満たす)。
     // ステージ切り替えは90秒中に何度も起きるので、ここが13のままだと毎回そこで無音区間が生まれる。
@@ -453,16 +454,28 @@ function buildChain(api){
         const pop=1+Math.sin(t*0.4)*0.04;
         g.save();g.translate(api.W/2,api.H*0.12);g.scale(pop,pop);
         g.font="800 30px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-        g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText("チェイン "+chain.length,0,0);
-        g.shadowColor="#ffd23f";g.shadowBlur=14;g.fillStyle="#ffe27a";g.fillText("チェイン "+chain.length,0,0);
+        g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText("れんさ "+chain.length,0,0);
+        g.shadowColor="#ffd23f";g.shadowBlur=14;g.fillStyle="#ffe27a";g.fillText("れんさ "+chain.length,0,0);
         g.shadowBlur=0;g.restore();g.textAlign="left";}
+      // --- stage-clear overlay: soft dim + sub-line so the 区切り is unmistakable ---
+      if(clearAnim>0){
+        const a=clamp(clearAnim/30,0,1)*0.25;
+        g.fillStyle="rgba(10,6,26,"+a+")";g.fillRect(0,0,api.W,api.H);
+        const sub=clearWon?"おめでとう！ もういちど あそべるよ":"つぎの ステージへ！";
+        const pop=1+Math.sin(t*0.3)*0.05;
+        g.save();g.translate(api.W/2,api.H*0.56);g.scale(pop,pop);
+        g.font="800 24px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";g.textBaseline="middle";
+        g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.55)";g.strokeText(sub,0,0);
+        g.shadowColor="#ffe27a";g.shadowBlur=14;g.fillStyle="#fff3c4";g.fillText(sub,0,0);
+        g.shadowBlur=0;g.restore();g.textAlign="left";g.textBaseline="alphabetic";
+      }
       // floats
       for(const f of floats){if(f.born<1)f.born=Math.min(1,f.born+0.12*dt);
-        f.y+=f.vy*dt;f.life-=0.014*dt;g.globalAlpha=Math.max(0,f.life);
+        f.y+=f.vy*dt;f.life-=0.014*dt;g.globalAlpha=Math.min(1,Math.max(0,f.life));
         const sc=ease?ease(f.born):f.born;const fs=f.size*(0.6+0.4*sc);
         g.save();g.translate(f.x,f.y);g.scale(1,1);
         g.font="800 "+fs+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-        g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText(f.txt,0,0);
+        g.lineWidth=8;g.strokeStyle="rgba(0,0,0,.7)";g.strokeText(f.txt,0,0);
         g.shadowColor=f.col;g.shadowBlur=16;g.fillStyle=f.col;g.fillText(f.txt,0,0);g.shadowBlur=0;g.restore();}
       g.globalAlpha=1;g.textAlign="left";floats=floats.filter(f=>f.life>0);
       // ① にじいろチェイン！ バナー(虹色に色替わり)
@@ -481,18 +494,6 @@ function buildChain(api){
         g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText("パーフェクト！",0,0);
         g.shadowColor="#7be08a";g.shadowBlur=14;g.fillStyle="#c7ffcf";g.fillText("パーフェクト！",0,0);g.shadowBlur=0;
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(perfMsgT<0)perfMsgT=0;}
-      // --- stage-clear overlay: soft dim + sub-line so the 区切り is unmistakable ---
-      if(clearAnim>0){
-        const a=clamp(clearAnim/30,0,1)*0.35;
-        g.fillStyle="rgba(10,6,26,"+a+")";g.fillRect(0,0,api.W,api.H);
-        const sub=clearWon?"おめでとう！ もういちど あそべるよ":"つぎの ステージへ！";
-        const pop=1+Math.sin(t*0.3)*0.05;
-        g.save();g.translate(api.W/2,api.H*0.56);g.scale(pop,pop);
-        g.font="800 24px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";g.textBaseline="middle";
-        g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.55)";g.strokeText(sub,0,0);
-        g.shadowColor="#ffe27a";g.shadowBlur=14;g.fillStyle="#fff3c4";g.fillText(sub,0,0);
-        g.shadowBlur=0;g.restore();g.textAlign="left";g.textBaseline="alphabetic";
-      }
       // hint - cute rounded translucent panel with glow + outline
       const ht="オーブを おして つなげて、はなして ドカン！";
       g.font="800 19px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";g.textBaseline="middle";

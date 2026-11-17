@@ -23,7 +23,8 @@ function build_donutfall(api){
     {a:"#ffe0d0",b:"#ffc9d6",c:"#e3d0ff"}  // 5 peach dream
   ];
   // 第4ラウンド: 判定を半径x1.35→x1.1へ絞る(狙わない連打が約半分当たる密度を下げる)。直径130px級の的は指(44px)より十分大きいまま。下限は指の半径相当。
-  const HIT_K=1.1,HIT_MIN=30;
+  // 第5ラウンド: 判定を見た目の白い輪(r*1.0)に一致させる(輪の外を押して当たる「ずるい当たり」をなくす)。mini(r=38)でも判定直径約76pxで指(44px)より大きい。
+  const HIT_K=1.0,HIT_MIN=36;
   function sky(){return SKY[(stage-1)%SKY.length];}
   function goalFor(s){return 13+(s-1)*4;}         // 13,17,21,25,29（7〜8歳向けに手応えを増やした）
   // fall speed scales with stage so the テンポ感 rises endlessly（7〜8歳向けに少し速く）
@@ -32,9 +33,10 @@ function build_donutfall(api){
   function fallSpeed(){return clamp(2.75+(stage-1)*0.56,2.75,9.4);}
   // 第2ラウンド改善: 補充間隔の上限を28→22に下げ、maxQuietSec(無反応の最長秒)を縮める。特に指をなぞる操作(drag)での間延び対策
   // 第4ラウンド: ステージ1だけ補充間隔を伸ばして同時数を約8個に(どこを押しても当たる密度を下げる)。maxQuietSecを見ながら調整
-  const STAGE1_GAP=22;
-  const IDLE_HELP=210;
-  function spawnGap(){const g0=stage<=1?STAGE1_GAP:clamp(24-(stage-1)*2,10,22);return fever>0?Math.max(8,g0*0.45):g0;}
+  // 第5ラウンド: 22→28フレーム(約0.47秒ごと)。同時に画面に出る数を約13個→約10個へ減らし、どこを押しても当たる密度を下げる
+  const STAGE1_GAP=28;
+  const IDLE_HELP=180;
+  function spawnGap(){const g0=stage<=1?STAGE1_GAP:clamp(28-(stage-1)*2.5,10,28);return fever>0?Math.max(8,g0*0.45):g0;}
   // hitStop は大ヒット限定 + 30フレーム以上のクールダウン
   function tryHitStop(f){if(hsCd<=0){api.hitStop(f);hsCd=32;}}
 
@@ -52,9 +54,9 @@ function build_donutfall(api){
   // 開始直後から的を3個見せる(1個だけより最初の成功が早く来る。軸1・軸3(b)対策。的の大きさ/判定は変えず開幕の数だけ増やすので軸3(a)は崩れない)
   // 第2ラウンド改善: 1個目は最初から画面内、かつ画面中央寄り(H*0.25)へ直接置く。低学年のタップは画面中央付近に集中するため、
   // 端(H*0.18やそれより上)より中央寄りに置いたほうが最初のタップで当たりやすい(firstScoreSecの中央値3.75秒/3.8秒→3秒以内を狙う)。
-  // 2個目は画面上端近くに直接置き(H*0.08)、0秒時点で2個とも画面内に見える状態を作る。
+  // 2個目は画面上寄り(H*0.2。端すぎて見えない問題を避ける)に直接置き、0秒時点で2個とも画面内に見える状態を作る。
   spawn();{const f=sweets[sweets.length-1];f.y=api.H*0.25;f.x=api.W*0.5;f.vx=0;f.vy=fallSpeed()*0.7;}
-  spawn();sweets[sweets.length-1].y=api.H*0.08;
+  spawn();sweets[sweets.length-1].y=api.H*0.2;
   spawn();{const t=sweets[sweets.length-1];t.y=api.H*0.4;t.x=api.W*(Math.random()<0.5?0.3:0.7);t.vy=fallSpeed()*0.8;}
 
   function pickType(){
@@ -333,10 +335,11 @@ function build_donutfall(api){
       // ---- spawn ----
       const paused=clearT>0;
       if(!paused){spawnT-=dt;if(spawnT<=0){spawn();spawnT=spawnGap();}}
-      // 第4ラウンド: 判定を絞った代わりの助け舟。5秒ほど何も割れていなければ、画面中央の上から1個だけゆっくり落とす(迷子の子が置いていかれない)
+      // 第4ラウンド: 判定を絞った代わりの助け舟。約3秒(180フレーム)何も割れていなければ、画面中央の上から1個だけゆっくり落とす(迷子の子が置いていかれない)
       if(!paused){idleT+=dt;if(idleT>=IDLE_HELP){idleT=0;spawn();const h=sweets[sweets.length-1];
-        if(h.type==="cake"){h.type="donut";h.hp=1;h.r=R;}
-        h.x=api.W*rnd(0.4,0.6);h.vx=0;h.y=-h.r*0.4;h.vy=fallSpeed()*0.6;}}
+        if(h.type==="cake"||h.type==="mini"){h.type="donut";h.hp=1;h.r=R;}
+        // 第5ラウンド: 助け舟はすでに画面内(上寄り)に出し、すぐ押せるようにする(画面の外から降りてくるのを待たせない)
+        h.x=api.W*rnd(0.4,0.6);h.vx=0;h.y=api.H*0.14;h.vy=fallSpeed()*0.6;}}
 
       // ---- sweets update + draw ----
       for(const s of sweets){

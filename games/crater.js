@@ -19,6 +19,12 @@ function buildCrater(api){
     4:"つぎは はやい! ボスも くる!!",5:"さいごは でっかい ボス!!"};
   // 軸4: ステージごとに空の色を変える(絵は触らず「場所が変わった」感)
   const TINT=[null,"#3a6bff","#ff3a1a","#8a1aff","#ffb02a"];
+  // 軸4: 溶岩の池の色もステージごとに変える(中心/中間/ふち)。TINTと同じ系統の色
+  const LAVA=[["#fff0a6","#ff8a3a","#d4401a"],["#d8f0ff","#5aa0ff","#2a4ad4"],["#fff0a6","#ff6a3a","#d41a1a"],
+    ["#f0d8ff","#b066ff","#6a1ad4"],["#ffffff","#ffd23f","#d49a1a"]];
+  // 軸4: ボスの色もステージごとに変える(2面=あかい / 4面=あおい / 5面=むらさき+つの)
+  const BOSSCOL={2:["#ffe6a0","#ff9a2a","#e03a10","#701205"],4:["#e0f4ff","#4aa8ff","#2a4ad4","#10236a"],
+    5:["#f6e0ff","#b066ff","#6a1ad4","#2a0a5a"]};
   const EMBER_COLS=[["#ffd23f","#ff8a3a","#ff5b3a","#fff0a6"],["#9ad0ff","#5a8aff","#d8ecff","#7ab0ff"],
     ["#ffd23f","#ff8a3a","#ff5b3a","#fff0a6"],["#d9a8ff","#b066ff","#f0d8ff","#9a5aff"],["#fff0a6","#ffd23f","#ffb02a","#ffffff"]];
   // ---- 隠し発見レイヤー(クレーン/ハンマー/トラックと同じ思想) ----
@@ -32,7 +38,8 @@ function buildCrater(api){
   let lstars=[];                                       // ② ラッキー命中の頭上キラッ
   let stage3BoostT=0;   // 軸4(補助): ステージ3開始直後だけ少しゴールドを出やすくし、90秒でボスに届かない印象を和らげる
   function goldChance(){
-    const base=stage>=2?0.09:0.05;
+    // 軸4: 3面は「きんいろの あわが でるぞ!」の予告どおり、ゴールドをはっきり出やすくする
+    const base=stage===3?0.2:(stage>=2?0.11:0.06);
     // 軸4(補助): あとゴール5個以内まで来たら一時的にゴールドを出やすくし、終盤の得点効率を上げてボス到達を後押しする
     const nearGoal=(stageGoal-stagePop)<=5;
     const boosted=nearGoal?base+0.12:base;
@@ -46,7 +53,7 @@ function buildCrater(api){
   // ステージが進むほど少し速くなるが、どれだけ進んでも0.5秒未満にはならないようclampする。
   function growRate(){
     // 軸4: ステージが進むほど成長が急加速してフィズル(取りこぼし)が増えるのを緩和(0.00013→0.00008)
-    const raw=0.00035+(stage-1)*0.00008;
+    const raw=0.00035+(stage-1)*0.00006;   // 軸3: 後半の空白(何も起きない時間)を縮めるため増分を少し緩める
     return clamp(raw,0.00035,0.00095);
   }
   // ambient: rising embers + heat shimmer columns + far smoke puffs
@@ -102,6 +109,16 @@ function buildCrater(api){
         craters[i].aspect=rnd(0.42,0.6); craters[i].asp=craters[i].aspect;
       }
     }
+    // 軸7: 小さい個体も3〜4個(大きい穴とかぶらない)。当たり半径は R*0.72 でも指先の半分以上
+    {
+      const nSmall=Math.min(craters.filter((c,i)=>c.scale===1&&i%2===1&&i%5!==1).length,rint(3,4)), sm=[];
+      let guard=0;
+      while(sm.length<nSmall&&guard++<200){
+        const i=Math.floor(rnd(0,craters.length));
+        if(craters[i].scale===1&&i%2===1&&i%5!==1&&!sm.includes(i)) sm.push(i);   // 最初に育つ偶数番は小さくしない(最初の成功を遅らせない)
+      }
+      for(const i of sm) craters[i].scale=rnd(0.72,0.8);
+    }
     // keep craters dormant while a boss owns the arena (also on resize)
     if(bossActive||bossWarnT>0||bossDefeatT>0){
       bossX=api.W/2; bossY=api.H*0.45;
@@ -113,25 +130,43 @@ function buildCrater(api){
   }
   layout();
   // start a few bubbles so the first frame is lively
-  for(let i=0;i<craters.length;i++) if(i%2===0){craters[i].growing=true;craters[i].cd=0;craters[i].bub=rnd(0.05,0.2);}
+  for(let i=0;i<craters.length;i++) if(i%2===0||i%5===1){craters[i].growing=true;craters[i].cd=0;craters[i].bub=rnd(0.05,0.2);}
 
   // 軸7: 出現する物の種類を毎回抽選(丸あわ66% / 石の塊12% / ばくだん12% / ふたご10%)
+  // 軸4/軸7: 丸あわは半分以下。ステージごとに出やすい物を変える(3面=ばくだん多め/4面=ふたご多め/5面=タワー多め)
   function rollShape(){
-    const r=Math.random();
-    return r<0.66?"bubble":(r<0.78?"lump":(r<0.90?"bomb":"twin"));
+    const w={bubble:0.40,lump:0.18,bomb:0.14,twin:0.14,tower:0.14};
+    if(stage===3) w.bomb=0.27;
+    else if(stage===4) w.twin=0.27;
+    else if(stage===5) w.tower=0.27;
+    const tot=w.bubble+w.lump+w.bomb+w.twin+w.tower;
+    let r=Math.random()*tot;
+    for(const k of ["bubble","lump","bomb","twin","tower"]){ r-=w[k]; if(r<0) return k; }
+    return "bubble";
   }
+  // 軸7: タワー(3つ縦に積んだ小あわ)の形。上から1個ずつ割れる。k=0が一番下
+  function towerGeom(c){
+    const R=R0*(c.scale||1), s=c.bub;
+    const br=R*(0.32+s*0.88), by=c.y-R*0.2-s*R*0.5;
+    const pr=br*0.46;
+    return {R,br,by,pr,step:pr*1.7,oy0:br*0.55};
+  }
+  function towerOrbY(tg,k){return tg.by+tg.oy0-tg.step*k;}
   function bombRadius(){return R0*3.2;}
   function spawnBubble(c,startBub){
     const cR=R0*(c.scale||1);
     c.growing=true;c.bub=startBub||0.04;
-    c.shapeType=rollShape(); c.twinLeft=2; c.twinGone=0;
+    c.shapeType=rollShape(); c.twinLeft=2; c.twinGone=0; c.pillar=false;
     c.asp=c.aspect;
     if(c.shapeType!=="bubble"){
       c.gold=false; c.rainbow=false; c.gemCol=null; c.gemName="";
       if(c.shapeType==="lump"){
         c.asp=rnd(0.8,1.1);
+        // 軸7: ふつうの大きさの穴では、ときどき縦長の「いわの柱」(割ると横にたおれる)
+        if((c.scale||1)<=1.05&&Math.random()<0.45){ c.asp=rnd(1.2,1.4); c.pillar=true; }
         const nPts=rint(7,9); c.lumpPts=[]; for(let k=0;k<nPts;k++) c.lumpPts.push(rnd(0.68,1.15));
-      }else{ c.asp=1; }
+      }else if(c.shapeType==="tower"){ c.asp=1; c.twinLeft=3; }
+      else{ c.asp=1; }
       return;
     }
     c.gold=Math.random()<goldChance(); c.rainbow=false; c.gemCol=null; c.gemName="";
@@ -161,15 +196,20 @@ function buildCrater(api){
   function burst(c,big,side){
     const R=R0*(c.scale||1);   // 軸7: 大きいクレーターは判定/演出も一回り大きく
     const stype=c.shapeType||"bubble";
-    const isLump=stype==="lump", isBomb=stype==="bomb", isTwin=stype==="twin";
+    const isLump=stype==="lump", isBomb=stype==="bomb", isTwin=stype==="twin", isTower=stype==="tower";
     const chained=chainDepth>0;
     // ふたご: 片方だけ割る(side指定かつ2個とも残っている時)。のこりは育ち続ける
-    const partial=isTwin&&side&&c.twinLeft===2;
+    // タワー: 上の1個だけ割る(2個以上残っている間)。のこりはぽんと弾んで育ち続ける
+    const partial=(isTwin&&side&&c.twinLeft===2)||(isTower&&c.twinLeft>1);
     const size=c.bub;
     let hx=c.x, hy=c.y-R*0.2;
     if(isTwin&&(partial||c.twinLeft===1)){
       const sd=partial?side:(c.twinGone===-1?1:-1);
       hx=c.x+sd*R*(0.32+size*0.88)*0.58; hy=c.y-R*0.2-size*R*0.5;
+    }
+    if(isTower){
+      const tg=towerGeom(c); hx=c.x; hy=towerOrbY(tg,Math.max(0,c.twinLeft-1));
+      api.tone(480+(3-c.twinLeft)*200,0.1,"triangle",0.13);
     }
     const gold=!!c.gold;
     const rainbow=!!c.rainbow;
@@ -223,8 +263,15 @@ function buildCrater(api){
     // 角ばった岩片(chunk)や細長い破片(sliver)も混ぜる →「砕ける」一辺倒でなく壊れ方の違いを画面全体に広げる
     if(isLump){
       // 石がガラガラ崩れる: 角ばった岩片8〜10個。初速を下向きに+2して重く落ちる
+      // いわの柱(pillar)は片側へ ずしーんと たおれる: 破片の横向きをそろえる
+      const fallDir=Math.random()<0.5?-1:1;
+      if(c.pillar){
+        floats.push({x:hx+fallDir*R*0.5,y:hy-R*1.1,txt:"ずしーん!",life:1,vy:-0.8,col:"#ffd9a0",size:28});
+        api.shake(10);
+      }
       for(let i=0;i<rint(8,10);i++){const a=rnd(0,TAU),sp=rnd(1.5,4.5)*(0.6+size);
-        shards.push({x:hx,y:hy,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp+2-rnd(0,1.5),
+        const pvx=c.pillar?fallDir*(Math.abs(Math.cos(a))*sp*1.3+1.5):Math.cos(a)*sp;
+        shards.push({x:hx,y:hy,vx:pvx,vy:Math.sin(a)*sp+2-rnd(0,1.5),
           r:rnd(6,12)*(0.6+size*0.6),life:1,decay:rnd(0.012,0.02),gv:2.2,
           col:i%3===0?"#8a4a2a":(i%3===1?"#5a2a14":"#b9744a"),shape:"chunk",sides:rint(5,7),ang:rnd(0,TAU)});}
     }else if((c.scale||1)>1.05 || Math.random()<0.2){
@@ -275,10 +322,10 @@ function buildCrater(api){
         vy:-rnd(0.8,1.8),vx:rnd(-0.6,0.6),life:1,r:rnd(4,7),rot:rnd(0,TAU),vr:rnd(-0.2,0.2),col:c.gemCol});
     }
     if(partial){
-      // ふたご: 片方だけ消える。のこりの1個はそのまま育つ(倒れる/残る)
-      c.twinLeft=1; c.twinGone=side; c.pop=0.6;
+      if(isTower){ c.twinLeft--; c.pop=0.6; c.bounce=1; }   // タワー: 上から1個ずつ。のこりが ぽよん
+      else{ c.twinLeft=1; c.twinGone=side; c.pop=0.6; }   // ふたご: 片方だけ消える。のこりの1個はそのまま育つ
     }else{
-      c.bub=0; c.growing=false; c.gold=false; c.rainbow=false; c.gemCol=null; c.pop=1; c.cd=rint(8,spawnInterval());  // 軸4補助: spawnIntervalを反映(旧: rint(18,72)固定)
+      c.bub=0; c.growing=false; c.gold=false; c.rainbow=false; c.gemCol=null; c.pop=1; c.cd=rint(8,Math.max(10,spawnInterval()-6));  // 軸4補助: spawnIntervalを反映(旧: rint(18,72)固定)
       c.twinLeft=2; c.twinGone=0;
     }
     // ばくだん: 半径内で育っている他のあわを連鎖でふっとばす(1個ごと +1 ボーナスは burst 内)
@@ -300,7 +347,7 @@ function buildCrater(api){
     // bubble burst on its own (missed). gentle puff, combo resets, NO game over.
     const R=R0*(c.scale||1);
     const hx=c.x, hy=c.y-R*0.2;
-    combo=0; comboT=0; stageFizzle++;   // ③ 自然に割れた=このステージのミスとして記録
+    combo=0; comboT=0; if(!bossActive) stageFizzle++;   // ③ 自然に割れた=このステージのミスとして記録(ボス中のおまけあわは数えない)
     api.noise(0.16,0.18,360,"lowpass",0.9); api.slide(200,90,0.16,0.14,"sine"); api.shake(4);
     rings.push({x:hx,y:hy,r:R*0.3,vr:R*0.45,life:1,decay:0.05,col:"#7a3a1a"});
     for(let i=0;i<8;i++){const a=rnd(0,TAU),sp=rnd(1.5,4);
@@ -348,7 +395,19 @@ function buildCrater(api){
       shards.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-2,r:rnd(4,8),
         life:1,decay:rnd(0.015,0.025),col:pick(BUB)});}
     floats.push({x,y:y-30,txt:"+2",life:1,vy:-1.1,col:"#ffd23f",size:26});
-    if(bossHp<=0) bossDefeat();
+    if(bossHp<=0){ bossDefeat(); return; }
+    // 軸4: ボスごとに動きを変える。4面=たたくたびに ぴょんと跳ぶ / 5面=たたくたびに まわりにあわが出る(2面は動かない)
+    if(stage===4){
+      rings.push({x:bossX,y:bossY,r:bossRadius()*0.6,vr:bossRadius()*0.3,life:1,decay:0.07,col:"#5ad0ff"});
+      bossX=rnd(api.W*0.3,api.W*0.7); bossY=rnd(api.H*0.35,api.H*0.55);
+      rings.push({x:bossX,y:bossY,r:bossRadius()*0.3,vr:bossRadius()*0.5,life:1,decay:0.06,col:"#fff0a6"});
+      floats.push({x:bossX,y:bossY-bossRadius()*1.25,txt:"ぴょん!",life:1,vy:-0.8,col:"#d8f0ff",size:26});
+    }else if(stage===5){
+      const bR=bossRadius();
+      const idle=craters.filter(c=>!c.growing&&Math.hypot(c.x-bossX,c.y-bossY)>bR*1.3);
+      for(let i=idle.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));const t=idle[i];idle[i]=idle[j];idle[j]=t;}
+      for(const c of idle.slice(0,2)) c.cd=0;   // layout/startBossWarn の c.cd=9999 をボス中だけ解除
+    }
   }
   function bossDefeat(){
     bossActive=false; bossDone=true; bossDefeatT=1.8;
@@ -407,6 +466,15 @@ function buildCrater(api){
         const R=R0*(c.scale||1);   // 軸7: 大きいクレーターは当たり判定も一回り大きく
         const by=c.y-R*0.2-c.bub*R*0.5;
         const br=R*(0.35+c.bub*0.85);
+        if(c.shapeType==="tower"){
+          // タワー: 残っている小あわのどれかに触れたら、いちばん上の1個が割れる
+          const tg=towerGeom(c); let hit=false;
+          for(let k=0;k<c.twinLeft;k++){
+            if(Math.hypot(x-c.x,y-towerOrbY(tg,k))<tg.pr+R*0.3){hit=true;break;}
+          }
+          if(hit&&c.bub>bestSize){best=c;bestSize=c.bub;bestSide=0;}
+          continue;
+        }
         if(c.shapeType==="twin"){
           // ふたご: 2つの小さなあわをそれぞれ判定(近い方を割る)
           let sd=0,dd=1e9;
@@ -418,7 +486,7 @@ function buildCrater(api){
           if(sd&&c.bub>bestSize){best=c;bestSize=c.bub;bestSide=sd;}
           continue;
         }
-        if(Math.hypot(x-c.x,y-by)<br+R*0.2){
+        if(Math.hypot(x-c.x,y-by)<br+R*(tsec<4?0.38:0.2)){   // 最初の4秒だけ吸着を少し広げ、最初の成功を確実に
           if(c.bub>bestSize){best=c;bestSize=c.bub;bestSide=0;}
         }
       }
@@ -450,7 +518,7 @@ function buildCrater(api){
       if(api.drawCover("bg.jpg")){ imgBg=true;
         // 画像背景: 後半ステージほど空を少し赤く染めて「熱くなってきた」感を出す(薄く)
         const tn=TINT[Math.min(stage,STAGES)-1];
-        if(tn){g.save();g.globalAlpha=0.12;g.fillStyle=tn;g.fillRect(0,0,api.W,api.H);g.restore();}
+        if(tn){g.save();g.globalAlpha=0.22;g.fillStyle=tn;g.fillRect(0,0,api.W,api.H);g.restore();}
       } else {
         // volcanic sky gradient (deep sunset -> lava glow at base)
         let grd=g.createLinearGradient(0,0,0,api.H);
@@ -461,7 +529,7 @@ function buildCrater(api){
         grd.addColorStop(1,"#ffae3a");
         g.fillStyle=grd; g.fillRect(0,0,api.W,api.H);
         const tn2=TINT[Math.min(stage,STAGES)-1];
-        if(tn2){g.save();g.globalAlpha=0.12;g.fillStyle=tn2;g.fillRect(0,0,api.W,api.H);g.restore();}
+        if(tn2){g.save();g.globalAlpha=0.22;g.fillStyle=tn2;g.fillRect(0,0,api.W,api.H);g.restore();}
         // hazy sun low on the horizon
         const sunx=api.W*0.5,suny=api.H*0.92;
         let sun=g.createRadialGradient(sunx,suny,0,sunx,suny,api.W*0.7);
@@ -554,6 +622,7 @@ function buildCrater(api){
         const cR=R0*(c.scale||1);   // 軸7: 大きいクレーターは演出も一回り大きく
         c.wob+=0.06*dt; c.gloop+=0.04*dt;
         if(c.pop>0) c.pop-=0.06*dt;
+        if(c.bounce>0) c.bounce=Math.max(0,c.bounce-0.07*dt);
         if(!paused){
           if(!c.growing){
             c.cd-=dt;
@@ -794,8 +863,13 @@ function buildCrater(api){
     const dmg=1-bossHp/Math.max(1,bossMaxHp);
     // boss.png は生成2回とも足/台座の影が抜けきらず不採用→従来の手描きマグマ玉のみを使う
     const bg=g.createRadialGradient(-bR*0.3,-bR*0.35,bR*0.1,0,0,bR*1.1);
-    bg.addColorStop(0,"#ffe6a0"); bg.addColorStop(0.35,"#ff9a2a");
-    bg.addColorStop(0.7,"#e03a10"); bg.addColorStop(1,"#701205");
+    const bc=BOSSCOL[stage]||BOSSCOL[2];
+    bg.addColorStop(0,bc[0]); bg.addColorStop(0.35,bc[1]);
+    bg.addColorStop(0.7,bc[2]); bg.addColorStop(1,bc[3]);
+    if(stage===5){   // 最後のボスは つの付き
+      g.fillStyle=bc[3];
+      for(const sd of [-1,1]){ g.beginPath(); g.moveTo(sd*bR*0.35,-bR*0.82); g.lineTo(sd*bR*0.78,-bR*1.3); g.lineTo(sd*bR*0.8,-bR*0.55); g.closePath(); g.fill(); }
+    }
     g.fillStyle=bg; g.beginPath();
     g.ellipse(0,0,bR,bR*(0.97+0.05*Math.sin(tsec*5)),0,0,TAU); g.fill();
     // damage cracks appear as hp drops
@@ -855,8 +929,9 @@ function buildCrater(api){
     if(imgCrater) g.globalAlpha=0.45;
     const lavaR=R*0.7*(0.95+0.05*Math.sin(c.gloop));
     const lava=g.createRadialGradient(x,y+R*0.3,0,x,y+R*0.3,lavaR);
-    lava.addColorStop(0,"#fff0a6"); lava.addColorStop(0.4,"#ff8a3a");
-    lava.addColorStop(0.8,"#d4401a"); lava.addColorStop(1,"rgba(180,40,10,0)");
+    const lc=LAVA[Math.min(stage,STAGES)-1]||LAVA[0];
+    lava.addColorStop(0,lc[0]); lava.addColorStop(0.4,lc[1]);
+    lava.addColorStop(0.8,lc[2]); lava.addColorStop(1,"rgba(180,40,10,0)");
     g.fillStyle=lava; g.beginPath();
     g.ellipse(x,y+R*0.32,lavaR,lavaR*0.5,0,0,TAU); g.fill();
     g.restore();
@@ -899,8 +974,8 @@ function buildCrater(api){
       g.translate(x+wob,by);
       // 軸7: c.asp(縦長/横長)で丸一辺倒を崩す。種類(shapeType)ごとに見た目と形を変える。半径はMath.maxで非負クランプ。
       const asp=c.asp||1, stype=c.shapeType||"bubble";
-      const drawOrb=(ox,br,bh)=>{
-        g.save(); g.translate(ox,0);
+      const drawOrb=(ox,br,bh,oy)=>{
+        g.save(); g.translate(ox,oy||0);
         const isLump=stype==="lump"&&!!c.lumpPts, isBomb=stype==="bomb";
         const bg=g.createRadialGradient(-br*0.3,-br*0.4,br*0.1,0,0,br*1.1);
         if(c.rainbow){
@@ -983,7 +1058,7 @@ function buildCrater(api){
           g.beginPath(); g.arc(tx,ty,Math.max(0,br*0.2*(0.6+bl*0.7)),0,TAU); g.fill();
           g.fillStyle="#fff"; g.beginPath(); g.arc(tx,ty,Math.max(0,br*0.08),0,TAU); g.fill();
           g.restore();
-        }else if(s>0.45){
+        }else if(s>0.45&&stype!=="tower"){
           // cute face on bigger bubbles (kawaii character)
           const er=br*0.16;
           if(danger){
@@ -1015,6 +1090,13 @@ function buildCrater(api){
         for(const sd of [-1,1]){
           if(c.twinGone===sd) continue;
           drawOrb(sd*off,pr,Math.max(0,pr*(0.96+0.06*Math.sin(c.wob*1.3+sd))));
+        }
+      }else if(stype==="tower"){
+        // タワー: 小あわを縦に積む。上から1個ずつ割れ、割れると のこりが ぽよんと弾む
+        const pr=br*0.46, step=pr*1.7, oy0=br*0.55;
+        const bn=c.bounce>0?Math.sin(c.bounce*Math.PI)*pr*0.35:0;
+        for(let k=0;k<c.twinLeft;k++){
+          drawOrb(0,pr,Math.max(0,pr*(0.96+0.06*Math.sin(c.wob*1.3+k))),oy0-step*k-bn*(k+1)/3);
         }
       }else{
         drawOrb(0,br,Math.max(0,br*(0.96+0.06*Math.sin(c.wob*1.3))*asp));

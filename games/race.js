@@ -44,9 +44,10 @@ function buildRace(api){
   }
   function laneCx(i){return roadX+laneW*(i+0.5);}
   // 7〜8歳向けの手応え: ステージ目標 6→8台(以降 +2/面・上限+8)、ボスHP 3→4、出現間隔 少し短く
-  function needFor(s){return 8+Math.min((s-1)*2,8);}
+  function needFor(s){return 6+Math.min(s-1,5);}   // 出現を間引いた分 目標も 6→7→8…台(以降 +1/面)に合わせ 90秒で節目が4〜5回来るように
   const BOSS_HP=4;
-  const WALL_P=0.25;   // stage2+ の出現のうち『かべ』になる確率
+  const WALL_P=0.35;   // stage2+ の出現のうち『かべ』になる確率(軸3: 狙う場面を増やす)
+  const AVOID_P=0.9;   // 得点3以上: 出現の90%は自機のいるレーン以外へ(動かず待つだけでは点が伸びない/軸3)
   const MOVE_CD=11;    // 連打で左右にぶれて当たりを拾うのを減らす 0.18秒(約11フレーム)。得点0のあいだは無し
   function reset(){enemies=[];sparks=[];shards=[];lines=[];floats=[];rings=[];dust=[];player=null;scroll=0;scrollSpd=4;count=0;combo=0;comboT=0;spawnT=0;boost=0;tick=0;flash=0;wash=0;
     stage=1;stageKills=0;stageNeed=needFor(1);clearT=0;clearMsg="";bannerCol="#ffd23f";finaleT=0;spin=0;boss=null;beat=0;
@@ -61,8 +62,14 @@ function buildRace(api){
     // 結局ズレて外れることを実測で確認した→ 加えて 降下中も自機へ ごく弱く寄っていく homing を
     // 得点0の間だけ付ける(frame側)ことで、最初の成功を安定して3秒以内に近づける(軸3)
     // 軸3(静けさ対策): 得点が4秒以上止まったときも 同じ『自機へ寄せる』救済を使う(無反応が12秒を超えない)
-    const earlyGame=(count===0||quietT>4);
-    const lane=earlyGame?clamp(player.lane+rint(-1,1),0,lanes-1):rint(0,lanes-1);
+    // 救済は『1回に1台』: 静けさ4秒以上で寄せ車を1台だけ出し、その車が道に居るあいだは通常の出現へ戻す
+    // (救済の車が何台も続けて待つだけの自機に当たって、動かなくても点が伸びてしまうのを防ぐ/軸3)
+    const rescueOn=count>0&&quietT>4&&!enemies.some(e=>e.rescue&&e.state==="drive");
+    const earlyGame=(count===0||rescueOn);
+    let lane=earlyGame?clamp(player.lane+rint(-1,1),0,lanes-1):rint(0,lanes-1);
+    // 軸3(狙う意味): 得点3以上のあいだ、自機のいるレーンには出にくくする=その場で待つだけでは当たらず、
+    // 来る車のレーンへ寄せる『狙い』が要る。救済(earlyGame)中・得点0〜2は今まで通り(最初の成功を守る)
+    if(!earlyGame&&count>=3&&lanes>=2&&rnd(0,1)<AVOID_P&&lane===player.lane)lane=(lane+rint(1,lanes-1))%lanes;
     const w=laneW*0.62,h=laneW*1.0;
     // avoid stacking too close in same lane
     for(const e of enemies){if(e.lane===lane&&e.y<h*1.5)return;}
@@ -84,7 +91,7 @@ function buildRace(api){
     // どのレーンへ寄せるか選ばないと コーンに当たる(減速+コンボ切れだけ・ゲームオーバー無し)
     if(!earlyGame&&stage>=2&&lanes>=3&&rnd(0,1)<WALL_P){
       let clear=true;
-      for(const e of enemies){if(e.y<h*2.2){clear=false;break;}}
+      for(const e of enemies){if(e.y<h*1.2){clear=false;break;}}
       if(clear){
         const wy=-h;
         for(let l=0;l<lanes;l++){
@@ -102,6 +109,7 @@ function buildRace(api){
     else if(stage>=2&&r<0.045)kind="rainbow";          // ① 激レア にじいろカー(数%だけ・いつ来るか分からない)
     else if(stage>=2&&r<0.185)kind="coin";        // bonus coin car (stage2+)
     else if(stage>=2&&r<0.345)kind="cone";        // unbreakable obstacle (avoid)
+    else if(stage===1&&count>=4&&r<0.10)kind="cone";   // 軸3: 1面にも『よける理由』(減速+コンボ切れだけ・得点4以上から・確率は低め)
     if(kind==="cone"){
       enemies.push({x:laneCx(lane),y:-h,lane,w:w*0.5,h:h*0.7,color:"#ff7a18",state:"drive",kind:"cone",vx:0,vy:0,rot:0,vr:0,ownSpd:0});
       return;
@@ -380,7 +388,7 @@ function buildRace(api){
         g.beginPath();g.arc(m.x,m.y,m.r,0,TAU);g.fill();}
       g.restore();g.globalAlpha=1;
       // enemies
-      spawnT-=dt;if(spawnT<=0){spawn();spawnT=clamp(30-count*0.1-(stage-1)*1.8,12,30);}
+      spawnT-=dt;if(spawnT<=0){spawn();spawnT=(count<3||quietT>3)?clamp(30-count*0.1-(stage-1)*1.8,12,30):clamp(46-count*0.1-(stage-1)*4,26,46);}
       for(const e of enemies){
         if(e.state==="drive"){e.y+=(scrollSpd*0.6+e.ownSpd)*dt;
           if(e.hurt>0)e.hurt=Math.max(0,e.hurt-0.06*dt);   // ミニトラックのヒット無敵(未定義の他kindには影響なし)
