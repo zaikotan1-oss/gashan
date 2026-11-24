@@ -155,7 +155,7 @@ function drawTokyoTower(obj,sx,gY){
     const r=sec.hp/sec.maxHp,st=sec.drawTopY+(sec.shakeDx||0)*0.3;
     const pct=cumH/obj.totalH,pctT=(cumH+sec.h)/obj.totalH;
     const bw=obj.w*(0.95-pct*0.78)+6,tw=obj.w*(0.95-pctT*0.78)+6;
-    ctx.save();ctx.globalAlpha=0.62+r*0.38;
+    ctx.save();ctx.globalAlpha=0.92+r*0.08;
     ctx.fillStyle=sec.col;
     ctx.beginPath();ctx.moveTo(cx-bw/2,st+sec.h);ctx.lineTo(cx+bw/2,st+sec.h);
     ctx.lineTo(cx+tw/2,st);ctx.lineTo(cx-tw/2,st);ctx.closePath();ctx.fill();
@@ -187,7 +187,7 @@ function drawTemple(obj,sx,gY){
     const r=sec.hp/sec.maxHp,st=sec.drawTopY,sh=sec.h;
     const shrink=i*0.14;
     const tw=obj.w*(1-shrink),tx=cx-tw/2;
-    ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(sec.shakeDx||0,0);
+    ctx.save();ctx.globalAlpha=0.92+r*0.08;ctx.translate(sec.shakeDx||0,0);
 
     // 石の基壇（最下層）
     if(i===0){
@@ -283,7 +283,7 @@ function drawCastle(obj,sx,gY){
     const r=sec.hp/sec.maxHp,st=sec.drawTopY,sh=sec.h;
     const shrink=i*0.16;
     const fw=obj.w*(1-shrink),fx=cx-fw/2;
-    ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(sec.shakeDx||0,0);
+    ctx.save();ctx.globalAlpha=0.92+r*0.08;ctx.translate(sec.shakeDx||0,0);
 
     // 石垣（最下層）
     if(i===0){
@@ -391,7 +391,7 @@ function drawRobot(obj,sx,gY){
   secs.forEach((sec,i)=>{
     if(!sec.alive)return;
     const r=sec.hp/sec.maxHp,st=sec.drawTopY;
-    ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(sec.shakeDx||0,0);
+    ctx.save();ctx.globalAlpha=0.92+r*0.08;ctx.translate(sec.shakeDx||0,0);
     ctx.fillStyle=sec.col;
     if(i===0){// legs
       ctx.fillRect(cx-55,st,42,sec.h);ctx.fillRect(cx+13,st,42,sec.h);
@@ -413,7 +413,7 @@ function drawRobot(obj,sx,gY){
       ctx.fillStyle=eyeC;ctx.globalAlpha*=(0.6+Math.abs(Math.sin(Date.now()*0.012))*0.4);
       ctx.beginPath();ctx.ellipse(cx-14,st+sec.h*0.38,10,6,0,0,Math.PI*2);ctx.fill();
       ctx.beginPath();ctx.ellipse(cx+14,st+sec.h*0.38,10,6,0,0,Math.PI*2);ctx.fill();
-      ctx.globalAlpha=0.62+r*0.38;
+      ctx.globalAlpha=0.92+r*0.08;
       ctx.fillStyle='#888';ctx.fillRect(cx-5,st,10,8);
     }
     if(r<0.6&&Math.random()<0.05)spawnHitFx(cx+(Math.random()-0.5)*obj.w*0.8,st+Math.random()*sec.h,'#8888AA',4);
@@ -429,7 +429,7 @@ function drawMothership(obj,sx,gY){
     if(!sec.alive)return;
     const r=sec.hp/sec.maxHp,st=sec.drawTopY;
     const ry=sec.h*0.48;const rx=obj.w*(i===1?0.5:0.36);
-    ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(sec.shakeDx||0,0);
+    ctx.save();ctx.globalAlpha=0.92+r*0.08;ctx.translate(sec.shakeDx||0,0);
     const g2=ctx.createRadialGradient(cx,st+ry,5,cx,st+ry,rx);
     g2.addColorStop(0,'#A0A0B8');g2.addColorStop(1,sec.col);
     ctx.fillStyle=g2;ctx.beginPath();ctx.ellipse(cx,st+ry,rx,ry,0,0,Math.PI*2);ctx.fill();
@@ -441,7 +441,7 @@ function drawMothership(obj,sx,gY){
       ctx.globalAlpha=(0.5+Math.sin(t+l)*0.5)*(0.3+r*0.7);
       ctx.beginPath();ctx.arc(cx+Math.cos(a)*rx*0.9,st+ry+Math.sin(a)*ry*0.6,5,0,Math.PI*2);ctx.fill();
     }
-    ctx.globalAlpha=0.62+r*0.38;
+    ctx.globalAlpha=0.92+r*0.08;
     if(i===1){ctx.fillStyle='#80FF80';ctx.globalAlpha=0.12;
       ctx.fillRect(cx-16,st+ry*1.9,32,gY-(st+ry*1.9));}
     if(r<0.6&&Math.random()<0.05)spawnHitFx(cx+(Math.random()-0.5)*rx*1.5,st+Math.random()*ry*2,'#8080BB',4);
@@ -470,6 +470,7 @@ function drawBoss(obj){
 
 // 前方に生き残っているオブジェクトがあれば進めない（主要オブジェクトのみ）
 const BLOCKING_KINDS=new Set(['building','megabuilding','watertower','house','boss']);
+const PASSABLE_KINDS=new Set(['car','bus','truck','train','barrel','snowman']);   // 自機が追い越す小物(通り過ぎたら消す)
 // 前をふさぐ建物に押しあて続けたときの自動掘削(進行不能を防ぐ保険)
 let stuckT=0, assistCD=0, idleT=0, assisting=false;
 function assistBreak(){
@@ -713,7 +714,7 @@ function mkGY(wx){return getTerrainY(wx);}
 
 function mkBuilding(wx,hm=1){
   const cs=BCOLS[Math.floor(rng()*BCOLS.length)];
-  const bw=50+rng()*55,tot=(90+rng()*200)*hm;
+  const bw=50+rng()*28,tot=(90+rng()*200)*hm;
   const gY=mkGY(wx+bw/2),nSec=2+Math.floor(rng()*3);
   const secs=[];let rem=tot;
   for(let i=0;i<nSec;i++){
@@ -871,44 +872,48 @@ function spawnFlyingUFO(){
 
 // ── SCENE TEMPLATES ───────────────────────────────────────────
 const SCENES=[
-  wx=>[mkBuilding(wx),mkBuilding(wx+60+rng()*20),mkBarrel(wx+130)],
-  wx=>[mkBuilding(wx),mkBuilding(wx+65),mkBuilding(wx+130+rng()*20),mkTree(wx+200)],
-  wx=>[mkBuilding(wx,1.5),mkBuilding(wx+75,0.6),mkCar(wx+140)],
+  wx=>[mkBuilding(wx),mkBuilding(wx+90+rng()*20),mkBarrel(wx+205)],
+  wx=>[mkBuilding(wx),mkBuilding(wx+90),mkBuilding(wx+180+rng()*20),mkTree(wx+275)],
+  wx=>[mkBuilding(wx,1.5),mkBuilding(wx+95,0.6),mkCar(wx+190)],
   wx=>[mkBuilding(wx),mkTree(wx+70),mkCar(wx-15)],
   wx=>[mkTree(wx),mkTree(wx+55),mkTree(wx+110),mkTree(wx+165)],
   wx=>[mkCactus(wx),mkCactus(wx+38),mkCactus(wx+76),mkCactus(wx+114),mkCactus(wx+152)],
-  wx=>[mkWaterTower(wx),mkBuilding(wx+65),mkBuilding(wx+135,0.7)],
+  wx=>[mkWaterTower(wx),mkBuilding(wx+75),mkBuilding(wx+165,0.7)],
   wx=>[mkBuilding(wx),mkBalloon(wx+20),mkBalloon(wx+55)],
-  wx=>[mkRocket(wx),mkBuilding(wx+55),mkBuilding(wx+120,1.2)],
+  wx=>[mkRocket(wx),mkBuilding(wx+60),mkBuilding(wx+150,1.2)],
   wx=>[mkSnowman(wx),mkBarrel(wx+50),mkBarrel(wx+80),mkFence(wx+115,5)],
   wx=>[mkTree(wx),mkTree(wx+55),mkCactus(wx+120),mkCactus(wx+160)],
   wx=>[mkCar(wx),mkCar(wx+90),mkBarrel(wx+50),mkBarrel(wx+180)],
-  wx=>[mkBuilding(wx,1.2),mkCar(wx-10),mkTree(wx+75),mkBalloon(wx+40),mkBuilding(wx+135,0.8)],
-  wx=>[mkFence(wx,8),mkBuilding(wx+20),mkBuilding(wx+110),mkBarrel(wx+180)],
-  wx=>[mkBus(wx),mkBuilding(wx+120),mkBarrel(wx+60)],
+  wx=>[mkBuilding(wx,1.2),mkCar(wx-10),mkTree(wx+90),mkBalloon(wx+40),mkBuilding(wx+160,0.8)],
+  wx=>[mkFence(wx,8),mkBuilding(wx+30),mkBuilding(wx+125),mkBarrel(wx+215)],
+  wx=>[mkBus(wx),mkBuilding(wx+130),mkBarrel(wx+65)],
   wx=>[mkTruck(wx),mkTruck(wx+130),mkBarrel(wx+65),mkBarrel(wx+85)],
-  wx=>[mkBuilding(wx,2.0),mkBuilding(wx+80,1.5),mkBuilding(wx+160,1.0),mkCar(wx+230)],  // tall city
+  wx=>[mkBuilding(wx,2.0),mkBuilding(wx+90,1.5),mkBuilding(wx+180,1.0),mkCar(wx+270)],  // tall city
   wx=>[mkRocket(wx),mkRocket(wx+50),mkWaterTower(wx+100)],
   wx=>[mkCar(wx),mkBus(wx+90),mkTruck(wx+210),mkBarrel(wx+340)],
   wx=>[mkMegaBuilding(wx)],   // rare mega tower
   wx=>[mkHouse(wx),mkHouse(wx+80),mkHouse(wx+160)],
   wx=>[mkTrain(wx)],
   wx=>[mkCrates(wx),mkCrates(wx+70),mkCrates(wx+140)],
-  wx=>[mkLighthouse(wx),mkBuilding(wx+55)],
+  wx=>[mkLighthouse(wx),mkBuilding(wx+65)],
   wx=>[mkHouse(wx),mkTree(wx+80),mkCar(wx-10)],
   wx=>[mkCrates(wx),mkBarrel(wx+65),mkCrates(wx+100),mkBarrel(wx+165)],
   wx=>[mkTrain(wx),mkBarrel(wx+170),mkCrates(wx+200)],
 ];
 // Stage 4-5 heavy scenes
 const HEAVY_SCENES=[
-  wx=>[mkBuilding(wx,2.2),mkBuilding(wx+85,1.8),mkBuilding(wx+170,2.0),mkBuilding(wx+255,1.5)],
+  wx=>[mkBuilding(wx,2.2),mkBuilding(wx+95,1.8),mkBuilding(wx+190,2.0),mkBuilding(wx+285,1.5)],
   wx=>[mkTruck(wx),mkTruck(wx+130),mkBus(wx+270),mkBarrel(wx+65),mkBarrel(wx+195)],
   wx=>[mkRocket(wx),mkRocket(wx+55),mkRocket(wx+110),mkWaterTower(wx+165)],
   wx=>[mkMegaBuilding(wx)],
-  wx=>[mkMegaBuilding(wx),mkBuilding(wx+120,0.8)],
+  wx=>[mkMegaBuilding(wx),mkBuilding(wx+130,0.8)],
   wx=>[mkMegaBuilding(wx),mkMegaBuilding(wx+130)],
 ];
 
+function bossNear(x0,x1){
+  for(let bi=0;bi<5;bi++){const bx=bossWXFor(bi);if(x1>bx-300&&x0<bx+400)return true;}
+  return false;
+}
 function spawnScene(){
   // ボスゾーンには大きな建物などは置かない(ボスと重ならないように)。
   // ただしボス手前は軽い的(樽/車)だけ挟んで「近づく間も何か壊せる」空白を埋める。
@@ -940,17 +945,20 @@ function spawnScene(){
   const useHeavy=si>=3&&rng()<0.4;
   const pool=useHeavy?HEAVY_SCENES:SCENES;
   const fn=pool[Math.floor(rng()*pool.length)];
-  fn(nextSpawnX).forEach(o=>{if(o)worldObjs.push(o);});
-  // Extra density for later stages
-  if(si>=2&&rng()<0.3){
+  let sceneEnd=nextSpawnX;
+  const addScene=(list)=>list.forEach(o=>{if(o){worldObjs.push(o);sceneEnd=Math.max(sceneEnd,o.wx+(o.w||60));}});
+  addScene(fn(nextSpawnX));
+  // Extra density for later stages(前のシーンと重ならないよう、その右に続けて置く。ボスの近くでは足さない)
+  if(si>=2&&rng()<0.3&&!bossNear(nextSpawnX,sceneEnd+500)){
     const fn2=SCENES[Math.floor(rng()*SCENES.length)];
-    fn2(nextSpawnX+30).forEach(o=>{if(o)worldObjs.push(o);});
+    addScene(fn2(sceneEnd+20));
   }
   // ① にじいろジェム: 画面に1個も無いとき たまに(約5%)空へ1個だけ出す激レア
   if(!worldObjs.some(o=>o.kind==='gem'&&o.alive)&&rng()<0.05){
     worldObjs.push(mkGem(nextSpawnX+rng()*100));
   }
-  const spacing=si>=3?110+rng()*50:120+rng()*70;
+  // シーン同士が重なると的が団子に見える。端までの幅+すき間を最低ラインにする(ジェム等の浮き物は含めない)。
+  const spacing=Math.max(si>=3?110+rng()*50:120+rng()*70,sceneEnd-nextSpawnX+30+rng()*30);
   nextSpawnX+=spacing;
   if(rng()<0.07+si*0.02)setTimeout(spawnFlyingUFO,1000+rng()*3000);
   if(rng()<0.06+si*0.015)setTimeout(spawnFlyingHelicopter,2000+rng()*3000);
@@ -1377,7 +1385,7 @@ function drawBuilding(obj){
   for(let i=0;i<obj.sections.length;i++){
     const sec=obj.sections[i];if(!sec.alive){st+=sec.h;continue;}
     const r=sec.hp/sec.maxHp;
-    ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(sec.shakeDx,0);
+    ctx.save();ctx.globalAlpha=0.92+r*0.08;ctx.translate(sec.shakeDx,0);
     ctx.fillStyle=obj.col;ctx.fillRect(sx,st,obj.w,sec.h);
     ctx.strokeStyle='rgba(20,10,0,.55)';ctx.lineWidth=2.5;ctx.strokeRect(sx,st,obj.w,sec.h);
     ctx.fillStyle=obj.dark;ctx.fillRect(sx+obj.w-7,st,7,sec.h);
@@ -1405,8 +1413,8 @@ function drawWaterTower(obj){
   const s=obj.sections;
   ctx.strokeStyle='#5A3010';ctx.lineWidth=5;
   [[10],[25],[40]].forEach(([lx])=>{ctx.beginPath();ctx.moveTo(sx+lx,gY-s[0].h);ctx.lineTo(sx+lx,gY);ctx.stroke();});
-  if(s[0].alive){const r=s[0].hp/s[0].maxHp;ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(obj.shakeDx,0);ctx.fillStyle=obj.dark;ctx.fillRect(sx,gY-s[0].h,obj.w,10);ctx.fillStyle=r>0.5?'#4CAF50':'#F44336';ctx.fillRect(sx,gY-s[0].h,obj.w*r,4);ctx.restore();}
-  if(s[1].alive){const r=s[1].hp/s[1].maxHp,ty=gY-s[0].h-s[1].h;ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(obj.shakeDx,0);ctx.fillStyle=obj.col;ctx.fillRect(sx+2,ty,obj.w-4,s[1].h);ctx.fillStyle=obj.dark;ctx.fillRect(sx+obj.w-6,ty,6,s[1].h);ctx.strokeStyle='#4A2010';ctx.lineWidth=3;[0.2,0.5,0.8].forEach(t=>{ctx.beginPath();ctx.moveTo(sx,ty+s[1].h*t);ctx.lineTo(sx+obj.w,ty+s[1].h*t);ctx.stroke();});ctx.fillStyle=r>0.5?'#4CAF50':'#F44336';ctx.fillRect(sx,ty,obj.w*r,4);ctx.restore();}
+  if(s[0].alive){const r=s[0].hp/s[0].maxHp;ctx.save();ctx.globalAlpha=0.92+r*0.08;ctx.translate(obj.shakeDx,0);ctx.fillStyle=obj.dark;ctx.fillRect(sx,gY-s[0].h,obj.w,10);ctx.fillStyle=r>0.5?'#4CAF50':'#F44336';ctx.fillRect(sx,gY-s[0].h,obj.w*r,4);ctx.restore();}
+  if(s[1].alive){const r=s[1].hp/s[1].maxHp,ty=gY-s[0].h-s[1].h;ctx.save();ctx.globalAlpha=0.92+r*0.08;ctx.translate(obj.shakeDx,0);ctx.fillStyle=obj.col;ctx.fillRect(sx+2,ty,obj.w-4,s[1].h);ctx.fillStyle=obj.dark;ctx.fillRect(sx+obj.w-6,ty,6,s[1].h);ctx.strokeStyle='#4A2010';ctx.lineWidth=3;[0.2,0.5,0.8].forEach(t=>{ctx.beginPath();ctx.moveTo(sx,ty+s[1].h*t);ctx.lineTo(sx+obj.w,ty+s[1].h*t);ctx.stroke();});ctx.fillStyle=r>0.5?'#4CAF50':'#F44336';ctx.fillRect(sx,ty,obj.w*r,4);ctx.restore();}
   obj.shakeDx*=0.75;
 }
 
@@ -1415,7 +1423,7 @@ function drawTree(obj){
   const sx=toS(obj.wx),gY=toSY(obj.groundY);if(sx>W+10||sx+obj.w<-10)return;
   const r=obj.hp/obj.maxHp,cx=sx+obj.w/2;
   drawGroundShadow(cx,gY,obj.w*0.42);
-  ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(obj.shakeDx||0,0);
+  ctx.save();ctx.globalAlpha=0.92+r*0.08;ctx.translate(obj.shakeDx||0,0);
   // 画像の木: 生成画像は下部(72%以下)に草の土台が残っているので、そこを clip で切り落とし
   //   幹の根元(=画像の72%位置)を地面に合わせる。見た目は当たり判定(w×h)より少し大きめ。
   {
@@ -1455,7 +1463,7 @@ function drawCactus(obj){
   const sx=toS(obj.wx),gY=toSY(obj.groundY);if(sx>W+10||sx+obj.w<-10)return;
   const r=obj.hp/obj.maxHp,cx=sx+obj.w/2;
   drawGroundShadow(cx,gY,obj.w*0.6);
-  ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(obj.shakeDx,0);
+  ctx.save();ctx.globalAlpha=0.92+r*0.08;ctx.translate(obj.shakeDx,0);
   ctx.fillStyle=obj.col;ctx.strokeStyle='rgba(0,40,0,.6)';ctx.lineWidth=2.5;
   ctx.beginPath();ctx.roundRect(cx-7,gY-obj.h,14,obj.h,7);ctx.fill();ctx.stroke();
   ctx.beginPath();ctx.roundRect(cx-22,gY-obj.h*0.65,13,obj.h*0.35,6);ctx.fill();ctx.stroke();
@@ -1468,7 +1476,7 @@ function drawVehicle(obj){
   const sx=toS(obj.wx),gY=toSY(obj.groundY);if(sx>W+10||sx+obj.w<-10)return;
   const r=obj.hp/obj.maxHp,isBus=obj.kind==='bus',isTruck=obj.kind==='truck';
   drawGroundShadow(sx+obj.w/2,gY,obj.w*0.5);
-  ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate((obj.shakeDx||0)+(obj.vx||0)*0.02,0);
+  ctx.save();ctx.globalAlpha=0.92+r*0.08;ctx.translate((obj.shakeDx||0)+(obj.vx||0)*0.02,0);
   ctx.shadowColor='rgba(20,10,0,.75)';ctx.shadowBlur=5;   // 背景に溶けないよう輪郭の影
   // ── 車体グラデ ──
   const cg=ctx.createLinearGradient(sx,gY-obj.h*1.6,sx,gY);
@@ -1561,7 +1569,7 @@ function drawSnowman(obj){
   if(!obj.alive)return;
   const sx=toS(obj.wx),gY=toSY(obj.groundY);if(sx>W+10||sx+obj.w<-10)return;
   const r=obj.hp/obj.maxHp,cx=sx+obj.w/2;
-  ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(obj.shakeDx,0);
+  ctx.save();ctx.globalAlpha=0.92+r*0.08;ctx.translate(obj.shakeDx,0);
   [[0,20,24],[0,-13,18],[0,-36,12]].forEach(([dx,dy,rad])=>{ctx.fillStyle='#F0F8FF';ctx.beginPath();ctx.arc(cx+dx,gY+dy-16,rad,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#B0C8D8';ctx.lineWidth=1.5;ctx.stroke();});
   ctx.fillStyle='#333';[-24,-14,-4].forEach(dy=>{ctx.beginPath();ctx.arc(cx,gY+dy-16,2.5,0,Math.PI*2);ctx.fill();});
   ctx.beginPath();ctx.arc(cx-5,gY-50,2.5,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(cx+5,gY-50,2.5,0,Math.PI*2);ctx.fill();
@@ -1574,7 +1582,7 @@ function drawRocket(obj){
   if(!obj.alive)return;
   const sx=toS(obj.wx),gY=toSY(obj.groundY);if(sx>W+10||sx+obj.w<-10)return;
   const r=obj.hp/obj.maxHp,cx=sx+obj.w/2;
-  ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(obj.shakeDx||0,0);
+  ctx.save();ctx.globalAlpha=0.92+r*0.08;ctx.translate(obj.shakeDx||0,0);
   const bw=obj.w*0.42;
   // ロケット本体（メタリックグラデ）
   const mg=ctx.createLinearGradient(cx-bw,gY-obj.h,cx+bw,gY-obj.h);
@@ -1616,7 +1624,7 @@ function drawHelicopter(obj){
   const sx=toS(obj.wx);if(sx>W+60||sx+obj.w<-60)return;
   obj.wobble+=0.025;obj.rotorAngle=(obj.rotorAngle||0)+0.3;
   const fy=H*0.3+Math.sin(obj.wobble)*16,cx=sx+obj.w/2,r=obj.hp/obj.maxHp;
-  ctx.save();ctx.globalAlpha=0.62+r*0.38;
+  ctx.save();ctx.globalAlpha=0.92+r*0.08;
   // 画像のヘリ(進行方向=左向き)。回るローターだけ canvas で上に重ねる
   const heliImg=api.drawAsset("helicopter.png",cx,fy+2,obj.w*1.4,obj.w*1.4,{center:true});
   if(!heliImg){
@@ -1645,7 +1653,7 @@ function drawUFO(obj){
   const sx=toS(obj.wx);if(sx>W+60||sx+obj.w<-60)return;
   obj.wobble+=0.03;
   const fy=obj.baseY+Math.sin(obj.wobble)*14,cx=sx+obj.w/2,r=obj.hp/obj.maxHp;
-  ctx.save();ctx.globalAlpha=0.62+r*0.38;
+  ctx.save();ctx.globalAlpha=0.92+r*0.08;
   const g2=ctx.createLinearGradient(cx,fy+obj.h/2,cx,toSY(getTerrainY(obj.wx+obj.w/2)));
   g2.addColorStop(0,'rgba(100,255,100,0.28)');g2.addColorStop(1,'rgba(100,255,100,0)');
   ctx.fillStyle=g2;
@@ -1677,7 +1685,7 @@ function drawBarrel(obj){
   if(!obj.alive)return;
   const sx=toS(obj.wx),gY=toSY(obj.groundY);if(sx>W+10||sx+obj.w<-10)return;
   const r=obj.hp/obj.maxHp,cx=sx+obj.w/2;
-  ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(obj.shakeDx||0,0);
+  ctx.save();ctx.globalAlpha=0.92+r*0.08;ctx.translate(obj.shakeDx||0,0);
   const bg=ctx.createLinearGradient(sx,0,sx+obj.w,0);
   bg.addColorStop(0,'#660000');bg.addColorStop(0.25,'#CC1111');bg.addColorStop(0.7,'#AA0000');bg.addColorStop(1,'#550000');
   ctx.fillStyle=bg;ctx.beginPath();ctx.roundRect(sx+3,gY-obj.h,obj.w-6,obj.h,6);ctx.fill();ctx.strokeStyle='rgba(20,10,0,.55)';ctx.lineWidth=2.5;ctx.stroke();
@@ -1715,7 +1723,7 @@ function drawHouse(obj){
   const body=obj.sections[0],roof=obj.sections[1];
   if(body&&body.alive){
     const r=body.hp/body.maxHp;
-    ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(body.shakeDx||0,0);
+    ctx.save();ctx.globalAlpha=0.92+r*0.08;ctx.translate(body.shakeDx||0,0);
     ctx.fillStyle=obj.col;ctx.fillRect(sx,body.drawTopY,obj.w,body.h);
     ctx.strokeStyle='rgba(20,10,0,.55)';ctx.lineWidth=2.5;ctx.strokeRect(sx,body.drawTopY,obj.w,body.h);
     ctx.fillStyle=obj.dark;ctx.fillRect(sx+obj.w-6,body.drawTopY,6,body.h);
@@ -1727,7 +1735,7 @@ function drawHouse(obj){
   if(roof&&roof.alive){
     const r=roof.hp/roof.maxHp;
     const rt=roof.drawTopY;
-    ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(roof.shakeDx||0,0);
+    ctx.save();ctx.globalAlpha=0.92+r*0.08;ctx.translate(roof.shakeDx||0,0);
     // Triangle roof
     ctx.fillStyle=obj.roof;
     ctx.beginPath();ctx.moveTo(sx-6,rt+roof.h);ctx.lineTo(sx+obj.w/2,rt);ctx.lineTo(sx+obj.w+6,rt+roof.h);ctx.closePath();ctx.fill();ctx.strokeStyle='rgba(20,10,0,.55)';ctx.lineWidth=2.5;ctx.stroke();
@@ -1742,7 +1750,7 @@ function drawTrain(obj){
   const sx=toS(obj.wx),gY=toSY(obj.groundY);
   if(sx>W+10||sx+obj.w<-10)return;
   const r=obj.hp/obj.maxHp;
-  ctx.save();ctx.globalAlpha=0.62+r*0.38;ctx.translate(obj.shakeDx||0,0);
+  ctx.save();ctx.globalAlpha=0.92+r*0.08;ctx.translate(obj.shakeDx||0,0);
   // Carriages
   ctx.fillStyle=obj.col;ctx.beginPath();ctx.roundRect(sx,gY-obj.h,obj.w,obj.h*0.7,6);ctx.fill();
   // Cab
@@ -1791,7 +1799,7 @@ function drawMegaBuilding(obj){
   obj.sections.forEach(sec=>{
     if(!sec.alive)return;
     const r=sec.hp/sec.maxHp;
-    ctx.save();ctx.globalAlpha=0.62+r*0.38;
+    ctx.save();ctx.globalAlpha=0.92+r*0.08;
     ctx.fillStyle=sec.col;
     ctx.fillRect(sx+sec.shakeDx,sec.drawTopY,obj.w,sec.h);
     // Thin border for depth
@@ -2007,6 +2015,9 @@ function frame(dt,now){
   while(nextSpawnX<camX+W+700)spawnScene();
   // 通常オブジェクト: 500px後ろで消去, ボス: 2000px後ろまで保持
   worldObjs=worldObjs.filter(o=>o.kind==='boss'?toS(o.wx)>-2000:toS(o.wx)>-500);
+  // 追い越した乗り物・樽は自機の車体の下にもぐって「裏に隠れた的」に見える。通り過ぎたら消して画面を読みやすくする。
+  for(let i=0;i<worldObjs.length;i++){const o=worldObjs[i];
+    if(o.alive&&PASSABLE_KINDS.has(o.kind)&&o.wx+o.w<exWorldX+30)o.alive=false;}
   flyingObjs.forEach(o=>{o.wx+=o.vx*dt;});
   flyingObjs=flyingObjs.filter(o=>o.alive&&toS(o.wx)>-200&&toS(o.wx)<W+200);
 
@@ -2088,7 +2099,7 @@ function initScene(keepScore){
   stageUsedAssist=false;   // ③ パーフェクト区間の判定をリセット
   clearMsg.classList.remove('show');_s=Date.now()|0;
   // さいしょの目の前には必ず当てやすい物(樽→くるま)を置く(木や柵だけだと最初の1点が遅れるため)
-  worldObjs.push(mkBarrel(exWorldX+250));worldObjs.push(mkCar(exWorldX+340));nextSpawnX=exWorldX+470;
+  worldObjs.push(mkBarrel(exWorldX+190));worldObjs.push(mkCar(exWorldX+280));nextSpawnX=exWorldX+470;
   resetCombo();
   while(nextSpawnX<camX+W+700)spawnScene();
   spawnAllBosses(); // 全ボスを事前配置
@@ -2190,7 +2201,7 @@ function initScene(keepScore){
       ctx.save();ctx.translate(cx,H*0.5);ctx.textAlign='center';
       ctx.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
       ctx.globalAlpha=clamp(luckyMsgT*1.3,0,1);
-      const tt='きょうのラッキー色は '+luckyName+'！';
+      const tt='きょうの ラッキーカラーは '+luckyName+'！';
       ctx.lineWidth=5;ctx.lineJoin='round';ctx.strokeStyle='rgba(0,0,0,.5)';ctx.strokeText(tt,0,0);
       ctx.fillStyle=luckyColor;ctx.fillText(tt,0,0);
       ctx.restore();ctx.globalAlpha=1;if(luckyMsgT<0)luckyMsgT=0;}

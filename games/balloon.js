@@ -188,7 +188,7 @@ function buildBalloon(api){
       {const brx=b.r*0.85,bry=b.r;
        gondolas.push({x:b.x,y:b.y+bry*0.62+bry*0.21,w:Math.max(6,brx*0.34),h:Math.max(6,bry*0.42),vx:rnd(-1.2,1.2),vy:-2.2,rot:0,vr:rnd(-0.08,0.08),life:1});
        api.slide(500,120,0.5,0.08,"triangle");}
-      floats.push({x:b.x,y:b.y-30,txt:b.big?"ねっききゅう どかーん！":"ボス どっかーん！",life:1,vy:-1.1,t:0,col:b.big?"#ffd23f":"#ff3b3b",size:b.big?34:42});
+      if(!banner)floats.push({x:b.x,y:b.y-30,txt:b.big?"ねっききゅう どかーん！":"ボス どっかーん！",life:1,vy:-1.1,t:0,col:b.big?"#ffd23f":"#ff3b3b",size:b.big?34:42});
       for(let k=40;k>0;k--){const a=rnd(0,TAU),s=rnd(3,12);
         confetti.push({x:b.x,y:b.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-3,s:rnd(5,11),color:pick(COLORS),rot:rnd(0,TAU),vr:rnd(-0.6,0.6),life:1,decay:rnd(0.01,0.02)});}
     }
@@ -198,6 +198,7 @@ function buildBalloon(api){
     stageClears++;
     api.boom(0.9);api.shake(11);tryHitStop(4);flash=Math.max(flash,0.7);flashCol="#fff0c8";
     showBanner("ステージ クリア！",target,true);
+    floats=floats.filter(f=>f.t>30);   // バナーと文字が重ならないよう出ている文字を消す
     // ③ パーフェクト: このステージで的の色を1こもにがさなかったら +3 & みどりの祝福
     if(escaped===0){count+=3;api.setScore(count);perfectT=2.2;api.tone(1760,0.14,"triangle",0.1);
       for(let k=18;k>0;k--){const a=rnd(0,TAU),s=rnd(3,8);
@@ -242,7 +243,7 @@ function buildBalloon(api){
       for(let k=46;k>0;k--){const a=rnd(0,TAU),s=rnd(3,11);
         confetti.push({x:b.x,y:b.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-3,s:rnd(5,11),color:pick(COLORS),rot:rnd(0,TAU),vr:rnd(-0.6,0.6),life:1,decay:rnd(0.01,0.02)});}
     }
-    if(total>=3)floats.push({x:b.x,y:b.y-40,txt:total+"こ どかん！",life:1,vy:-1.1,t:0,
+    if(total>=3&&!banner)floats.push({x:b.x,y:b.y-40,txt:total+"こ どかん！",life:1,vy:-1.1,t:0,
       col:total>=10?"#ff3b3b":total>=6?"#ff8c42":"#ffd23f",size:total>=8?48:34});
   }
   reset();
@@ -423,8 +424,10 @@ function buildBalloon(api){
         g.save();g.globalAlpha=Math.max(0,f.life);g.translate(f.x,f.y);g.scale(pop,pop);
         g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.shadowColor=f.col;g.shadowBlur=18;
-        g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText(f.txt,0,0);
-        g.shadowBlur=0;g.fillStyle=f.col;g.fillText(f.txt,0,0);g.restore();}
+        g.lineJoin="round";
+        g.lineWidth=11;g.strokeStyle="rgba(20,30,60,.7)";g.strokeText(f.txt,0,0);
+        g.shadowBlur=0;g.lineWidth=8;g.strokeStyle=f.col;g.strokeText(f.txt,0,0);
+        g.fillStyle="#fff";g.fillText(f.txt,0,0);g.restore();}
       g.globalAlpha=1;g.textAlign="left";floats=floats.filter(f=>f.life>0);
       // rainbow fever wash (big chains)
       if(feverT>0){feverT-=dt;const fa=Math.max(0,Math.min(1,feverT/60))*0.35;
@@ -454,8 +457,10 @@ function buildBalloon(api){
         const a=Math.max(0,Math.min(1,banner.life*1.3)),pop=1+Math.max(0,0.5-banner.t*0.045)*1.6;
         g.save();g.globalAlpha=a;g.translate(api.W/2,api.H*0.46);g.scale(pop,pop);
         g.font="900 "+(banner.big?54:40)+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";g.textBaseline="middle";
-        g.lineWidth=8;g.strokeStyle="rgba(0,0,0,.45)";g.strokeText(banner.txt,0,0);
-        g.shadowColor=banner.col;g.shadowBlur=24;g.fillStyle=banner.col;g.fillText(banner.txt,0,0);
+        g.lineJoin="round";
+        g.lineWidth=14;g.strokeStyle="rgba(20,30,60,.75)";g.strokeText(banner.txt,0,0);
+        g.shadowColor=banner.col;g.shadowBlur=24;g.lineWidth=8;g.strokeStyle=banner.col;g.strokeText(banner.txt,0,0);
+        g.shadowBlur=0;g.fillStyle="#fff";g.fillText(banner.txt,0,0);
         g.restore();g.textAlign="left";g.textBaseline="alphabetic";
         if(banner.life<=0)banner=null;
       }

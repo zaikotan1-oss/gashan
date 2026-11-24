@@ -172,7 +172,7 @@ function buildAvalanche(api){
     for(const o of obstacles){
       if(o.dead||o.lane===undefined)continue;
       const d=Math.abs(o.x-px);
-      if(d<o.w*1.0+unit*0.4&&d<bestD){bestD=d;lane=o.lane;}
+      if(d<o.w*0.9+unit*0.3&&d<bestD){bestD=d;lane=o.lane;}
     }
     if(lane<0&&(count===0||tsec-lastScoreT>5)){ // さいしょの1回は必ず的にあたる // 5秒つづけて外した時のたすけ: いちばん近い的へ
       for(const o of obstacles){
@@ -195,7 +195,7 @@ function buildAvalanche(api){
     api.shake(3);
     // ねらいが外れた時は叱らず、玉の頭上に小さく「ころころ」(得点は0でも雪けむりと音は残す)
     if(lane<0&&fever<=0)feverGauge=Math.max(0,feverGauge-0.06); // ねらわず外すとフィーバーゲージが少し減る(狙いが報われる)
-    if(lane<0&&floats.length<2)pushFloat({x:Math.max(sx,unit*3),y:slopeYAt(sx)-unit*2.4,txt:"ころころ",life:1.1,vy:-0.6,col:"#ffffff",size:28});
+    if(lane<0&&floats.length<2)pushFloat({x:Math.max(sx,api.W*0.18),y:slopeYAt(sx)-unit*2.4,txt:"ころころ",life:1.1,vy:-0.6,col:"#ffffff",size:28});
   }
 
   function hitObstacle(b,o){
@@ -226,7 +226,7 @@ function buildAvalanche(api){
     if(isJustHit){
       if(tsec-lastJustT>0.5){
         lastJustT=tsec;
-        pushFloat({x:o.x,y:oy-o.w-16-floatStack*26,txt:"ねらいどおり!",life:1,vy:-1.0,col:"#ffe14d",size:22});
+        pushFloat({x:o.x,y:oy-o.w-16-floatStack*26,txt:"ねらいどおり!",life:1,vy:-1.0,col:"#ffe14d",size:28});
         floatStack++;
       }
       api.tone(1760,0.05,"triangle",0.05);
@@ -418,7 +418,7 @@ function buildAvalanche(api){
           sparks.push({x:sunPos.x,y:sunPos.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,
             len:rnd(8,16),life:1,decay:rnd(0.03,0.05)});}
       }
-      if(balls.length>=14)return;    // hard cap so spam can't explode the array
+      if(balls.length>=10)return;    // hard cap so spam can't explode the array
       startAvalanche(px,py);
     },
     frame(dt,now){
@@ -757,7 +757,7 @@ function buildAvalanche(api){
         g.beginPath();g.arc(Math.cos(a)*r*0.5,Math.sin(a)*r*0.5,r*0.1,0,TAU);g.fill();}
       g.restore();
       // rim + highlight
-      g.strokeStyle="rgba(70,110,160,.8)";g.lineWidth=3;g.beginPath();g.arc(0,0,r,0,TAU);g.stroke();
+      g.strokeStyle="rgba(70,110,160,.8)";g.lineWidth=4;g.beginPath();g.arc(0,0,r,0,TAU);g.stroke();
       g.fillStyle="rgba(255,255,255,.85)";
       g.beginPath();g.arc(-r*0.35,-r*0.38,r*0.2,0,TAU);g.fill();
     }
@@ -790,6 +790,8 @@ function buildAvalanche(api){
     else if(kind==="snowman"){bw=w*0.95;bh=w*1.9;}  // ⑦ ゆきだるま: 3段の丸
     else if(kind==="car"){bw=w*1.7;bh=w*0.9;}       // ⑦ そり/くるま: 横長の車体+車輪2つ
     else if(kind==="penguin"){bw=w*1.0;bh=w*1.5;}   // ⑦ ペンギン(生き物)
+    // 小さい個体でも指先(約44px)より細くならないよう、見た目の幅の下限を入れる(当たり判定は o.w のまま触らない)
+    if(bw<unit*1.2){const kk=unit*1.2/Math.max(1,bw);bw*=kk;bh*=kk;}
     const simple=kind==="snowman"||kind==="car"||kind==="penguin"; // 専用の顔/飾りを自分で描く種類
     // にじいろブロックは体色が虹の6色を巡回して にじ色に見える(激レアの合図)
     const base=o.rainbow?RAINBOW[Math.floor(tsec*6+o.wob)%RAINBOW.length]:o.col;

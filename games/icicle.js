@@ -40,7 +40,7 @@ function build_icicle(api){
   }
   function layout(){
     W=api.W;H=api.H;groundY=H*0.84;
-    moon.x=W*0.74;moon.y=H*0.14;moon.r=Math.max(46,W*0.1);  // ④ お月さまの当たり判定(描画と一致・寛容)
+    moon.x=W*0.735;moon.y=H*0.20;moon.r=Math.max(46,W*0.1);  // ④ お月さまの当たり判定(描画と一致・寛容)
     rebuildIcicles();buildFlakes();
   }
   layout();
@@ -209,7 +209,7 @@ function build_icicle(api){
       if(type!=="down")return;
       if(clearT>0)return;
       // ④ おつきさま ひみつタップ: 空(つららより上)のお月さまに触れたら ウインク＋金の粉(減点なし・つらら落としと衝突しない)
-      if(y<H*0.19&&Math.hypot(x-moon.x,y-moon.y)<moon.r){
+      if(y<H*0.27&&Math.hypot(x-moon.x,y-moon.y)<moon.r){
         moonWink=1;api.tone(1318,0.12,"triangle",0.1);api.tone(1760,0.14,"triangle",0.08);
         for(let i=0;i<8;i++){const a=rnd(0,TAU),s=rnd(2,5);
           sparks.push({x:moon.x,y:moon.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s+1,len:rnd(6,12),life:1,decay:rnd(0.04,0.07)});}
@@ -265,13 +265,14 @@ function build_icicle(api){
         g.fillStyle=grd;g.fillRect(0,0,W,H);
       }
       // cold moon glow upper area (お月さまはひみつタップの標的なので画像時も描く。広い光暈だけ弱める)
-      const mx=moon.x,my=moon.y,mr=W*0.04;
+      const mx=moon.x,my=moon.y,mr=W*0.055;
       let mg=g.createRadialGradient(mx,my,0,mx,my,Math.max(0,W*0.5));
       const mga=imgBg?0.5:1;
       mg.addColorStop(0,"rgba(230,245,255,"+(0.5*mga)+")");mg.addColorStop(0.3,"rgba(200,225,255,"+(0.16*mga)+")");mg.addColorStop(1,"rgba(200,225,255,0)");
       g.fillStyle=mg;g.fillRect(0,0,W,H);
-      g.save();g.globalCompositeOperation="lighter";g.shadowColor="rgba(235,248,255,.9)";g.shadowBlur=24;
-      g.fillStyle="rgba(245,252,255,.95)";g.beginPath();g.arc(mx,my,mr,0,TAU);g.fill();g.restore();
+      if(!imgBg){   // 画像背景のときは絵のお月さまに重ねない(二重・半円盤の硬い線を出さない)。ウインク顔だけ下で描く
+        g.save();g.globalCompositeOperation="lighter";g.shadowColor="rgba(235,248,255,.9)";g.shadowBlur=24;
+        g.fillStyle="rgba(245,252,255,.95)";g.beginPath();g.arc(mx,my,Math.max(0,W*0.04),0,TAU);g.fill();g.restore();g.globalCompositeOperation="source-over";}
       // ④ おつきさま ひみつタップ: 叩かれた瞬間だけ ^_^ のウインク顔(発見のごほうび)
       if(moonWink>0){moonWink-=0.018*dt;
         g.save();g.strokeStyle="#7fa8c8";g.lineWidth=Math.max(2,mr*0.16);g.lineCap="round";g.globalAlpha=clamp(moonWink*1.4,0,1);
@@ -455,7 +456,7 @@ function build_icicle(api){
       if(combo>1){
         const pop=1+Math.max(0,comboT-0.7)*1.2;
         const ctx2="コンボ x"+combo;
-        g.save();g.translate(W/2,H*0.205);g.scale(pop,pop);   // 氷の帯(H*0.16)の下へ出す=帯と同化しない
+        g.save();g.translate(W/2,H*0.30);g.scale(pop,pop);   // つららの先端(最長≒H*0.26)の下へ出す=つららを隠さない
         g.font="800 32px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.globalAlpha=clamp(comboT,0,1);
         g.lineJoin="round";g.lineWidth=6;g.strokeStyle="rgba(8,24,52,.85)";g.strokeText(ctx2,0,0);   // 黒縁を先に描いて背景から浮かせる
@@ -723,6 +724,7 @@ function build_icicle(api){
     {const hudTxt="ステージ "+stage+" / "+STAGES+"      あと "+left+" こ";
      const tw=g.measureText(hudTxt).width;
      if(tw>W*0.94)g.font="800 "+Math.max(16,Math.floor(22*W*0.94/tw))+"px 'Hiragino Maru Gothic ProN',system-ui";
+     g.lineJoin="round";g.lineWidth=5;g.strokeStyle="rgba(8,24,52,.75)";g.strokeText(hudTxt,W/2,by-9);   // 黒縁で淡い氷の帯の上でも読める
      g.fillText(hudTxt,W/2,by-9);}
     g.shadowBlur=0;
     g.fillStyle="rgba(0,0,0,.3)";rrect(bx,by,bw,bh,bh/2);g.fill();

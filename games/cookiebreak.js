@@ -19,7 +19,9 @@ function build_cookiebreak(api){
     {key:"gummyb",col:"#8fd0ff",chip:"#4db8ff"},  // グミ(みず)
     {key:"cake",  col:"#fff0a6",chip:"#ffd23f"},  // ケーキ(きいろ)
     {key:"mint",  col:"#a8f0c8",chip:"#5ad6a0"},  // ミント
-    {key:"stick", col:"#ffd9ec",chip:"#ff5b8a"}   // 軸7対策: キャンディスティック(細長いシルエット)
+    {key:"stick", col:"#ffd9ec",chip:"#ff5b8a"},  // 軸7対策: キャンディスティック(細長いシルエット)
+    {key:"gingerbread",col:"#d9955a",chip:"#fff"}, // 軸7: ジンジャーマン(人型の生き物)
+    {key:"donut", col:"#ff9fcf",chip:"#fff"}       // 軸7: ドーナツ(穴のあいた輪っか)
   ];
   const PARTS=TYPES.map(t=>t.col);
   // A) rare GOLD cookie: 7% — glowing star cookie, big bonus + rainbow burst on break
@@ -27,10 +29,12 @@ function build_cookiebreak(api){
   const RB={key:"rainbow",col:"#ff5b8a",chip:"#fff"}; // ① 激レア にじいろクッキー
   // 軸7対策: TYPESとは別枠の『おおきいアメ』(1列×2マス分の縦長の大玉。マス目1x1固定だった見た目に大小の対比を出す)
   const BIGTYPE={key:"bigcandy",col:"#ff9ecb",chip:"#ff5b9a"};
+  // 軸7: 縦3マスの『ソフトクリーム』(いちばん背が高い物。ステージ2から塔に出る)
+  const TALLTYPE={key:"icecream",col:"#fff0d6",chip:"#ff8fb3"};
   const RAINBOW=["#ff5b8a","#ff8c42","#ffd23f","#7be08a","#4db8ff","#b58bff","#ff7bd0"];
   // ---- 隠し発見レイヤー(ハンマー/トラックと同じ思想) ----
   // ② きょうのラッキーおかし: build時に1種を秘密に選ぶ。その味を割ると小ボーナス＋頭上に星のヒント
-  const FLAVNAME={cookie:"クッキー",choco:"チョコ",gummy:"ピンクグミ",gummyb:"みずいろグミ",cake:"きいろケーキ",mint:"ミント",stick:"スティック"};
+  const FLAVNAME={cookie:"クッキー",choco:"チョコ",gummy:"ピンクグミ",gummyb:"みずいろグミ",cake:"きいろケーキ",mint:"ミント",stick:"スティック",gingerbread:"ジンジャーマン",donut:"ドーナツ"};
   let luckyKey=pick(TYPES).key, luckySeen=false, luckyMsgT=0;
   let rbMsgT=0;                    // ① にじいろクッキー 発見バナー
   let comboKept=true, nonstopT=0;  // ③ ノンストップ クリア判定
@@ -87,31 +91,42 @@ function build_cookiebreak(api){
   }
   // 軸7対策: 稀に(1列につき約5%)、縦に並んだ普通のおかし2マスを合体させて『おおきいアメ』(1x2マス)にする。
   // 別の列で新規生成し直すのではなく既存ブロックの合体にすることで、列ごとに独立した重力ロジックを壊さない。
-  function mergeBigIn(c){
+  function mergeBigIn(c,n){
+    n=n||2;
     const colBlocks=blocks.filter(b=>b.col===c && !b.hard && !b.gold && !b.rb && (b.h||1)===1).sort((a,z)=>a.row-z.row);
-    for(let i=0;i<colBlocks.length-1;i++){
-      if(colBlocks[i+1].row===colBlocks[i].row+1){
-        const top=colBlocks[i], bot=colBlocks[i+1];
-        top.type=BIGTYPE; top.h=2; top.hard=false; top.gold=false; top.rb=false; top.hp=1;
-        const idx=blocks.indexOf(bot); if(idx>=0)blocks.splice(idx,1);
-        return true;
-      }
+    // n マス縦にならんでいる並びを全部さがし、その中からランダムに1つ選ぶ
+    const starts=[];
+    for(let i=0;i+n-1<colBlocks.length;i++){
+      let ok=true;
+      for(let k=1;k<n;k++){ if(colBlocks[i+k].row!==colBlocks[i].row+k){ok=false;break;} }
+      if(ok)starts.push(i);
     }
-    return false;
+    if(!starts.length)return false;
+    const i=pick(starts), top=colBlocks[i];
+    top.type=(n>=3?TALLTYPE:BIGTYPE); top.h=n; top.hard=false; top.gold=false; top.rb=false; top.hp=1;
+    for(let k=1;k<n;k++){ const idx=blocks.indexOf(colBlocks[i+k]); if(idx>=0)blocks.splice(idx,1); }
+    return true;
   }
   function maybeAddBig(){
     let made=0;
     const done={};
+    // 軸7: ステージ2以降は、縦3マスの『ソフトクリーム』を各塔にちょうど1個(増やしすぎると狙う得が薄れて軸3の線が崩れるので1個まで)
+    if(stage>1){
+      const o2=[]; for(let c=0;c<cols;c++)o2.push(c);
+      for(let k=o2.length-1;k>0;k--){const j=rint(0,k); const t=o2[k]; o2[k]=o2[j]; o2[j]=t;}
+      for(const c of o2){ if(mergeBigIn(c,3)){ done[c]=1; break; } }
+    }
     for(let c=0;c<cols;c++){
+      if(done[c]) continue;
       if(Math.random()>=(stage>1?0.3:0.35)) continue;
-      if(mergeBigIn(c)){ made++; done[c]=1; }
+      if(mergeBigIn(c,2)){ made++; done[c]=1; }
     }
     // 軸7: 大玉が足りない時は、どれかの列で必ず合体させて「大きい物」が画面に出るようにする(ステージ1は最初から2個以上、2以降は1個以上)
     const need=stage===1?2:1;
     if(made<need){
       const order=[]; for(let c=0;c<cols;c++)order.push(c);
       for(let k=order.length-1;k>0;k--){const j=rint(0,k); const t=order[k]; order[k]=order[j]; order[j]=t;}
-      for(const c of order){ if(made>=need)break; if(done[c])continue; if(mergeBigIn(c)){ made++; done[c]=1; } }
+      for(const c of order){ if(made>=need)break; if(done[c])continue; if(mergeBigIn(c,2)){ made++; done[c]=1; } }
     }
   }
   function blockY(r){return by+r*S;}
@@ -145,18 +160,22 @@ function build_cookiebreak(api){
     const isHardBreak=(b.hard||b.type.key==="mint")&&!isSoft;    // かたいアメ: パリンと砕ける(小さく多い破片・速い)
     const isCake=b.type.key==="cake";                            // ケーキ: バーンと広く散らばる
     const isBig=b.type.key==="bigcandy";                         // 軸7対策: おおきいアメは破片も一回り大きく・多く
+    const isTall=b.type.key==="icecream";                        // 軸7: ソフトクリーム(縦3マス)は大破片が倒れて崩れる
     // particle caps: keep 60fps even on fever flood-breaks
     const capped=shards.length>140;
     let shN,shSzLo,shSzHi,shVLo,shVHi,shDeLo,shDeHi;
     if(isSoft&&b.type.key==="gummyb"){ shN=capped?2:rint(3,5); shSzLo=S*0.16; shSzHi=S*0.3; shVLo=-2.5; shVHi=2.5; shDeLo=0.005; shDeHi=0.009; } // ちびグミ: 小さなふにゃ破片
     else if(isSoft){ shN=capped?2:rint(3,5); shSzLo=S*0.26; shSzHi=S*0.48; shVLo=-2.5; shVHi=2.5; shDeLo=0.005; shDeHi=0.009; }
     else if(isHardBreak){ shN=capped?3:rint(8,12); shSzLo=S*0.09; shSzHi=S*0.2; shVLo=-7.5; shVHi=7.5; shDeLo=0.01; shDeHi=0.02; }
+    else if(isTall){ shN=capped?4:rint(10,14); shSzLo=S*0.24; shSzHi=S*0.44; shVLo=-6; shVHi=6; shDeLo=0.008; shDeHi=0.014; }
     else if(isBig){ shN=capped?3:rint(7,10); shSzLo=S*0.22; shSzHi=S*0.4; shVLo=-6; shVHi=6; shDeLo=0.008; shDeHi=0.014; }
     else{ shN=capped?2:rint(5,8); shSzLo=S*0.16; shSzHi=S*0.34; shVLo=-5; shVHi=5; shDeLo=0.006; shDeHi=0.012; }
     // 軸7対策③: ケーキは砕けるだけでなく『倒れる』動きを足す。大きめの破片1個を強く回転させて落とし、
     // 飛び散る細かい破片(下の通常処理)と混ぜて「倒れて崩れる」見え方にする。
     if(isCake) shards.push({x:cx,y:cy,vx:rnd(-1,1),vy:rnd(0.4,1.4),s:Math.max(1,S*0.7),col,
       rot:0,vr:rnd(4,5.5)*(Math.random()<0.5?-1:1),life:1,decay:0.022});
+    if(isTall) shards.push({x:cx,y:cy-heff*0.2,vx:rnd(-1.2,1.2),vy:rnd(0.2,1.2),s:Math.max(1,S*0.95),col,
+      rot:0,vr:rnd(3.5,5)*(Math.random()<0.5?-1:1),life:1,decay:0.02});   // 軸7: 大きい破片1個が強く回って『倒れる』
     const spN=sparks.length>160?2:(big?8:5);
     for(let i=shN;i>0;i--)shards.push({x:cx+rnd(-S*0.3,S*0.3),y:cy+rnd(-S*0.3,S*0.3),
       vx:rnd(shVLo,shVHi)+(big?rnd(-3,3):0),vy:rnd(isHardBreak?-11:-9,-2),s:Math.max(1,rnd(shSzLo,shSzHi)),col:rr?pick(RAINBOW):col,
@@ -277,9 +296,11 @@ function build_cookiebreak(api){
     }
     // ② きょうのラッキーおかし命中: 小さな祝福(白飛びしないよう控えめ)＋初回だけ中央に教示
     if(isLucky){
-      if(blocks.length>0) luckyMsgT=luckySeen?Math.max(luckyMsgT,0.7):1.6; luckySeen=true;
+      if(feverBanner<=0){   // 軸6: フィーバー開始バナー中はラッキーの帯・文字を出さない(重なり防止)
+        if(blocks.length>0) luckyMsgT=luckySeen?Math.max(luckyMsgT,0.7):1.6; luckySeen=true;
+      }
       api.tone(1046,0.14,"triangle",0.1); api.tone(1568,0.16,"triangle",0.08);
-      floats.push({x:offsetFloatX(cx),y:cy-84,txt:"ラッキー！",life:1,vy:-0.9,col:b.type.chip,size:26});
+      if(feverBanner<=0) floats.push({x:offsetFloatX(cx),y:cy-84,txt:"ラッキー！",life:1,vy:-0.9,col:b.type.chip,size:26});
       for(let i=0;i<7;i++){const a=rnd(-TAU*0.5,0),v=rnd(2,5);
         sparks.push({x:cx,y:cy,vx:Math.cos(a)*v,vy:Math.sin(a)*v-1.5,life:1,decay:0.03,s:rnd(2,3.5),col:"#fff7c2"});}
     }
@@ -302,6 +323,7 @@ function build_cookiebreak(api){
     if(blocks.length===0)doClear();
   }
   function startFever(){
+    luckyMsgT=0; rbMsgT=0;   // 軸6: フィーバー開始バナーと重ならないよう他のバナーを消す
     fever=12; feverGauge=0; feverBanner=2;
     flash=1; flashHue="#ff5bd0";
     api.boom(0.7); api.shake(18);
@@ -579,14 +601,15 @@ function build_cookiebreak(api){
         g.restore(); g.globalAlpha=1; g.textAlign="left"; g.textBaseline="alphabetic"; g.lineJoin="miter"; if(rbMsgT<0)rbMsgT=0; } }
       // ② きょうのラッキーおかし はっけん！ 中央の小ヒント(初回だけ大きく)
       if(luckyMsgT>0){ luckyMsgT-=0.016*dt;
+        if(feverBanner>0){ luckyMsgT=0; } else {
         // 軸6対策①: 半透明バンドで背後の浮遊テキストと重なっても文字がにじまないようにする
-        g.save(); g.globalAlpha=clamp(luckyMsgT*1.3,0,1)*0.4; g.fillStyle="#5a2a44"; g.fillRect(0,api.H*0.43-28,api.W,56); g.restore();
-        g.save(); g.translate(api.W/2,api.H*0.43); g.textAlign="center"; g.textBaseline="middle";
+        g.save(); g.globalAlpha=clamp(luckyMsgT*1.3,0,1)*0.4; g.fillStyle="#5a2a44"; g.fillRect(0,api.H*0.30-28,api.W,56); g.restore();
+        g.save(); g.translate(api.W/2,api.H*0.30); g.textAlign="center"; g.textBaseline="middle";
         g.globalAlpha=clamp(luckyMsgT*1.3,0,1); g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
         const t2="きょうのラッキーは "+(FLAVNAME[luckyKey]||"")+"！";
         g.lineWidth=5; g.lineJoin="round"; g.strokeStyle="rgba(90,40,60,.45)"; g.strokeText(t2,0,0);
         g.fillStyle="#fff2a0"; g.fillText(t2,0,0);
-        g.restore(); g.globalAlpha=1; g.textAlign="left"; g.textBaseline="alphabetic"; g.lineJoin="miter"; if(luckyMsgT<0)luckyMsgT=0; }
+        g.restore(); g.globalAlpha=1; g.textAlign="left"; g.textBaseline="alphabetic"; g.lineJoin="miter"; if(luckyMsgT<0)luckyMsgT=0; } }
       // ③ ノンストップ ボーナス！ バナー(クリア文字の下=重ねない)
       if(nonstopT>0){ nonstopT-=0.014*dt;
         const pop=1+Math.max(0,nonstopT-1.3)*1.3;
@@ -615,12 +638,36 @@ function build_cookiebreak(api){
     const isRoundCookie=t.key==="cookie";              // 軸7: まんまるクッキー(いちばん大きく膨らむ)
     const isBig=t.key==="bigcandy";                    // おおきい丸玉(1x2マス)
     const isStick=t.key==="stick";                     // 細長いキャンディスティック
+    const isTall=t.key==="icecream";                   // 軸7: 縦3マスのソフトクリーム
+    const isGinger=t.key==="gingerbread";              // 軸7: ジンジャーマン(人型)
+    const isDonut=t.key==="donut";                     // 軸7: ドーナツ(穴あき)
+    const isSmallMint=isRoundCandy;                    // 軸7: ちびアメ玉(0.7倍・マスの下に座る。当たり判定はマス全体のまま)
     function bodyPath(px,py,pw,ph,inset){
       if(isChibi) g.ellipse(px+pw/2,py+ph*0.68,Math.max(0,pw*0.30),Math.max(0,ph*0.28),0,0,TAU);
       else if(isJelly) g.ellipse(px+pw/2,py+ph/2,Math.max(0,pw*0.46),Math.max(0,ph*0.42),0,0,TAU);
       else if(isChocoBar) roundRect(px+inset,py+ph*0.12,Math.max(0,pw-2*inset),ph*0.76,pw*0.1);
       else if(isRoundCookie) g.arc(px+pw/2,py+ph/2,Math.max(0,pw*0.49),0,TAU);
-      else if(isRoundCandy) g.arc(px+pw/2,py+ph/2,Math.max(0,pw*0.44),0,TAU);
+      else if(isRoundCandy) g.arc(px+pw/2,py+ph*0.66,Math.max(0,pw*0.31),0,TAU);
+      else if(isDonut){ const dcx=px+pw/2,dcy=py+ph/2; g.arc(dcx,dcy,Math.max(0,pw*0.47),0,TAU); g.moveTo(dcx+pw*0.16,dcy); g.arc(dcx,dcy,Math.max(0,pw*0.16),0,TAU,true); }
+      else if(isGinger){
+        const X=u=>px+pw*u, Y=v=>py+ph*v;
+        g.beginPath(); g.moveTo(X(0.42),Y(0.35));
+        g.arc(X(0.5),Y(0.2),Math.max(0,pw*0.16),2.06,Math.PI*2+1.08);
+        g.lineTo(X(0.78),Y(0.37)); g.quadraticCurveTo(X(0.97),Y(0.3),X(0.96),Y(0.5)); g.lineTo(X(0.8),Y(0.52));
+        g.lineTo(X(0.68),Y(0.54)); g.lineTo(X(0.84),Y(0.84)); g.quadraticCurveTo(X(0.86),Y(0.98),X(0.7),Y(0.96));
+        g.lineTo(X(0.58),Y(0.92)); g.lineTo(X(0.5),Y(0.72)); g.lineTo(X(0.42),Y(0.92)); g.lineTo(X(0.3),Y(0.96));
+        g.quadraticCurveTo(X(0.14),Y(0.98),X(0.16),Y(0.84)); g.lineTo(X(0.32),Y(0.54)); g.lineTo(X(0.2),Y(0.52));
+        g.quadraticCurveTo(X(0.03),Y(0.5),X(0.04),Y(0.4)); g.quadraticCurveTo(X(0.05),Y(0.3),X(0.22),Y(0.37)); g.closePath();
+      }
+      else if(isTall){
+        const X=u=>px+pw*u, Y=v=>py+ph*v;
+        g.beginPath(); g.moveTo(X(0.5),Y(0.01));
+        g.quadraticCurveTo(X(0.7),Y(0.04),X(0.7),Y(0.17)); g.quadraticCurveTo(X(0.84),Y(0.19),X(0.85),Y(0.33));
+        g.quadraticCurveTo(X(1.0),Y(0.36),X(0.97),Y(0.5)); g.quadraticCurveTo(X(1.0),Y(0.58),X(0.9),Y(0.6));
+        g.lineTo(X(0.5),Y(0.99)); g.lineTo(X(0.1),Y(0.6));
+        g.quadraticCurveTo(X(0),Y(0.58),X(0.03),Y(0.5)); g.quadraticCurveTo(X(0),Y(0.36),X(0.15),Y(0.33));
+        g.quadraticCurveTo(X(0.16),Y(0.19),X(0.3),Y(0.17)); g.quadraticCurveTo(X(0.3),Y(0.04),X(0.5),Y(0.01)); g.closePath();
+      }
       else if(isBig) roundRect(px+inset,py+inset,Math.max(0,pw-2*inset),Math.max(0,ph-2*inset),Math.max(0,pw-2*inset)*0.5);   // 2マス分の高さいっぱいの縦長カプセル(大小の対比)
       else if(isStick) roundRect(px+pw*0.3,py+inset*0.5,pw*0.4,ph-inset,pw*0.2);
       else roundRect(px+inset,py+inset,pw-2*inset,ph-2*inset,pw*0.28);
@@ -637,6 +684,7 @@ function build_cookiebreak(api){
       g.fillStyle="rgba(255,255,255,.4)";
       g.beginPath();
       if(isChibi) g.ellipse(x+s*0.4,y+s*0.58,Math.max(0,s*0.12),Math.max(0,s*0.06),-0.5,0,TAU);
+      else if(isSmallMint) g.ellipse(x+s*0.4,y+s*0.54,Math.max(0,s*0.1),Math.max(0,s*0.05),-0.5,0,TAU);
       else g.ellipse(x+s*0.32,y+s*0.26,Math.max(0,s*0.26),Math.max(0,s*0.13),-0.5,0,TAU);
       g.fill();
       g.restore();
@@ -719,8 +767,8 @@ function build_cookiebreak(api){
     } else if(t.key==="mint"){
       // 軸7対策: まんまるアメ玉+ねじり線(caramelツイスト)
       g.save(); g.strokeStyle="rgba(255,255,255,.6)"; g.lineWidth=Math.max(1.5,s*0.05); g.lineCap="round";
-      g.beginPath(); g.moveTo(x+s*0.26,y+s*0.3); g.quadraticCurveTo(x+s*0.5,y+s*0.5,x+s*0.74,y+s*0.3); g.stroke();
-      g.beginPath(); g.moveTo(x+s*0.26,y+s*0.7); g.quadraticCurveTo(x+s*0.5,y+s*0.5,x+s*0.74,y+s*0.7); g.stroke();
+      g.beginPath(); g.moveTo(x+s*0.36,y+s*0.55); g.quadraticCurveTo(x+s*0.5,y+s*0.66,x+s*0.64,y+s*0.55); g.stroke();
+      g.beginPath(); g.moveTo(x+s*0.36,y+s*0.8); g.quadraticCurveTo(x+s*0.5,y+s*0.66,x+s*0.64,y+s*0.8); g.stroke();
       g.restore();
     } else if(isStick){
       // 軸7対策: キャンディスティック = 細長い縦シルエット＋ねじり縞(丸・四角に加えて『長い』形)
@@ -730,6 +778,43 @@ function build_cookiebreak(api){
       g.restore();
       g.fillStyle="#fff"; g.beginPath(); g.arc(x+s*0.5,y+heff*0.08,Math.max(0,s*0.06),0,TAU); g.fill();
       g.beginPath(); g.arc(x+s*0.5,y+heff*0.94,Math.max(0,s*0.06),0,TAU); g.fill();
+    } else if(isDonut){
+      // ドーナツ: 生地のふち＋カラフルなスプリンクル(輪っか＝穴があいた形)
+      const dcx=x+s/2,dcy=y+s/2;
+      g.save(); g.beginPath(); bodyPath(x,y,s,heff,1); g.clip();
+      g.strokeStyle="#e8b873"; g.lineWidth=Math.max(2,s*0.1);
+      g.beginPath(); g.arc(dcx,dcy,Math.max(0,s*0.47),0,TAU); g.stroke();
+      g.beginPath(); g.arc(dcx,dcy,Math.max(0,s*0.16),0,TAU); g.stroke();
+      g.restore();
+      const sc=["#fff","#4db8ff","#ffd23f","#7be08a","#b58bff"];
+      for(let i=0;i<8;i++){ const a=i/8*TAU+0.3, rr4=s*(0.26+0.03*(i%2));
+        g.save(); g.translate(dcx+Math.cos(a)*rr4,dcy+Math.sin(a)*rr4); g.rotate(a*2+i);
+        g.fillStyle=sc[i%sc.length]; g.fillRect(-s*0.06,-s*0.022,s*0.12,s*0.044); g.restore(); }
+    } else if(isGinger){
+      // ジンジャーマン: 目・口・白いボタン3つ・手足の白いアイシング
+      g.fillStyle="#5a3420";
+      g.beginPath(); g.arc(x+s*0.43,y+s*0.18,Math.max(0,s*0.03),0,TAU); g.arc(x+s*0.57,y+s*0.18,Math.max(0,s*0.03),0,TAU); g.fill();
+      g.strokeStyle="#5a3420"; g.lineWidth=Math.max(1.4,s*0.03); g.lineCap="round";
+      g.beginPath(); g.arc(x+s*0.5,y+s*0.21,Math.max(0,s*0.06),0.2*Math.PI,0.8*Math.PI); g.stroke();
+      g.fillStyle="#fff";
+      for(let i=0;i<3;i++){ g.beginPath(); g.arc(x+s*0.5,y+s*(0.42+0.1*i),Math.max(0,s*0.04),0,TAU); g.fill(); }
+      g.strokeStyle="rgba(255,255,255,.9)"; g.lineWidth=Math.max(1.5,s*0.035);
+      g.beginPath(); g.moveTo(x+s*0.1,y+s*0.44); g.lineTo(x+s*0.2,y+s*0.44);
+      g.moveTo(x+s*0.8,y+s*0.44); g.lineTo(x+s*0.9,y+s*0.44);
+      g.moveTo(x+s*0.22,y+s*0.88); g.lineTo(x+s*0.32,y+s*0.88);
+      g.moveTo(x+s*0.68,y+s*0.88); g.lineTo(x+s*0.78,y+s*0.88); g.stroke();
+    } else if(isTall){
+      // ソフトクリーム: 下はワッフルのコーン、上はピンクの渦のクリームと赤いさくらんぼ
+      g.save(); g.beginPath(); bodyPath(x,y,s,heff,1); g.clip();
+      g.fillStyle="#e0a458"; g.fillRect(x,y+heff*0.6,s,heff*0.4+2);
+      g.strokeStyle="rgba(120,70,30,.6)"; g.lineWidth=Math.max(1.5,s*0.035);
+      for(let i=-3;i<=4;i++){ g.beginPath(); g.moveTo(x+s*(0.5+i*0.2),y+heff*0.6); g.lineTo(x+s*(0.5+i*0.2-0.35),y+heff); g.stroke();
+        g.beginPath(); g.moveTo(x+s*(0.5+i*0.2),y+heff*0.6); g.lineTo(x+s*(0.5+i*0.2+0.35),y+heff); g.stroke(); }
+      g.strokeStyle="rgba(255,143,179,.75)"; g.lineWidth=Math.max(2,s*0.07); g.lineCap="round";
+      for(let i=0;i<3;i++){ const yy=y+heff*(0.22+0.15*i); g.beginPath(); g.moveTo(x+s*0.1,yy+s*0.1); g.quadraticCurveTo(x+s*0.5,yy-s*0.1,x+s*0.9,yy+s*0.1); g.stroke(); }
+      g.restore();
+      g.fillStyle="#ff3d5a"; g.beginPath(); g.arc(x+s*0.5,y+heff*0.02,Math.max(0,s*0.1),0,TAU); g.fill();
+      g.fillStyle="rgba(255,255,255,.7)"; g.beginPath(); g.arc(x+s*0.47,y+heff*0.02-s*0.03,Math.max(0,s*0.03),0,TAU); g.fill();
     } else if(isBig){
       // 軸7対策: おおきいアメ = うずまき模様のジャイアントキャンディ玉(大小の対比)
       g.save(); g.beginPath(); bodyPath(x,y,s,heff,1); g.clip();

@@ -227,11 +227,13 @@ function build_gumball(api){
     if(stageEat<stageGoal||clearT>0||endingT>0) return;
     if(stage>=STAGES){
       endingT=2.6;celebrate=2.4;flash=1;flashHue="#ffd23f";floats.length=0;
+      feverBann=0;rbMsgT=0;perfectT=0;luckyMsgT=0;   // 軸6: ぜんぶクリア帯の上に他のバナーを残さない
       api.boom(0.7);api.shake(20);
       api.slide(523,1046,0.5,0.22,"triangle");
     }else{
       clearStage=stage;clearT=1.7;celebrate=1.6;flash=0.8;flashHue=sky().c;
       floats.length=0;   // 軸6: クリア帯の上に文字が重ならないよう消す
+      feverBann=0;rbMsgT=0;perfectT=0;luckyMsgT=0;   // 軸6: 大きいバナーも一緒に消す
       api.boom(0.5);api.shake(12);
       api.slide(523,784,0.3,0.2,"triangle");api.tone(988,0.3,"triangle",0.1);
       for(let i=0;i<22;i++){const a=rnd(0,TAU),sp=rnd(3,9);
@@ -600,35 +602,38 @@ function build_gumball(api){
 
       // ---- ① にじいろガムボール！ 発見バナー(虹色に色替わり=激レアの大きな祝福) ----
       if(rbMsgT>0){rbMsgT-=0.016*dt;
-        const a=clamp(rbMsgT*1.4,0,1),pop=1+Math.max(0,rbMsgT-1.1)*1.6;
+        if(!paused){const a=clamp(rbMsgT*1.4,0,1),pop=1+Math.max(0,rbMsgT-1.1)*1.6;
         const col="hsl("+(((tsec*220)|0)%360)+",95%,64%)";
         g.save();g.translate(W/2,H*0.2);g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";
         g.font="900 40px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor=col;g.shadowBlur=20;g.fillStyle="#fff";
         g.fillText("にじいろガムボール！",0,0);
         g.shadowBlur=0;g.lineWidth=2.5;g.strokeStyle=col;g.strokeText("にじいろガムボール！",0,0);
-        g.restore();g.globalAlpha=1;g.textAlign="left";if(rbMsgT<0)rbMsgT=0;}
+        g.restore();g.globalAlpha=1;g.textAlign="left";}
+        if(rbMsgT<0)rbMsgT=0;}
       // ---- ② きょうのラッキー色 はっけん！(開始時に一度だけ・中央上) ----
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
-        const a=clamp(luckyMsgT*1.2,0,1);
+        if(!paused){const a=clamp(luckyMsgT*1.2,0,1);
         g.save();g.translate(W/2,H*0.27);g.globalAlpha=a;g.textAlign="center";
         g.font="800 24px 'Hiragino Maru Gothic ProN',system-ui";
         const t2="きょうのラッキーいろは "+(COLNAME[luckyColor]||"")+"！";
         g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.4)";g.strokeText(t2,0,0);
         g.fillStyle=luckyColor;g.fillText(t2,0,0);
-        g.restore();g.globalAlpha=1;g.textAlign="left";if(luckyMsgT<0)luckyMsgT=0;}
+        g.restore();g.globalAlpha=1;g.textAlign="left";}
+        if(luckyMsgT<0)luckyMsgT=0;}
       // ---- ③ パーフェクトロール！ 祝福バナー(クリア文字と重ならない下側) ----
       if(perfectT>0){perfectT-=0.016*dt;
-        const a=clamp(perfectT*1.3,0,1),pop=1+Math.max(0,perfectT-1.2)*1.6;
+        if(!paused){const a=clamp(perfectT*1.3,0,1),pop=1+Math.max(0,perfectT-1.2)*1.6;
         g.save();g.translate(W/2,H*0.6);g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";
         g.font="900 32px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor="rgba(123,224,138,.9)";g.shadowBlur=16;g.fillStyle="#c7ffcf";
         g.fillText("パーフェクトロール！",0,0);
         g.shadowBlur=0;g.lineWidth=1.5;g.strokeStyle="rgba(40,120,60,.7)";g.strokeText("パーフェクトロール！",0,0);
-        g.restore();g.globalAlpha=1;g.textAlign="left";if(perfectT<0)perfectT=0;}
+        g.restore();g.globalAlpha=1;g.textAlign="left";}
+        if(perfectT<0)perfectT=0;}
       // ---- フィーバー突入バナー ----
       if(feverBann>0){feverBann-=0.016*dt;
-        const a=clamp(feverBann*1.5,0,1),pop=1+Math.max(0,feverBann-1.2)*2.2;
+        if(!paused){const a=clamp(feverBann*1.5,0,1),pop=1+Math.max(0,feverBann-1.2)*2.2;
         g.save();g.translate(W/2,H*0.35);g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";
         g.font="900 46px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor="rgba(255,43,255,.9)";g.shadowBlur=24;
@@ -637,7 +642,8 @@ function build_gumball(api){
         g.shadowBlur=0;g.lineWidth=2.5;g.strokeStyle="#fff";g.strokeText("フィーバータイム！",0,0);
         g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";g.fillStyle="#fff";
         g.fillText("てんすう 2ばい！",0,40);
-        g.restore();g.globalAlpha=1;g.textAlign="left";
+        g.restore();g.globalAlpha=1;g.textAlign="left";}
+        if(feverBann<0)feverBann=0;
       }
 
       // ---- ステージクリア演出 ----
@@ -700,7 +706,7 @@ function build_gumball(api){
       g.fillStyle=gg;roundRect(bx,by,Math.max(bh,bw*fr),bh,bh/2);g.fill();}
     g.strokeStyle="rgba(255,255,255,.55)";g.lineWidth=2;roundRect(bx,by,bw,bh,bh/2);g.stroke();
     // フィーバーゲージ(進行バーの下)
-    const fw2=bw*0.66,fx2=(W-fw2)/2,fy2=by+bh+7,fh2=9;
+    const fw2=bw*0.66,fx2=(W-fw2)/2,fy2=by+bh+7,fh2=11;
     g.fillStyle="rgba(0,0,0,.28)";roundRect(fx2,fy2,fw2,fh2,fh2/2);g.fill();
     if(fever>0){
       // 残り時間バー(虹色に点滅)
@@ -708,25 +714,19 @@ function build_gumball(api){
       g.save();g.shadowBlur=8+4*Math.sin(tsec*8);g.shadowColor="#ff2bff";
       g.fillStyle="hsl("+(((tsec*200)|0)%360)+",95%,62%)";
       roundRect(fx2,fy2,Math.max(fh2,fw2*fr2),fh2,fh2/2);g.fill();g.restore();
-      g.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";
-      g.lineWidth=4;g.strokeStyle="rgba(40,20,50,.7)";g.strokeText("フィーバー！ 2ばい！",W/2,fy2+fh2+17);
-      g.fillStyle="#fff";g.fillText("フィーバー！ 2ばい！",W/2,fy2+fh2+17);
     }else if(feverGauge>0.02){
       g.save();if(feverGauge>0.85){g.shadowBlur=8+4*Math.sin(tsec*7);g.shadowColor="#ffd23f";}
       const gg2=g.createLinearGradient(fx2,0,fx2+fw2,0);
       gg2.addColorStop(0,"#ffb84a");gg2.addColorStop(1,"#ff2bff");
       g.fillStyle=gg2;roundRect(fx2,fy2,Math.max(fh2,fw2*clamp(feverGauge,0,1)),fh2,fh2/2);g.fill();
       g.restore();
-      g.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";
-      g.lineWidth=4;g.strokeStyle="rgba(40,20,50,.7)";g.strokeText("フィーバーゲージ",W/2,fy2+fh2+17);
-      g.fillStyle="#fff";g.fillText("フィーバーゲージ",W/2,fy2+fh2+17);
     }
     g.strokeStyle="rgba(255,255,255,.4)";g.lineWidth=1.5;roundRect(fx2,fy2,fw2,fh2,fh2/2);g.stroke();
     g.restore();g.textAlign="left";
     // コンボ表示(中央)
-    if(combo>1){
+    if(combo>1&&rbMsgT<=0&&feverBann<=0){   // 軸6: 大きいバナーが出ている間はコンボを引っ込める
       const pop=1+Math.max(0,comboT-0.7)*1.2;
-      g.save();g.translate(W/2,H*0.15);g.scale(pop,pop);g.textAlign="center";
+      g.save();g.translate(W/2,H*0.17);g.scale(pop,pop);g.textAlign="center";
       g.font="800 30px 'Hiragino Maru Gothic ProN',system-ui";
       g.globalAlpha=clamp(comboT,0,1);
       g.shadowColor="rgba(255,90,150,.8)";g.shadowBlur=14;

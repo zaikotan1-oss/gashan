@@ -52,7 +52,7 @@ function build_icecream(api){
       sp:rnd(0.1,0.4),tw:rnd(0,TAU),col:pick(["#ffffff","#fff0a6","#ffd2f0","#bfe9ff"])});
   }
   function layout(){
-    R=clamp(Math.min(api.W,api.H)*0.07,26,54);
+    R=clamp(Math.min(api.W,api.H)*0.07,26,60);
     towerX=api.W/2;
     towerBaseY=api.H*0.82;
     // re-stack any existing scoops onto the new geometry
@@ -109,7 +109,7 @@ function build_icecream(api){
     // はじめの1回だけ、何も押さない子にも「ここを タップ！」を塔の横に出す(吸着・当たり判定は変えない)
     if(stage===1&&!firstHintShown){firstHintShown=true;
       const tp=scoops[scoops.length-1];
-      if(tp)floats.push({x:Math.min(towerX+R*3.2,api.W-90),y:tp.baseY,txt:'ここを タップ！',vy:0,life:1.6,col:'#ff5b8a',size:24});}
+      if(tp)floats.push({x:Math.min(towerX+R*3.2,api.W-125),y:tp.baseY,txt:'ここを タップ！',vy:0,life:1.6,col:'#fff7c2',size:28});}
   }
 
   function spawnBall(tx,ty,tgt){
@@ -287,7 +287,7 @@ function build_icecream(api){
         // 外しても『どこを押せばいいか』が見えるように、押した所の小さな波紋と「ここを タップ！」を出す
         rings.push({x:px,y:py,r:6,vr:3,life:1,decay:0.06,col:'#ffffff'});
         if(tsec-lastHintAt>0.8&&!floats.some(f=>f.life>0.3&&/ラッキー|ゴールド|にじいろ/.test(f.txt))){lastHintAt=tsec;
-          floats.push({x:top.x,y:top.baseY-top.r*1.8,txt:'ここを タップ！',vy:0,life:0.9,col:'#ff5b8a',size:22});}
+          floats.push({x:Math.max(125,Math.min(top.x,api.W-125)),y:Math.max(api.H*0.16,top.baseY-top.r*2.6),txt:'ここを タップ！',vy:0,life:0.9,col:'#fff7c2',size:28});}
         return;
       }
       // (軸3) 連射間隔の下限。連打の速さだけでは伸びず、狙いの精度がスコアに効くようにする。
@@ -504,7 +504,7 @@ function build_icecream(api){
         if(stageBroken>0&&scoops.some(s=>!s.broken))nonstopBroken=true;}}
       for(const f of floats){f.y+=f.vy*dt;f.life-=0.018*dt;
         g.globalAlpha=Math.max(0,f.life);g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";
-        g.textAlign="center";g.lineWidth=8;g.lineJoin="round";g.strokeStyle="rgba(60,20,50,.7)";
+        g.textAlign="center";g.lineWidth=Math.max(3,f.size*0.22);g.lineJoin="round";g.strokeStyle="rgba(60,20,50,.7)";
         g.strokeText(f.txt,f.x,f.y);g.fillStyle=f.col;g.fillText(f.txt,f.x,f.y);}
       g.globalAlpha=1;g.lineJoin="miter";g.textAlign="left";floats=floats.filter(f=>f.life>0);
 

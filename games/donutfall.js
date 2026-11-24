@@ -460,9 +460,13 @@ function build_donutfall(api){
     const left=clamp(stageGoal-stageKill,0,stageGoal);
     const bw=Math.min(api.W*0.6,360),bh=16,bx=(api.W-bw)/2,by=api.H*0.045;
     g.save();g.textAlign="center";
-    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
+    g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
+    const ht="ステージ "+stage+"      あと "+left+" こ";
+    const tw=Math.max(bw,g.measureText(ht).width);
+    g.fillStyle="rgba(255,255,255,.6)";rrect(api.W/2-tw/2-14,by-36,tw+28,36+bh+10,14);g.fill();
+    g.lineWidth=5;g.lineJoin="round";g.strokeStyle="rgba(255,255,255,.95)";g.strokeText(ht,api.W/2,by-10);
     g.fillStyle="#7a3b5a";g.shadowColor="rgba(255,255,255,.6)";g.shadowBlur=6;
-    g.fillText("ステージ "+stage+"      あと "+left+" こ",api.W/2,by-8);
+    g.fillText(ht,api.W/2,by-10);
     g.shadowBlur=0;
     g.fillStyle="rgba(255,255,255,.5)";rrect(bx,by,bw,bh,bh/2);g.fill();
     const fr=clamp(stageKill/stageGoal,0,1);
@@ -488,12 +492,14 @@ function build_donutfall(api){
       g.fillStyle=pg;rrect(x,y,Math.max(h,w*fr),h,h/2);g.fill();
     }
     g.strokeStyle="rgba(255,255,255,.8)";g.lineWidth=2;rrect(x,y,w,h,h/2);g.stroke();
-    g.font="800 15px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
+    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
+    g.lineWidth=5;g.lineJoin="round";g.strokeStyle="rgba(255,255,255,.95)";
     g.shadowColor="rgba(255,255,255,.7)";g.shadowBlur=6;
     if(fever>0){const pu=1+0.08*Math.sin(tsec*10);
-      g.save();g.translate(api.W/2,y-8);g.scale(pu,pu);
+      g.save();g.translate(api.W/2,y-10);g.scale(pu,pu);
+      g.strokeText("フィーバー！ てん 2ばい！",0,0);
       g.fillStyle="#ff2bcf";g.fillText("フィーバー！ てん 2ばい！",0,0);g.restore();}
-    else{g.fillStyle="#7a3b5a";g.fillText("フィーバーゲージ",api.W/2,y-8);}
+    else{g.strokeText("フィーバーゲージ",api.W/2,y-10);g.fillStyle="#7a3b5a";g.fillText("フィーバーゲージ",api.W/2,y-10);}
     g.restore();g.textAlign="left";
   }
 

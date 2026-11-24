@@ -25,6 +25,10 @@ function build_gummy(api){
   const GUM=["#ff5b9e","#5bc8ff","#ffd23f","#7be08a","#c78bff","#ff8c42"];
   const GUMNAME=["ピンク","みずいろ","きいろ","みどり","むらさき","オレンジ"];
   luckyColor=pick(GUM);luckyMsgT=2.6; // 起動時に一度だけ「きょうのラッキーいろは◯！」を中央上に教える
+  // グミが穴から顔を出す高さ(R確定後に決まるので関数)。下端が穴の手前のふち(h.y+R*0.72)に隠れて「穴にはまっている」見た目にする
+  function pop(){return R*0.05;}
+  // u=0(完全に穴の中)〜1(顔を出した)。u<1の間は穴の中から せり上がる
+  function moleY(m,u){const sz=m.size||1;return m.baseY-pop()+(1-u)*(pop()+R*1.7*sz);}
   function safeY(y){return (y>api.H*0.22&&y<api.H*0.38)?api.H*0.4:y;} // engineの「やったね！」帯(H*0.22〜0.38)を避ける
   function curBg(){return STAGE_BG[(stage-1)%STAGE_BG.length];}
   function stageGoalFor(s){return 10+(s-1)*3;}   // 8,10,12,14→10,13,16,19（7〜8歳向けに手応えを増やした）
@@ -196,7 +200,7 @@ function build_gummy(api){
     setTimeout(()=>api.tone(1046,0.3,"triangle",0.2),300);
     if(hsCool<=0){api.hitStop(5);hsCool=45;}
     const h=holes[4],hx=h?h.x:api.W/2,hy=(h?h.y:api.H/2)-R*2;
-    floats.push({x:hx,y:hy-R,txt:"キングを たおした！ ＋10",life:1.4,vy:-0.6,col:"#ffd23f",size:36});
+    floats.push({x:hx,y:safeY(hy-R),txt:"キングを たおした！ ＋10",life:1.4,vy:-0.6,col:"#ffd23f",size:36});
     const nb=Math.max(0,Math.min(30,160-bits.length));
     for(let i=0;i<nb;i++){const a=rnd(0,TAU),s=rnd(3,10);
       bits.push({x:hx,y:hy,vx:Math.cos(a)*s,vy:Math.sin(a)*s-3,r:rnd(4,10),
@@ -247,7 +251,7 @@ function build_gummy(api){
       let best=null,bd=1e9;
       for(let i=moles.length-1;i>=0;i--){const m=moles[i];
         if(m.state==="smashed")continue;
-        const my=m.baseY-m.up*R*1.6;
+        const my=moleY(m,m.up);
         const d=Math.hypot(x-m.x,y-my);
         if(d<bd){bd=d;best=m;}}
       // さいしょの1こ(count===0)だけは広めに吸着=最初の成功を必ず来させる。2こ目からは狙わないと当たらない半径。
@@ -403,13 +407,19 @@ function build_gummy(api){
         m.bob+=0.08*dt;m.wob+=0.18*dt;
         const e=m.state==="rise"?api.ease(m.up):1;
         const bob=m.state==="up"?Math.sin(m.bob)*R*0.05:0;
-        const my=m.baseY-((m.state==="rise"?e:m.up)*R*1.6)-bob;
+        const my=moleY(m,m.state==="rise"?e:m.up)-bob;
         g.save();
-        g.beginPath();g.rect(m.x-R*1.5,0,R*3,m.baseY+R*0.66);g.clip();
+        g.beginPath();g.rect(m.x-R*1.5,0,R*3,m.baseY+R*0.72);g.clip();
         drawGummy(m,m.x,my,m.state==="smashed"?m.squash:1);
         g.restore();
       }
       moles=moles.filter(m=>!m._dead);
+      // 穴の手前のふち: グミを描いた『後』に下半分だけ描き直し、穴の中から出てくる絵にする
+      for(const h of holes){
+        g.fillStyle="#6b3d22";g.beginPath();g.ellipse(h.x,h.y+R*0.72,R*0.98,R*0.44,0,0,Math.PI);g.fill();
+        g.strokeStyle="rgba(255,210,160,.3)";g.lineWidth=2;
+        g.beginPath();g.ellipse(h.x,h.y+R*0.74,R*0.9,R*0.38,0,Math.PI*0.15,Math.PI*0.85);g.stroke();
+      }
       // ---- shockwave rings ----
       for(const ri of rings){ri.r+=ri.vr*dt;ri.life-=ri.decay*dt;
         g.save();g.globalAlpha=Math.max(0,ri.life)*0.7;g.strokeStyle=ri.col;

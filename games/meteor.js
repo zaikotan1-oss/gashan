@@ -65,7 +65,7 @@ function buildMeteor(api){
   function startStage(){
     stageBest=0;stageWasted=0;lastScoreT=tnow;   // ③ パーフェクト判定: この街で「1発も外さず(空振り無し)」を数え直す
     meteorSp=clamp(14+stage*1.7,15,27); // meteors fall a touch faster each stage (7〜8歳向けに少し速め)
-    objs=[];ufos=[];meteors=[];layout();
+    objs=[];ufos=[];meteors=[];craters=[];dust=[];rings=[];layout();
     banner=skyOf().name+"まちを ぜんぶ こわせ！";banT=2.2;
     api.slide(330,560,0.22,0.16,"triangle");api.tone(740,0.12,"sine",0.12);
   }
@@ -110,7 +110,8 @@ function buildMeteor(api){
           o.hp--;o.flash=1;o.color="#b06a5a";
           api.tone(220,0.1,"square",0.18);
           for(let k=rint(2,4);k>0;k--)shards.push({x:o.x+rnd(-o.w/2,o.w/2),y:groundY-rnd(0,o.h),vx:dir*rnd(2,6),vy:rnd(-7,-2),s:rnd(o.w*0.12,o.w*0.24),color:"#9aa3b8",rot:rnd(0,TAU),vr:rnd(-0.5,0.5),life:1,decay:rnd(0.01,0.018),pts:chunkPts()});
-          floats.push({x:o.x,y:groundY-o.h-10,txt:"がんじょう！",life:1,vy:-0.9,col:"#cfe0ff",size:24});
+          {let near=0;for(const f of floats)if(f.txt==="がんじょう！"&&f.life>0.3&&Math.abs(f.x-o.x)<slotW*1.2)near++;
+            if(near<2)floats.push({x:o.x,y:groundY-o.h-10-30*near,txt:"がんじょう！",life:1,vy:-0.9,col:"#cfe0ff",size:24});}
           continue;
         }
         o.state="fly";
@@ -141,7 +142,7 @@ function buildMeteor(api){
         for(let i=0;i<22;i++){const a=rnd(0,TAU),s=rnd(4,12);
           sparks.push({x:u.x,y:u.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,len:rnd(8,18),life:1,decay:rnd(0.03,0.05),col:pick(["#7affd2","#fff2a0","#fff"])});}
         // 軸6対策: UFOの真上に出すと「にじいろビル！(0.2H)」「てんさい！(0.3H)」の帯と重なって欠けるため、低い固定帯へ。見出し表示中はさらに下げる
-        floats.push({x:clamp(u.x,90,api.W-90),y:rbMsgT>0?groundY-60:groundY-140,txt:"ボーナス！",life:1,vy:-0.9,col:"#7affd2",size:38});}
+        floats.push({x:clamp(u.x,90,api.W-90),y:rbMsgT>0?groundY-250:groundY-200,txt:"ボーナス！",life:1,vy:-0.9,col:"#7affd2",size:38});}
     }
     // コンボは命中した時だけ伸ばす(空振りでx2等が出ていた実装ミスの修正・軸2/軸3対策)
     if(hitCount>0){combo++;comboT=1;lastScoreT=tnow;}
@@ -290,7 +291,7 @@ function buildMeteor(api){
       // decay hit-flash
       for(const o of objs){if(o.flash)o.flash=Math.max(0,o.flash-0.08*dt);}
       // rising-in objects (new street appears); gone objects stay gone until next stage
-      for(const o of objs){if(o.state==="rise"){o.rise=Math.min(1,(o.rise||0)+0.05*dt);if(o.rise>=1)o.state="stand";}}
+      for(const o of objs){if(o.state==="rise"){o.rise=Math.min(1,(o.rise||0)+0.09*dt);if(o.rise>=1)o.state="stand";}}
       // stage-clear timer -> build the next, harder street
       if(clearT>0){clearT-=0.016*dt;
         if(clearT<=0){stage=stage<MAXSTAGE?stage+1:1;wave++;combo=0;comboT=0;
@@ -301,7 +302,7 @@ function buildMeteor(api){
       for(const o of objs){if(o.state==="fly"){o.vy+=0.5*dt;o.x+=o.vx*dt;o.y=(o.y||0)+o.vy*dt;o.rot+=o.vr*dt;
         if(groundY-o.h+o.y>api.H+40){o.state="gone";o.respawnT=rnd(30,70);o.y=0;}}}
       // dust(軸6対策: 標的より先=奥に描いて、砂煙が木や岩を霞ませない。薄く・半径に上限)
-      for(const d of dust){d.r=Math.min(d.r+d.vr*dt,slotW*0.8);d.x+=d.vx*dt;d.y-=0.4*dt;d.life-=d.decay*dt;g.globalAlpha=Math.max(0,d.life)*0.22;
+      for(const d of dust){d.r=Math.min(d.r+d.vr*dt,slotW*0.6);d.x+=d.vx*dt;d.y-=0.4*dt;d.life-=d.decay*dt;g.globalAlpha=Math.max(0,d.life)*0.12;
         g.fillStyle="#caa";g.beginPath();g.arc(d.x,d.y,Math.max(0,d.r),0,TAU);g.fill();}
       g.globalAlpha=1;dust=dust.filter(d=>d.life>0);
       // draw objects (standing/rising)
@@ -458,7 +459,7 @@ function buildMeteor(api){
       g.fillStyle=col;g.fillText("にじいろビル！",0,0);
       g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";}
     // ② きょうのラッキー色 ヒント(初回だけ大きく・以降は小さく)
-    if(luckyMsgT>0){g.save();g.translate(api.W/2,api.H*(clearT>0?0.34:0.28));g.textAlign="center";g.textBaseline="middle";
+    if(luckyMsgT>0&&clearT<=0&&rbMsgT<=0){g.save();g.translate(api.W/2,api.H*(clearT>0?0.34:0.28));g.textAlign="center";g.textBaseline="middle";
       g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 "+clamp(api.W*0.038,18,26)+"px 'Hiragino Maru Gothic ProN',system-ui";
       const t2="きょうのラッキーいろは "+(COLNAME[luckyColor]||"")+"！";
       g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.45)";g.strokeText(t2,0,0);
@@ -482,7 +483,7 @@ function buildMeteor(api){
   }
   function drawObj(o){
     let yo=0,a=1;
-    if(o.state==="rise"){yo=(1-o.rise)*o.h;a=o.rise;}
+    if(o.state==="rise"){yo=(1-o.rise)*o.h;a=Math.min(1,o.rise*2.2);}
     if(o.state==="gone")return;
     g.save();
     if(o.state==="fly"){g.translate(o.x,groundY-o.h*0.5+(o.y||0));g.rotate(o.rot);g.translate(-o.x,-(groundY-o.h*0.5));}
@@ -494,6 +495,7 @@ function buildMeteor(api){
       const dark=shade(o.color,-0.35);
       tg.addColorStop(0,shade(o.color,0.25));tg.addColorStop(1,dark);
       g.fillStyle=tg;g.beginPath();g.arc(cx,cy,cr,0,TAU);g.fill();
+      g.lineWidth=3;g.strokeStyle="rgba(20,10,40,.7)";g.stroke();
       g.fillStyle="rgba(255,255,255,.22)";g.beginPath();g.arc(cx-cr*0.3,cy-cr*0.3,cr*0.3,0,TAU);g.fill();
     }else if(o.rainbow){
       // ① にじいろビル: 七色の帯がゆっくり流れてきらめく(source-over のみ=白飛びしない)。目立つので気づける。
@@ -517,6 +519,7 @@ function buildMeteor(api){
       const rg=g.createRadialGradient(cx-cr*0.3,cy-cr*0.3,Math.max(0,cr*0.15),cx,cy,cr);
       rg.addColorStop(0,shade(o.color,0.3));rg.addColorStop(1,shade(o.color,-0.35));
       g.fillStyle=rg;g.beginPath();g.arc(cx,cy,cr,0,TAU);g.fill();
+      g.lineWidth=3;g.strokeStyle="rgba(20,10,40,.7)";g.stroke();
       g.fillStyle="rgba(0,0,0,.18)";g.beginPath();g.arc(cx-cr*0.18,cy+cr*0.3,cr*0.26,0,TAU);g.fill();
       g.beginPath();g.arc(cx+cr*0.28,cy-cr*0.05,cr*0.16,0,TAU);g.fill();
       g.fillStyle="rgba(255,255,255,.22)";g.beginPath();g.arc(cx-cr*0.32,cy-cr*0.32,cr*0.22,0,TAU);g.fill();
@@ -527,6 +530,7 @@ function buildMeteor(api){
       const cg=g.createLinearGradient(x,y,x+o.w,y);
       cg.addColorStop(0,shade(o.color,0.18));cg.addColorStop(0.5,o.color);cg.addColorStop(1,shade(o.color,-0.3));
       g.fillStyle=cg;rrect(x,y,o.w,o.h,Math.max(0,o.h*0.4));g.fill();
+      g.lineWidth=3;g.strokeStyle="rgba(20,10,40,.7)";g.stroke();
       g.fillStyle="rgba(190,225,255,.6)";rrect(x+o.w*0.2,y-o.h*0.5,o.w*0.45,o.h*0.55,Math.max(0,o.h*0.18));g.fill();
       g.fillStyle="rgba(255,255,255,.4)";g.fillRect(x,y,o.w,2);
       g.fillStyle="#2a2a2a";
@@ -541,6 +545,7 @@ function buildMeteor(api){
       const bg=g.createLinearGradient(x,y,x+o.w,y);
       bg.addColorStop(0,shade(o.color,0.18));bg.addColorStop(0.5,o.color);bg.addColorStop(1,shade(o.color,-0.3));
       g.fillStyle=bg;g.fillRect(x,y,o.w,o.h);
+      g.lineWidth=3;g.strokeStyle="rgba(20,10,40,.7)";g.strokeRect(x,y,o.w,o.h);
       g.fillStyle="rgba(255,255,255,.22)";g.fillRect(x,y,o.w*0.28,o.h);
       g.fillStyle="rgba(255,255,255,.5)";g.fillRect(x,y,o.w,2);
       const rows=Math.max(1,Math.floor(o.h/20));

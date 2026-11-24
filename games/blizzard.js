@@ -325,7 +325,7 @@ function build_blizzard(api){
         // bounds: keep on screen, soft bounce
         if(b.x<b.r){b.x=b.r;b.vx*=-0.4;}
         if(b.x>api.W-b.r){b.x=api.W-b.r;b.vx*=-0.4;}
-        if(b.y<b.r){b.y=b.r;b.vy*=-0.4;}
+        {const topY=Math.min(api.H*0.13+b.r*1.2,api.H*0.27);if(b.y<topY){b.y=topY;b.vy*=-0.4;}} // 上の帯(HUD・もどる・題字)には雪玉を入れない
         if(b.y>api.H-b.r){b.y=api.H-b.r;b.vy*=-0.4;}
         // sucked into the eye -> shatter + fling
         if(nearest&&nd<R*0.4+nearest.power*3){
@@ -598,11 +598,11 @@ function build_blizzard(api){
         const pop=1+Math.max(0,comboT-0.7)*1.2;
         g.save();g.translate(api.W/2,api.H*0.16);g.scale(pop,pop);
         g.font="800 30px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-        g.globalAlpha=clamp(comboT,0,1);
+        g.globalAlpha=clamp(comboT*1.5,0,1);
+        g.lineJoin="round";g.lineWidth=6;g.strokeStyle="rgba(20,50,90,.75)";g.strokeText("コンボ x"+combo,0,0);
         g.shadowColor="rgba(120,210,255,.8)";g.shadowBlur=14;
         g.fillStyle="#7be0ff";g.fillText("コンボ x"+combo,0,0);
-        g.shadowBlur=0;g.lineWidth=1.5;g.strokeStyle="rgba(255,255,255,.6)";
-        g.strokeText("コンボ x"+combo,0,0);
+        g.shadowBlur=0;
         g.restore();g.globalAlpha=1;g.textAlign="left";
       }
       // ① にじいろブロック! 発見バナー(虹色に色替わり・中央上=HUD安全帯)
@@ -685,9 +685,11 @@ function build_blizzard(api){
     const left=clamp(stageGoal-stageKill,0,stageGoal);
     const bw=Math.min(api.W*0.6,360),bh=14,bx=(api.W-bw)/2,by=api.H*0.05;
     g.save();g.textAlign="center";
-    g.font="800 17px 'Hiragino Maru Gothic ProN',system-ui";
+    g.font="800 20px 'Hiragino Maru Gothic ProN',system-ui";
+    const htxt="ステージ "+stage+"      あと "+left;
+    g.lineJoin="round";g.lineWidth=5;g.strokeStyle="rgba(20,50,90,.7)";g.strokeText(htxt,api.W/2,by-7);
     g.fillStyle="#fff";g.shadowColor="rgba(20,50,90,.6)";g.shadowBlur=6;
-    g.fillText("ステージ "+stage+"      あと "+left,api.W/2,by-7);
+    g.fillText(htxt,api.W/2,by-7);
     g.shadowBlur=0;
     g.fillStyle="rgba(20,50,90,.35)";roundRect(bx,by,bw,bh,bh/2);g.fill();
     const fr=clamp(stageKill/stageGoal,0,1);

@@ -237,6 +237,8 @@ function buildCandyshoot(api){
       api.slide(523,1046,0.5,0.22,"triangle");
     }else{
       clearStage=stage;clearT=1.6;celebrate=1;flash=0.7;flashHue=sky()[3];
+      // クリア文字の帯(画面の34〜56%)に重なる浮き文字は帯の上へ逃がす
+      for(const f of floats){if(f.y>api.H*0.30&&f.y<api.H*0.58)f.y=api.H*0.28;}
       api.boom(0.5);api.shake(12);api.slide(523,784,0.3,0.2,"triangle");
       api.tone(660,0.25,"triangle",0.14);api.tone(988,0.3,"triangle",0.1);
       for(let i=0;i<22;i++){const a=rnd(0,TAU),s=rnd(3,9);
@@ -507,11 +509,16 @@ function buildCandyshoot(api){
       // ③ パーフェクト ボーナス！ バナー(下側=クリア文字と重ねない)
       if(noMissT>0){noMissT-=0.014*dt;
         const pop=1+Math.max(0,noMissT-1.3)*1.4;
-        g.save();g.translate(api.W/2,api.H*0.64);g.scale(pop,pop);g.textAlign="center";
+        g.save();g.translate(api.W/2,api.H*0.60);g.scale(Math.min(pop,1.5),Math.min(pop,1.5));g.textAlign="center";
         g.globalAlpha=clamp(noMissT*1.3,0,1);g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";
+        // 淡い緑でも背景に溶けないよう、ラッキーバナーと同じ濃い帯＋濃い縁を敷く
+        const ptxt="パーフェクト ボーナス！";
+        const pw=g.measureText(ptxt).width+36;
+        g.fillStyle="rgba(120,40,90,.5)";rrect(-pw/2,-30,pw,46,14);g.fill();
+        g.lineJoin="round";g.lineWidth=7;g.strokeStyle="rgba(90,25,70,.9)";g.strokeText(ptxt,0,0);
         g.shadowColor="rgba(123,224,138,.9)";g.shadowBlur=16;
-        g.fillStyle="#c7ffcf";g.fillText("パーフェクト ボーナス！",0,0);
-        g.shadowBlur=0;g.lineWidth=1.5;g.strokeStyle="rgba(40,120,60,.7)";g.strokeText("パーフェクト ボーナス！",0,0);
+        g.fillStyle="#c7ffcf";g.fillText(ptxt,0,0);
+        g.shadowBlur=0;
         g.restore();g.globalAlpha=1;g.textAlign="left";if(noMissT<0)noMissT=0;}
       // ---- HUD (top center) ----
       drawHUD();

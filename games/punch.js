@@ -131,9 +131,14 @@ function buildPunch(api){
     bricks.forEach(b=>{b.x=wallX+b.col*S;b.y=groundY-(b.row+1)*S;});
   }
   function newWall(){
-    clearing=false;noBreak=0;
     // たまに「デカボス」を出す（最初の壁は出さない・連続もしない）。
-    if(bossCooldown<=0&&level>1&&Math.random()<0.3){spawnBoss();return;}
+    const bossRoll=bossCooldown<=0&&level>1&&Math.random()<0.3;
+    // ステージクリアのバナー表示中はボス予告を待つ(「クリア！」と「ボスが くるぞ！」が重なって読めない対策・軸6)。
+    //  待つ間は clearing を立てたままにして、空の壁で二重にクリア判定されないようにする。
+    if(bossRoll&&stageBanner>0){clearing=true;noBreak=0;
+      setTimeout(()=>{clearing=false;noBreak=0;spawnBoss();},Math.round(stageBanner*16.7)+60);return;}
+    clearing=false;noBreak=0;
+    if(bossRoll){spawnBoss();return;}
     if(bossCooldown>0)bossCooldown--;
     // 前壁で予告したレシピを消費（無ければ抽選）→ 次壁の予告を先に決めておく。
     curRecipe=nextRecipe||pickRecipe();
@@ -306,15 +311,16 @@ function buildPunch(api){
     for(let i=0;i<16;i++)sparks.push({x:cx,y:cy,vx:rnd(-12,12),vy:rnd(-13,3),life:1,decay:rnd(0.03,0.06),
       col:pick(["#fff","#ffd23f","#ff8f6b","#fff3c4"])});
     count+=20;api.setScore(count);
-    floats(api.W/2,api.H*0.28,"ドッカーン！","#ffd23f");
-    floats(api.W/2,api.H*0.42,"ボス げきは！","#fff");
-    setTimeout(()=>{boss=null;bossCooldown=1;proceedNext();},600);
+    // 巨大バナー(やったね！ H*0.3)と重ならない位置へ。撃破中はコンボ数字も隠す(描画側)。
+    floats(api.W/2,api.H*0.12,"ドッカーン！","#ffd23f");
+    floats(api.W*0.4,api.H*0.58,"ボス げきは！","#fff");
+    setTimeout(()=>{boss=null;bossCooldown=1;proceedNext();},1100);
   }
   // 壁クリア/ボス撃破の共通の“次へ進む”処理（wave/stage を進める）
   function proceedNext(){
     level++;
     if(wave<wavesPerStage){
-      wave++;floats(api.W/2,api.H*0.4,"つぎは "+(nextRecipe?nextRecipe.name:"？")+"！","#fff");
+      wave++;floats(api.W/2,api.H*0.52,"つぎは "+(nextRecipe?nextRecipe.name:"？")+"！","#fff");
       setTimeout(newWall,60);
     }else{clearStage();}
   }
@@ -533,8 +539,7 @@ function buildPunch(api){
       // gentle ramp: stage1=1 wall, then +1 wall per stage up to 4 (7〜8歳向けに1壁ぶん手応えを足した)
       wavesPerStage=Math.min(wavesPerStage+1,4);
       stageBanner=140;stageBannerTxt="ステージ "+(stage-1)+" クリア！";
-      floats(api.W/2,api.H*0.30,"すごい！","#aef0ff");
-      floats(api.W/2,api.H*0.42,"つぎは "+(nextRecipe?nextRecipe.name:"？")+"！","#fff");
+      floats(api.W/2,api.H*0.52,"つぎは "+(nextRecipe?nextRecipe.name:"？")+"！","#fff");
       setTimeout(newWall,110);
     }
   }
@@ -806,8 +811,8 @@ function buildPunch(api){
         g.save();g.textAlign="center";
         const a=clamp(spawnTitle/30,0,1);g.globalAlpha=a;
         g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";
-        g.lineWidth=7;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText(spawnTxt+"！",api.W/2,api.H*0.30);
-        g.fillStyle="#fff2a0";g.fillText(spawnTxt+"！",api.W/2,api.H*0.30);
+        g.lineWidth=7;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText(spawnTxt+"！",api.W/2,api.H*0.36);
+        g.fillStyle="#fff2a0";g.fillText(spawnTxt+"！",api.W/2,api.H*0.36);
         g.restore();g.globalAlpha=1;g.textAlign="left";
       }
       // ボス予告（大きくチラ見せ）
@@ -823,7 +828,7 @@ function buildPunch(api){
       // combo counter (big, punchy, escalates in size/colour)
       //  ボス予告/ステージクリアのバナーとy座標が近接(H*0.16 vs H*0.2/H*0.22)するため、
       //  それらの表示中はコンボ数字を一時的に隠して重なり読みにくくなる瞬間を消す(軸6対策)。
-      if(combo>=2&&bossWarn<=0&&stageBanner<=0){
+      if(combo>=2&&bossWarn<=0&&stageBanner<=0&&!(boss&&boss.dying)){
         const cc=comboCol(),sz=26+Math.min(combo,20)*1.6;
         const pulse=1+0.12*Math.max(0,(comboTimer-100)/20);
         g.save();g.translate(api.W*0.5,api.H*0.16);g.scale(pulse,pulse);g.textAlign="center";
@@ -1087,7 +1092,8 @@ function buildPunch(api){
     //  ダメージが進むと赤みに着色した複製(tinted)で「怒り」を表現。だいぶつ/かいじゅうは手描きのまま。
     const bimgName=bo.type.id==="robo"?"robo.png":null;
     const bimg=bimgName?api.asset(bimgName):null;
-    if(bimg&&bimg.ready){
+    const bimgDrawn=!!(bimg&&bimg.ready);
+    if(bimgDrawn){
       const side=Math.max(0,h*1.08);
       const src=(dmg>0.5?api.tinted(bimgName,"#ff5a3a",0.28):null)||bimg;
       api.drawSrc(src,bo.cx,y+h-side/2,side,side,{center:true});
@@ -1096,7 +1102,7 @@ function buildPunch(api){
     else if(bo.type.id==="kaiju")drawKaiju(bo,x,y,w,h,dmg);
     else drawRobo(bo,x,y,w,h,dmg);
     // ダメージのヒビ（欠けるほど濃く枝分かれ）
-    if(dmg>0.12){g.strokeStyle="rgba(20,12,26,"+(0.35+0.4*dmg)+")";g.lineWidth=Math.max(2,w*0.02);g.lineCap="round";g.lineJoin="round";
+    if(dmg>0.12&&!bimgDrawn){g.strokeStyle="rgba(20,12,26,"+(0.35+0.4*dmg)+")";g.lineWidth=Math.max(2,w*0.02);g.lineCap="round";g.lineJoin="round";
       g.beginPath();g.moveTo(x+w*0.5,y+h*0.14);g.lineTo(x+w*0.42,y+h*0.42);g.lineTo(x+w*0.56,y+h*0.56);g.lineTo(x+w*0.46,y+h*0.86);
       if(dmg>0.4){g.moveTo(x+w*0.42,y+h*0.42);g.lineTo(x+w*0.2,y+h*0.5);g.moveTo(x+w*0.56,y+h*0.56);g.lineTo(x+w*0.82,y+h*0.5);}
       if(dmg>0.7){g.moveTo(x+w*0.3,y+h*0.3);g.lineTo(x+w*0.16,y+h*0.7);g.moveTo(x+w*0.66,y+h*0.3);g.lineTo(x+w*0.8,y+h*0.72);}

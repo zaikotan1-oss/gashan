@@ -5,7 +5,7 @@ function build_snowball(api){
   let launchX,launchY,groundY,U;                 // U = unit size
   let count=0,combo=0,comboT=0,tsec=0,flash=0,flashCol="#fff";
   let charging=false,chargeP=0,aimX=0,aimY=0,cannonA=-Math.PI/2,cannonRecoil=0;
-  let spawnT=0;
+  let spawnT=0,firstHit=false,idleT=0;   // firstHit: 最初の1回の得点までは吸着を広く / idleT: 最後の得点からの無反応秒
   // fever time / rare gold fort / float texts / hitStop cooldown
   let fever=0,feverT=0,feverGauge=0,feverBannT=0,hitCd=0,floats=[];
   let pendingFeverStart=false;   // 軸6: フィーバー開始とステージクリアのバナーが同時発火して文字が重なるのを防ぐ持ち越しフラグ
@@ -51,8 +51,12 @@ function build_snowball(api){
   function spawnFort(){
     if(forts.length>=(fever>0?8:5))return;
     // place along the upper play area, avoid the safe HUD corners (y<56 near edges)
-    const x=rnd(api.W*0.14,api.W*0.86);
-    const y=rnd(api.H*0.20,api.H*0.55);
+    let x=rnd(api.W*0.14,api.W*0.86);
+    // 軸6: エンジンの「すごい！」バナー帯(H*0.24〜0.38)に砦を出さない
+    let y=rnd(api.H*0.20,api.H*0.55);
+    if(y>api.H*0.24&&y<api.H*0.38)y=Math.random()<0.5?rnd(api.H*0.20,api.H*0.24):rnd(api.H*0.40,api.H*0.55);
+    // 最初の1体は中央寄り・低めに出して、最初の1回を当てやすくする(軸3の最初の得点まで3秒以内)
+    if(!firstHit&&forts.length===0&&!fever){x=rnd(api.W*0.36,api.W*0.64); y=rnd(api.H*0.42,api.H*0.52);}
     const gold=Math.random()<0.08;                 // rare golden fort (A)
     const big=!gold&&stage>=2&&Math.random()<clamp(0.22+0.07*(stage-2),0.22,0.55);  // でか砦は少し多め(7〜8歳向け)
     const tiny=!gold&&!big&&Math.random()<0.25;    // 軸7: 大中小の3段階サイズにして大きさ差をはっきりさせる
@@ -71,7 +75,7 @@ function build_snowball(api){
   // ① にじいろ とりで: たまに(stage>=2・約5%)予告してから出現する激レア。いつ来るか分からない=ドキドキ発見。
   function trySpawn(){
     if(stage>=2 && !pendingRB && fever<=0 && !forts.some(f=>f.rainbow) && Math.random()<0.05){
-      const x=rnd(api.W*0.18,api.W*0.82), y=rnd(api.H*0.22,api.H*0.5);
+      const x=rnd(api.W*0.18,api.W*0.82), y=rnd(api.H*0.40,api.H*0.56);
       pendingRB={x,y,t:0.75};
       api.tone(880,0.08,"triangle",0.08);   // 予告のちいさなキラン
       return;
@@ -123,14 +127,14 @@ function build_snowball(api){
   }
   // auto-aim + gravity-compensated shot: snap to the fort nearest to the tap
   // and solve the launch velocity so the ball passes exactly through it.
-  const MAGK=0.5;   // 吸着の縁からの距離(U倍)。下限0.5
+  const MAGK=0.4;   // 最初の得点のあとの吸着の縁からの距離(U倍)
   function calcShot(tx,ty,p){
     let ax=tx, ay=ty, bd=1e9;
     // 軸3: 砦の「縁」からの距離で最寄りを選ぶ(小さい砦は狭く・大きい砦は広く吸着する)
     for(const f of forts){const d=Math.hypot(f.x-tx,f.y-ty)-f.r;
       if(d<bd){bd=d; ax=f.x; ay=f.y;}}
     // 吸着には縁からの距離上限を設ける。離れすぎたタップは生のタップ座標へ撃つ(=狙わない連打は外れる)。
-    const MAG=U*MAGK;
+    const MAG=U*(!firstHit?3:((idleT<6)?MAGK:1.5));   // 最初の得点まで・6秒以上得点が無い時はやさしく広く拾い、得点が続く間は狭め
     if(bd>MAG){ax=tx; ay=ty;}
     const sx=launchX, sy=launchY-U*0.6;
     const dx=ax-sx, dy=ay-sy;
@@ -169,6 +173,7 @@ function build_snowball(api){
     // ② ラッキー色: きょうの秘密の旗色を倒すと +1 の隠しボーナス。気づくと得する。
     const isLucky=!f.gold&&!f.rainbow&&f.flag===luckyFlag;
     if(isLucky){pts+=1; if(!luckySeen){luckySeen=true; luckyTeachT=2.0;}}
+    firstHit=true; idleT=0;
     count+=pts; stageKill++; api.setScore(count);
     combo++; comboT=1;
     const power=clamp(0.35+combo*0.05,0.35,0.7);
@@ -238,7 +243,7 @@ function build_snowball(api){
   }
   // 当たり判定の半径: 見た目の幅に合わせる(つららは細いので小さめ)。見えている所に当てれば当たる・離れていれば外れる
   function hitR(f){return f.r*(f.shape==="tall"?0.7:(f.shape==="stack"?0.85:(f.shape==="round"?0.88:0.82)));}
-  function ring(x,y,r,col){rings.push({x,y,r:r*0.4,vr:r*0.9,life:1,col});}
+  function ring(x,y,r,col){rings.push({x,y,r:r*0.4,vr:Math.min(r*0.9,U*0.45),life:1,col});}   // 軸6: 広がり幅に上限(約9U)。画面を横切って他の砦に重ならない
   function burst(x,y,col,n,spd){
     for(let i=0;i<n;i++){const a=rnd(0,TAU),s=rnd(spd*0.4,spd);
       sparks.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,life:1,decay:rnd(0.015,0.03),
@@ -375,6 +380,9 @@ function build_snowball(api){
       if(clearT<=0){spawnT-=dt; if(spawnT<=0){trySpawn(); spawnT=fever>0?12:clamp(58-(stage-1)*6,20,58);}}  // 出現は少し速め(7〜8歳向け)。軸3: 吸着/球を絞った分、無反応が延びすぎないよう下限を20に
       // ensure there is always something to shoot
       if(forts.length===0&&clearT<=0&&!pendingRB)spawnFort();
+      // 軸3: 7秒得点が無ければ砦を1体足す(全部外した時の無反応の穴埋め)
+      idleT+=0.016*dt;
+      if(idleT>7&&clearT<=0&&!pendingRB&&forts.length<2){spawnFort(); idleT=3;}
       // ① にじいろ とりで 接近予告: 出現位置で虹色がキラキラ集まる(次くるかも のドキドキ)
       if(pendingRB){pendingRB.t-=0.016*dt;
         const p=pendingRB, prog=clamp(1-p.t/0.75,0,1), pulse=0.5+0.5*Math.sin(tsec*14);
@@ -759,13 +767,15 @@ function build_snowball(api){
       g.beginPath(); g.arc(-bw*0.35,-bh*0.5,Math.max(0,bw*0.22),0,TAU); g.fill();
     }else if(shape==="stack"){
       // だんご3段: 段の継ぎ目のうっすら線＋てっぺんの小さな縞ぼうし
-      g.strokeStyle="rgba(150,180,205,.45)"; g.lineWidth=1.5;
+      g.strokeStyle="rgba(40,80,130,.6)"; g.lineWidth=2.5;
       g.beginPath();
       g.arc(0,bh*0.33,Math.max(0,bw*0.5),0.1*Math.PI,0.9*Math.PI);
       g.moveTo(bw*0.42,-bh*0.24); g.arc(0,-bh*0.24,Math.max(0,bw*0.32),0.1*Math.PI,0.9*Math.PI);
       g.stroke();
-      g.fillStyle="#ff5b5b";
-      roundRect(-bw*0.22,-bh*0.9,bw*0.44,bh*0.16,3); g.fill();
+      // 赤いぼうし(大きめ): 背景の小屋の雪だるまと見分ける
+      g.fillStyle="#e83a3a"; roundRect(-bw*0.7,-bh*0.92,bw*1.4,bh*0.2,4); g.fill();
+      g.fillStyle="#ff5b5b"; roundRect(-bw*0.44,-bh*1.12,bw*0.88,bh*0.26,4); g.fill();
+      g.strokeStyle="rgba(40,80,130,.6)"; g.lineWidth=1.5; roundRect(-bw*0.7,-bh*0.92,bw*1.4,bh*0.2,4); g.stroke();
     }else{
       // つらら型: 縦の筋とアイスのハイライト
       g.strokeStyle="rgba(255,255,255,.55)"; g.lineWidth=1.5;

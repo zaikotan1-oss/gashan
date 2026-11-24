@@ -109,7 +109,8 @@ function buildHammer(api){
     return pick(bag);
   }
   function spawn(){
-    const free0=holes.map((h,i)=>i).filter(i=>!holes[i].occ);
+    // ボス戦中は上段中央の穴(holes[1])を使わない(ボスの体の真下に重なって、的が隠れて叩けなくなるため)
+    const free0=holes.map((h,i)=>i).filter(i=>!holes[i].occ&&!(boss&&!boss.dead&&i===1));
     if(!free0.length)return;
     // 同じ列のすぐ上/下の穴に出ている的があれば、その穴は避ける(縦に重なって足が隠れるのを防ぐ)
     const free1=free0.filter(i=>!targets.some(t=>t.state!=="smashed"&&t.hi%3===i%3&&Math.abs(Math.floor(t.hi/3)-Math.floor(i/3))===1));
@@ -196,7 +197,9 @@ function buildHammer(api){
   // 叩くと大ダメージ(2)。ふだんは1ダメージ。考えどころ=「光ったら いまだ!」のタイミング。
   // ※気づかず連打しても倒せる(=④はそのまま)。光ると得。
   function positionBoss(){if(boss){boss.x=api.W/2;boss.y=api.H*0.30;boss.r=R*1.7;}}
-  function spawnBoss(){boss={hp:6,maxHp:6,weakT:0,weak:false,flash:0,bob:rnd(0,TAU),dead:false};positionBoss();bossSeenWeak=false;}
+  function spawnBoss(){boss={hp:6,maxHp:6,weakT:0,weak:false,flash:0,bob:rnd(0,TAU),dead:false};positionBoss();bossSeenWeak=false;
+    // ボスの陰になる上段中央(holes[1])にもう出ている的は、引っ込めて「隠れて叩けない的」をなくす
+    for(const t of targets){if(t.hi===1&&t.state!=="smashed"&&t.state!=="duck")t.state="duck";}}
   function hitBoss(){
     if(!boss||boss.dead)return;
     boss.flash=1;const weak=boss.weak,dmg=weak?2:1;

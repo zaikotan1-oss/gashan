@@ -500,7 +500,7 @@ function buildWrecking(api){
   // 一度に壊した数の自己ベスト。更新でご褒美＝「もっと大きく壊す」を狙う再挑戦動機（長く遊べる）。
   function rec(n){
     if(n>bestBurst){bestBurst=n;
-      if(n>=4){pushFloat({x:api.W/2,y:api.H*0.42,txt:"さいこう "+n+"こ！",life:1,vy:-0.6,col:"#3fffb0",size:27});
+      if(n>=4){pushFloat({x:api.W/2,y:api.H*(blocks.length===0?0.66:0.42),txt:"さいこう "+n+"こ！",life:1,vy:-0.6,col:"#3fffb0",size:27});
         celebrate=Math.max(celebrate,1.3);api.tone(784,0.12,"triangle",0.16);setTimeout(()=>api.tone(1046,0.16,"triangle",0.16),90);}}
   }
   // auto-aim: タップ近くに ばくだん があれば優先して吸い付く（クラスタを確実に起爆＝連鎖が狙える）
@@ -644,8 +644,8 @@ function buildWrecking(api){
     setTimeout(()=>{
       count+=bonus;api.setScore(count);rec(n);
       const txt=n>=18?"パーフェクト！":n>=10?"だいせいこう！":"ドッカーン！";
-      pushFloat({x:api.W/2,y:api.H*0.46,txt:txt,life:1.2,vy:-0.5,col:n>=18?"#ff2bff":n>=10?"#ffe14a":"#ff8a3a",size:n>=18?44:36});
-      pushFloat({x:api.W/2,y:api.H*0.46+42,txt:"+"+bonus,life:1.1,vy:-0.4,col:"#fff",size:24});
+      pushFloat({x:api.W/2,y:api.H*0.66,txt:txt,life:1.2,vy:-0.5,col:n>=18?"#ff2bff":n>=10?"#ffe14a":"#ff8a3a",size:n>=18?44:36});
+      pushFloat({x:api.W/2,y:api.H*0.66+42,txt:"+"+bonus,life:1.1,vy:-0.4,col:"#fff",size:24});
       if(n>=10){celebrate=Math.max(celebrate,2.2);api.boom(0.6);}
     },all.length*16+200);
     setTimeout(()=>{if(blocks.length===0)stageClear(true);else newBuilding(true);},all.length*16+450);

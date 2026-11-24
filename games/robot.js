@@ -45,19 +45,26 @@ function buildRobot(api){
   function mkBuild(i){
     // taller range as stages climb
     const s=stage||1,grow=1+(s-1)*0.12;
-    let type="normal",hp=1,w=slotW*0.74,h=rnd(api.H*0.1,api.H*0.26*grow);
+    let type="normal",hp=1,big=false,w=slotW*0.74,h=rnd(api.H*0.1,api.H*0.26*grow);
     // special building types appear from stage 2; rarer = juicier
+    // 軸7: 四角いビル系(normal/tough/chain/gold/rainbow)が全ステージで約半分以下になるよう、帯をステージ別に割り当てる。
+    // 累積の境目 [rainbow, gold, tough, chain, tank, bus, stack, small, bigTank]（残りが normal）
+    const T=s>=3?[0.035,0.12,0.19,0.24,0.36,0.45,0.53,0.64,0.76]
+           :s>=2?[0.035,0.12,0.20,0.20,0.34,0.44,0.52,0.64,0.74]
+           :[0,0.10,0.10,0.10,0.36,0.44,0.50,0.62,0.62];
     const r=Math.random();
-    if(s>=2&&r<0.035){type="rainbow";}        // ① 激レア にじいろビル: ステージ2以降ときどきだけ。踏むと虹の大盤振る舞い
-    else if(r<(s>=2?0.12:0.10)){type="gold";} // high-value sparkler (also in stage 1 for early sparkle)
-    else if(s>=2&&r<0.22){type="tough";hp=2;} // needs 2 stomps
-    else if(s>=3&&r<0.30){type="chain";}      // tall, triggers chain collapse
-    // --- 軸7: 四角いビルの色違いだけにならないよう、形・大きさが違う壊す対象を混ぜる ---
-    else if(r<0.36){type="tank";w=slotW*0.5;h=rnd(api.H*0.14,api.H*0.20);}                    // 丸い給水タンク(小さめ・円形)
-    else if(r<0.44){type="bus";w=slotW*1.5;h=rnd(api.H*0.07,api.H*0.09);}                     // 横長のバス(低い・幅広)
-    else if(r<0.50){type="stack";hp=3;w=slotW*0.62;h=rnd(api.H*0.16,api.H*0.24*grow);}        // 積みコンテナ(3段・上から1段ずつ崩れる)
-    else if(r<0.62){type="small";w=slotW*0.35;h=rnd(api.H*0.08,api.H*0.12);}                  // 小さな木箱(小型オブジェクト)
-    const color=type==="gold"?"#ffd23f":type==="tank"?"#cfd8e6":pick(COLORS);
+    if(r<T[0]){type="rainbow";}        // ① 激レア にじいろビル: ステージ2以降ときどきだけ。踏むと虹の大盤振る舞い
+    else if(r<T[1]){type="gold";}      // high-value sparkler (also in stage 1 for early sparkle)
+    else if(r<T[2]){type="tough";hp=2;}  // needs 2 stomps
+    else if(r<T[3]){type="chain";}       // tall, triggers chain collapse
+    else if(r<T[4]){type="tank";w=slotW*0.5;h=rnd(api.H*0.14,api.H*0.20);}                    // 丸い給水タンク(小さめ・円形)
+    else if(r<T[5]){type="bus";w=slotW*1.5;h=rnd(api.H*0.07,api.H*0.09);}                     // 横長のバス(低い・幅広)
+    else if(r<T[6]){type="stack";hp=3;w=slotW*0.62;h=rnd(api.H*0.16,api.H*0.24*grow);}        // 積みコンテナ(3段・上から1段ずつ崩れる)
+    else if(r<T[7]){type="small";w=slotW*0.35;h=rnd(api.H*0.08,api.H*0.12);}                  // 小さな木箱(小型オブジェクト)
+    else if(r<T[8]){type="tank";big=true;w=slotW*0.62;h=rnd(api.H*0.16,api.H*0.22);}          // 大きい丸タンク(drawTankBody を再利用・色違い)
+    // 四角いビル系は幅をそろえない(細い・太いが混ざる)。slotW は超えない
+    if(type==="normal"||type==="tough"||type==="chain"||type==="gold"||type==="rainbow")w=slotW*rnd(0.6,0.9);
+    const color=type==="gold"?"#ffd23f":type==="tank"?(big?pick(["#cfd8e6","#f2c98a","#a9d8b8","#f0a8a0"]):"#cfd8e6"):pick(COLORS);
     return{x:(i+0.5)*slotW,w,baseH:h,h,color,state:"up",squash:1,respawnT:0,seed:rint(0,999),type,hp};
   }
   function reset(){builds=[];feet=[];waves=[];dust=[];shards=[];floats=[];sparks=[];flash=0;timeT=0;count=0;combo=0;comboT=0;comboMax=0;bodyBob=0;scoreShown=0;comboBar=0;hudPop=0;colorWash=0;clouds=[];
@@ -68,10 +75,18 @@ function buildRobot(api){
   // ステージバナー/にじいろバナー中は、詰まらないよう最大3個まで(keep:true の特別な文字は除く)
   function addFloat(o){
     if((stageBannerT>0||rbMsgT>0)&&!o.keep&&floats.length>=3)return;
-    // 近くの生き残り文字の大きさ(size)から間隔を作る: size40前後でも上下に重ならない
-    let off=0;
-    for(const f of floats){if(f.life>0&&Math.abs(f.x-o.x)<slotW*0.9&&Math.abs(f.y-(o.y-off))<60)off+=Math.max(34,((f.size||24)+(o.size||24))*0.55);}
-    o.y-=off;
+    // 近くの生き残り文字との縦の差が (size合計×0.7) より小さければ、その文字のすぐ上(gapぶん)に置き直す。
+    // 押し上げ量を足すのでなく「既存の文字からの差」を保証するので、PERFECT! と x7 のような大きい文字同士も重ならない。
+    for(let pass=0;pass<3;pass++){
+      let moved=false;
+      for(const f of floats){
+        if(!(f.life>0)||Math.abs(f.x-o.x)>=slotW*0.9)continue;
+        const gap=((f.size||24)+(o.size||24))*0.7;
+        if(Math.abs(o.y-f.y)<gap){o.y=f.y-gap;moved=true;}
+      }
+      if(!moved)break;
+    }
+    if(o.y<36)o.y=36;
     floats.push(o);
   }
   function stageQuota(s){return 8+(s-1)*4;} // 8,12,16,20,24 buildings per stage（7〜8歳向けに手応えを増やした）
@@ -195,7 +210,11 @@ function buildRobot(api){
         sparks.push({x:b.x,y:ty,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1.5,life:1,decay:rnd(0.02,0.035),col:luckyColor,r:rnd(2,4)});}
       addFloat({x:b.x+b.w*0.6,y:ty,txt:"ラッキー！",life:1,vy:-1.1,col:luckyColor,fill:"#fff",size:26,pop:1.5});
     }
-    if(combo>=4)addFloat({x:b.x,y:groundY-b.h-20,txt:"x"+combo,life:1,vy:-1.2,col:combo>=6?"#ff3b3b":combo>=3?"#ff8c42":"#ffd23f",size:combo>=4?42:30,pop:1.6});
+    if(combo>=4){
+      // コンボ文字は PERFECT! の真上に重ねず、ビルの右(右端なら左)に逃がして出す
+      let cx=b.x+b.w*0.75;if(cx>api.W-60)cx=b.x-b.w*0.75;
+      addFloat({x:cx,y:groundY-b.h-20,txt:"x"+combo,life:1,vy:-1.4,col:combo>=6?"#ff3b3b":combo>=3?"#ff8c42":"#ffd23f",size:combo>=4?42:30,pop:1.6});
+    }
     // --- chain collapse: tall chain-building topples its neighbours ---
     if(b.type==="chain"&&!chained){
       const idx=builds.indexOf(b);

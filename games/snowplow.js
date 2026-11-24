@@ -45,7 +45,7 @@ function buildSnowplow(api){
   }
   function layout(){
     groundY=api.H*0.78;
-    truckW=clamp(api.W*0.2,90,180);
+    truckW=clamp(api.W*0.2,90,240);   // 軸6: iPad横(1180px)で主役を大きく(上限180→240)
     truckH=truckW*0.62;
     truckX=api.W*0.26;
     truckY=groundY-truckH*0.5;
@@ -389,7 +389,9 @@ function buildSnowplow(api){
           o.x-=speed*dt;
           const bladeStop=bladeX+truckW*0.03-o.w*0.5;     // 刃に届く位置(=ここまでは進める)
           const jamStop=queueBack+o.w*0.75;   // 手前のオブジェクトに突っ込まない位置(渋滞)。軸3: 間隔を広めにして取り違えヒットを防ぐ
-          const stopX=Math.max(bladeStop,jamStop);
+          // 軸6: 2番目以降の待ち行列は車体の右端より外に並べる(車体の裏に隠れて見えない、を防ぐ)。先頭だけが刃に着く
+          const queueMin=truckX+truckW*0.4+o.w*0.5+4;
+          const stopX=queueBack>-Infinity?Math.max(bladeStop,jamStop,queueMin):bladeStop;
           if(o.x<stopX)o.x=stopX;
           // 軸3: 直近0.6秒以内に「狙い成功」タップがあったときだけ、刃に着いたオブジェクトを壊す。
           // タップの正誤に関係なく壊れていた自動衝突をやめ、放っておくと刃の手前で渋滞するようにする。
@@ -474,7 +476,7 @@ function buildSnowplow(api){
         const pop=1+Math.max(0,comboT-0.7)*1.2;
         g.save();g.translate(api.W/2,api.H*0.13);g.scale(pop,pop);
         g.font="800 32px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-        g.globalAlpha=clamp(comboT,0,1);
+        g.globalAlpha=clamp(comboT*2.5,0,1);   // 軸6: コンボ中ははっきり読める(消え際だけ薄く)
         g.shadowColor="rgba(255,170,30,.8)";g.shadowBlur=14;g.fillStyle="#ffd23f";
         g.fillText("コンボ x"+combo,0,0);
         g.shadowBlur=0;g.lineWidth=4;g.lineJoin="round";g.strokeStyle="rgba(10,42,58,.85)";

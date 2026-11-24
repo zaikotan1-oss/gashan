@@ -232,7 +232,7 @@ function build_cakesmash(api){
           r:rnd(tierH*0.12,tierH*0.26),rot:rnd(0,TAU),vr:rnd(-0.3,0.3),
           life:1,decay:0.006,col:RBC[i%RBC.length]});}
       [0,4,7,12,16].forEach((semi,i)=>setTimeout(()=>api.tone(659*Math.pow(2,semi/12),0.16,"triangle",0.13),i*60));
-      floats.push({x,y:y-tierH*1.4,txt:"にじいろ！ +"+pts,life:1,vy:-0.9,col:"#ff5da2",size:36});
+      floats.push({x,y:Math.max(H*0.2,y-tierH*1.4),txt:"にじいろ！ +"+pts,life:1,vy:-0.9,col:"#ff5da2",size:36});
       feverGauge=Math.min(1,feverGauge+0.4);
     }else if(t.gold){
       // rainbow burst + fanfare + big bonus float
@@ -243,7 +243,7 @@ function build_cakesmash(api){
           r:rnd(tierH*0.12,tierH*0.24),rot:rnd(0,TAU),vr:rnd(-0.3,0.3),
           life:1,decay:0.006,col:FRUIT[i%FRUIT.length]});}
       [0,4,7,12].forEach((semi,i)=>setTimeout(()=>api.tone(659*Math.pow(2,semi/12),0.16,"triangle",0.14),i*70));
-      floats.push({x,y:y-tierH*1.4,txt:"ゴールド！ +"+pts,life:1,vy:-0.9,col:"#ffd23f",size:34});
+      floats.push({x,y:Math.max(H*0.2,y-tierH*1.4),txt:"ゴールド！ +"+pts,life:1,vy:-0.9,col:"#ffd23f",size:34});
       feverGauge=Math.min(1,feverGauge+0.35);
     }else{
       feverGauge=Math.min(1,feverGauge+0.12);
@@ -625,7 +625,7 @@ function build_cakesmash(api){
 
       // ---- combo timer + combo text (top center) ----
       if(combo>0){comboT-=0.016*dt;if(comboT<=0)combo=0;}
-      if(combo>1){
+      if(combo>1&&!(fever>FEVER_LEN-1.3)){
         const pop=1+Math.max(0,comboT-0.7)*1.1;
         g.save();g.translate(W/2,H*0.17);g.scale(pop,pop);
         g.font="800 30px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
@@ -950,7 +950,7 @@ function build_cakesmash(api){
     g.save();g.textAlign="center";
     g.font="800 17px 'Hiragino Maru Gothic ProN',system-ui";
     g.fillStyle="#7a2a4a";g.shadowColor="rgba(255,255,255,.6)";g.shadowBlur=5;
-    g.fillText("ステージ "+stage+"      ケーキ あと "+left,W/2,by-8);
+    g.fillText("ステージ "+(clearT>0?stage-1:stage)+"      ケーキ あと "+left,W/2,by-8);
     g.shadowBlur=0;
     g.fillStyle="rgba(120,40,80,.25)";roundRect(bx,by,bw,bh,bh/2);g.fill();
     const fr=clamp(stageSmash/stageGoal,0,1);

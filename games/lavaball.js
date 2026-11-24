@@ -117,7 +117,8 @@ function buildLavaball(api){
     if(stage===1) poorN=(rowsMade===0)?2:rint(1,2);
     else poorN=rint(1,Math.max(1,Math.floor(n*0.25)));
     rowsMade++;
-    poorN=clamp(poorN,1,n-2);
+    // 軸3: ステージ3からは 35% の行で ふつうの道を からっぽに(=えらびはずすと すかっ)。ステージ1〜2は今のまま
+    if(stage>=3&&Math.random()<0.35) poorN=0; else poorN=clamp(poorN,1,n-2);
     const richN=n-poorN;
     const specials=types.filter(isRich).slice(0,richN);
     const richTypes=specials.slice();
@@ -228,9 +229,9 @@ function buildLavaball(api){
     // ⑥ ゴールド/にじいろは「ゴールド！」「+点」「xN」が同時に出る。高さと横をずらして重ならないようにする
     const bigRare=o.type==="gold"||o.type==="rainbow";
     const sideX=clamp(o.x+o.r*1.8,40,api.W-40), sideXL=clamp(o.x-o.r*1.8,40,api.W-40);
-    if(combo>1) pushFloat({x:bigRare?sideX:o.x,y:bigRare?o.y-o.r*3.4:o.y-o.r,txt:"x"+combo,life:1,vy:-1.0,
+    if(combo>1) pushFloat({x:bigRare?sideX:o.x,y:bigRare?o.y-o.r*4.4:o.y-o.r,txt:"x"+combo,life:1,vy:-1.0,
       col:combo>=6?"#fff2c0":"#ffe08a",size:combo>=4?40:30});
-    if(gain>=4) pushFloat({x:bigRare?sideXL:o.x,y:bigRare?o.y-o.r*1.4:o.y-o.r*2.1,txt:"+"+gain,life:1,vy:-0.8,
+    if(gain>=4) pushFloat({x:bigRare?sideXL:o.x,y:bigRare?o.y+o.r*0.2:o.y-o.r*2.1,txt:"+"+gain,life:1,vy:-0.8,
       col:o.type==="gold"?"#ffd23f":"#c78bff",size:o.type==="gold"?36:26});
     checkStage();
   }
@@ -243,7 +244,7 @@ function buildLavaball(api){
         col:"hsl("+(i*18)+",95%,60%)"});}
     rings.push({x,y,r:20,vr:26,life:1,decay:0.04,col:"#ffd23f"});
     [0,4,7,12].forEach((s,i)=>setTimeout(()=>api.tone(659.25*Math.pow(2,s/12),0.16,"triangle",0.15),i*70));
-    pushFloat({x,y:y-78,txt:"ゴールド！",life:1,vy:-0.8,col:"#ffd23f",size:34});
+    pushFloat({x,y:y-118,txt:"ゴールド！",life:1,vy:-0.8,col:"#ffd23f",size:34});
     flash=1;
   }
 
@@ -255,7 +256,7 @@ function buildLavaball(api){
       shards.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-rnd(2,5),r:rnd(3,8),
         rot:rnd(0,TAU),vr:rnd(-0.4,0.4),life:1,decay:rnd(0.008,0.015),col:"hsl("+(i*14)+",95%,62%)"});}
     for(let i=0;i<10;i++) ember(x+rnd(-ball.r*0.5,ball.r*0.5),y,true);
-    pushFloat({x,y:y-80,txt:"にじいろ！",life:1,vy:-0.8,col:"#ff5da2",size:34});
+    pushFloat({x,y:y-118,txt:"にじいろ！",life:1,vy:-0.8,col:"#ff5da2",size:34});
     api.boom(0.7); api.shake(16);
     api.slide(660,1320,0.5,0.22,"triangle"); api.tone(880,0.14,"triangle",0.12); api.tone(1320,0.16,"triangle",0.1);
     if(hitCd<=0){ api.hitStop(5); hitCd=32; }   // 節目限定＋クールダウン
@@ -634,8 +635,8 @@ function buildLavaball(api){
       }
     }
     // shadow
-    g.fillStyle="rgba(0,0,0,.3)"; g.beginPath();
-    g.ellipse(0,o.r*0.85,o.r*0.9,o.r*0.3,0,0,TAU); g.fill();
+    if(!o.lane){ g.fillStyle="rgba(0,0,0,.3)"; g.beginPath();   // 上の道は岩柱があるので影の楕円は描かない(柱の上に浮いて見えるため)
+      g.ellipse(0,o.r*0.85,Math.max(0,o.r*0.9),Math.max(0,o.r*0.3),0,0,TAU); g.fill(); }
     if(o.type==="hut") drawHut(o);
     else if(o.type==="crystal") drawCrystal(o);
     else if(o.type==="boulder") drawBoulder(o);

@@ -42,7 +42,7 @@ function buildDino(api){
         w:slotW*0.72,h:rnd(api.H*sd.hmax*0.9,api.H*sd.hmax),
         color:"#cfc6b0",state:"stand",vx:0,vy:0,rot:0,vr:0,respawnT:0,rise:1,seed:rint(0,999),sway:rnd(0,TAU),hp:2,maxhp:2}; // お城は2回なぎで崩れる(手応え)
     }
-    const tree=stage===0?Math.random()<0.4:Math.random()<0.22;
+    const tree=stage===0?Math.random()<0.4:Math.random()<(stage<3?0.3:0.22);
     if(tree)return{x:(i+0.5)*slotW,slot:i,type:"tree",
       w:slotW*0.5,h:rnd(api.H*0.07,api.H*0.12),
       color:"#3a8e4a",state:"stand",vx:0,vy:0,rot:0,vr:0,respawnT:0,rise:1,seed:rint(0,999),sway:rnd(0,TAU),hp:1};
@@ -189,7 +189,7 @@ function buildDino(api){
     // 同一フレームで白フラッシュ+加算ウォッシュ+超ブレスが重なると準白飛びするため、点火alphaを抑える
     api.shake(30);api.hitStop(9);api.boom(0.8);flash=0.55;wash=0.7;washHue=12;superFlash=0.85;roar=1;
     api.slide(120,900,0.6,0.5,"sawtooth");api.noise(0.35,0.4,500,"lowpass");api.tone(1046,0.2,"triangle",0.3);
-    floats.push({x:cx,y:api.H*0.36,txt:"ちょうドラゴンブレス！！",life:1,vy:-0.7,col:"#ff5a2a",size:46,t:0});
+    floats.push({x:cx,y:api.H*0.25,txt:"ちょうドラゴンブレス！！",life:1,vy:-0.7,col:"#ff5a2a",size:46,t:0});
     let n=0;
     for(const o of objs){if(o.state!=="stand")continue;
       sweepDir=o.x<cx?-1:1;o.hp=1;smash(o,true);n++;}
@@ -380,7 +380,7 @@ function buildDino(api){
       // ① にじいろビル！ 発見バナー(虹色に色替わり・中央上=HUD安全帯)
       if(rbMsgT>0){rbMsgT-=0.016*dt;
         const pop=1+Math.max(0,rbMsgT-1)*1.3,col="hsl("+((tNow*4)%360)+",90%,62%)";
-        g.save();g.translate(api.W/2,api.H*0.33);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
+        g.save();g.translate(api.W/2,api.H*0.31);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(rbMsgT*1.4,0,1);g.font="900 38px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor=col;g.shadowBlur=18;
         g.lineWidth=7;g.strokeStyle="rgba(0,0,0,.45)";g.strokeText("にじいろビル！",0,0);
@@ -408,7 +408,7 @@ function buildDino(api){
   };
   function drawObj(o,front){
     if(o.state==="gone")return;
-    let yo=0,a=front?0.85:1; // 恐竜の真正面の物は少し透かして、恐竜の頭が隠れきらないように
+    let yo=0,a=front?0.92:1; // 恐竜の真正面の物は少し透かして、恐竜の頭が隠れきらないように
     if(o.state==="rise"){yo=(1-o.rise)*o.h;a=ease?ease(o.rise):o.rise;}
     else if(o.state==="stand"&&o.ttl>0&&o.ttl<60&&Math.floor(o.ttl/5)%2===0)a=0.4; // 消える直前の点滅(予告)
     g.save();g.globalAlpha=a;

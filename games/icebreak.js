@@ -6,9 +6,17 @@ function buildIcebreak(api){
   let lastStopT=-9; // hitStopは「大ヒット単発」専用(連打で画面凍結しないよう間隔を空ける)
   // grid[col] = array of cells bottom->top; each cell {col,row,x,y,ty,vy,settled,hp,col0,wob}
   let grid=[],shards=[],sparks=[],rings=[],snow=[],glints=[],floats=[],critters=[],balls=[];
+  // 同じ場所に同時に出る文字(ぼふっ！/xN/バキバキ！ など)が重ならないよう、近くの新しい文字より上へずらして置く
+  function addFloat(o){
+    for(let k=0;k<4;k++){ let hit=null;
+      for(const f of floats){ if(f.life>0.5&&Math.abs(f.x-o.x)<110&&Math.abs(f.y-o.y)<34){ hit=f; break; } }
+      if(!hit)break; o.y=hit.y-36; }
+    if(o.y<44) o.y=44;
+    floats.push(o);
+  }
   let lastScoreT=0,brokeN=0,stageStartT=0,stageScored=false;   // 最後に得点が増えた時刻(取り残し救済) / 1タップで割れた数
   // stage progression (endless): clear all ice -> "ステージ クリア!" -> harder
-  let stage=1,clearBanner=0,clearTxt="",celebrate=0,refilling=false;
+  let stage=1,clearBanner=0,clearTxt="",nextTxt="",celebrate=0,refilling=false;
   // 上乗せ要素: オーロラフィーバー(ゲージMAXで一定時間ぜんぶ2倍!)
   let fever=0,feverGauge=0,feverBanner=0;
   const FEVER_LEN=10; // seconds
@@ -46,7 +54,7 @@ function buildIcebreak(api){
     for(let k=0;k<RAINBOW.length;k++)rings.push({x:cx,y:cy,r:S*0.3,life:1,col:RAINBOW[k]});
     for(let i=0;i<22;i++){const a=rnd(0,TAU),v=rnd(3,9);
       sparks.push({x:cx,y:cy,vx:Math.cos(a)*v,vy:Math.sin(a)*v-2,life:1,decay:rnd(0.02,0.04),s:rnd(2,4),col:RAINBOW[i%RAINBOW.length]});}
-    floats.push({x:cx,y:cy-40,txt:"にじいろ！",life:1,vy:-0.8,col:"#ff7bd0",size:38});
+    addFloat({x:cx,y:cy-40,txt:"にじいろ！",life:1,vy:-0.8,col:"#ff7bd0",size:38});
   }
   // ② ラッキー色 撃破: 小さめボーナス＋頭上に星のキラッ(気づけるヒント)
   function luckyBreak(c){
@@ -56,7 +64,7 @@ function buildIcebreak(api){
     api.tone(1046,0.14,"triangle",0.11); api.tone(1568,0.16,"triangle",0.08);
     for(let i=0;i<8;i++){const a=rnd(-TAU*0.5,0),v=rnd(2,5);
       sparks.push({x:cx,y:cy-4,vx:Math.cos(a)*v,vy:Math.sin(a)*v-1.5,life:1,decay:rnd(0.02,0.035),s:rnd(2,3.5),col:luckyColor});}
-    floats.push({x:cx,y:cy-30,txt:"ラッキー！",life:1,vy:-0.8,col:luckyColor,size:26});
+    addFloat({x:cx,y:cy-30,txt:"ラッキー！",life:1,vy:-0.8,col:luckyColor,size:26});
   }
   function layout(){
     groundY=api.H*0.9;
@@ -169,7 +177,7 @@ function buildIcebreak(api){
     if(c.shape===5){   // ゆきだるま: ふわっと雪けむり・ぼふっ！(氷とちがう やわらかい音・弱い揺れ)
       api.noise(0.22,0.3,520,"lowpass",0.8); api.shake(viaChain?1:2);
       for(let i=0;i<10;i++){ sparks.push({x:c.x+S/2+rnd(-S*0.2,S*0.2),y:c.y+S*0.55+rnd(-S*0.3,S*0.2),vx:rnd(-2.2,2.2),vy:rnd(-3,-0.4),life:1,decay:rnd(0.012,0.022),s:rnd(3,5.5),col:"#ffffff"}); }
-      floats.push({x:c.x+S/2,y:c.y-S*0.15,txt:"ぼふっ！",life:1,vy:-0.8,col:"#ffffff",size:24});
+      addFloat({x:c.x+S/2,y:c.y-S*0.15,txt:"ぼふっ！",life:1,vy:-0.8,col:"#ffffff",size:24});
     }
     if(c.pil){ const grp=c.pil; for(const m of grp) m.pil=null;   // つらら柱: 3個いっしょに割れる
       for(const m of grp){ if(m!==c&&!m.dead){ m.hp=1; crack(m,true); } } }
@@ -183,7 +191,7 @@ function buildIcebreak(api){
         flash=Math.min(1,flash+0.6); flashHue="#ffe6ff";
         api.boom(0.6); api.shake(16);
         api.slide(784,1568,0.5,0.25,"triangle");
-        floats.push({x:api.W/2,y:api.H*0.5,txt:"オーロラフィーバー！",life:1,vy:-0.5,col:"#ffd9ff",size:32});
+        addFloat({x:api.W/2,y:api.H*0.5,txt:"オーロラフィーバー！",life:1,vy:-0.5,col:"#ffd9ff",size:32});
       }
     }
     return true;
@@ -238,7 +246,7 @@ function buildIcebreak(api){
     // ちっちゃい氷(ちび)は1個だけぽこっと割れる(まわりには広がらない)
     const neigh=target.shape===4?[]:pg?pillarFall(pg,target):neighbours(target);
     if(pg){   // つらら柱がとなりの列へばたーん！(上の2個ぶんが飛んで、となりの氷を1個ずつ割る)
-      floats.push({x:px,y:py-50,txt:"ばたーん！",life:1,vy:-0.8,col:"#ffe9a8",size:30});
+      addFloat({x:px,y:py-50,txt:"ばたーん！",life:1,vy:-0.8,col:"#ffe9a8",size:30});
       api.noise(0.25,0.3,320,"lowpass",0.8); api.tone(130,0.18,"square",0.09);
       for(const m of pg){ if(m===target)continue;
         for(let i=0;i<4;i++) shards.push({x:m.x+S/2,y:m.y+S/2,vx:fallDir*rnd(4,9),vy:-rnd(1,6),s:rnd(S*0.2,S*0.36),col:"#d6f0ff",
@@ -260,9 +268,9 @@ function buildIcebreak(api){
     api.boom(soft?0.14:clamp(0.28+broke*0.06,0.28,0.6));
     api.slide(520*Math.pow(2,clamp(combo,0,12)/14),120,0.18,soft?0.12:0.22,"triangle");
     if(!soft) api.noise(0.16,0.26,1500,"bandpass",0.7);
-    if(combo>1) floats.push({x:px,y:py-22,txt:"x"+combo,life:1,vy:-1.1,
+    if(combo>1) addFloat({x:px,y:py-22,txt:"x"+combo,life:1,vy:-1.1,
       col:combo>=8?"#ff8af0":combo>=5?"#7be0ff":"#ffe14a",size:combo>=5?40:30});
-    if(broke>=3) floats.push({x:px,y:py-56,txt:"バキバキ！",life:1,vy:-0.7,col:"#9fe8ff",size:24});
+    if(broke>=3) addFloat({x:px,y:py-56,txt:"バキバキ！",life:1,vy:-0.7,col:"#9fe8ff",size:24});
     if(totalCells()===0) stageClear();
   }
   function neighbours(c){
@@ -303,9 +311,9 @@ function buildIcebreak(api){
     if(refilling)return; refilling=true;
     // ③ ノンストップ ボーナス: コンボを一度も切らさず 壊し切ったら +5 & みどりの祝福
     if(noStop){ count+=5; api.setScore(count); lastScoreT=tsec;
-      floats.push({x:api.W/2,y:api.H*0.55,txt:"ノンストップ！＋5",life:1,vy:-0.6,col:"#7be08a",size:34});
+      addFloat({x:api.W/2,y:api.H*0.55,txt:"ノンストップ！＋5",life:1,vy:-0.6,col:"#7be08a",size:34});
       api.tone(1318,0.16,"triangle",0.1); api.tone(1976,0.18,"triangle",0.08); }
-    clearBanner=1.8; clearTxt="ステージ クリア！"; celebrate=1.8; flash=1; flashHue="#bfeaff";
+    clearBanner=1.8; clearTxt="ステージ クリア！"; nextTxt="つぎは ステージ "+(stage+1)+"！"; celebrate=1.8; flash=1; flashHue="#bfeaff";
     api.boom(0.6); api.shake(20);
     api.slide(523,1046,0.5,0.3,"triangle");
     lastScoreT=tsec;
@@ -322,7 +330,7 @@ function buildIcebreak(api){
         moonWink=1; api.tone(1318,0.12,"triangle",0.1); api.tone(1760,0.14,"triangle",0.07);
         for(let i=0;i<9;i++){const a=rnd(-TAU*0.5,0),v=rnd(2,5);
           sparks.push({x:moonPos.x,y:moonPos.y,vx:Math.cos(a)*v*0.7,vy:Math.sin(a)*v-1,life:1,decay:0.02,s:rnd(2,4),col:"#eaf6ff"});}
-        floats.push({x:moonPos.x,y:moonPos.y+moonPos.r+16,txt:"おつきさま",life:1,vy:-0.5,col:"#dff2ff",size:20});
+        addFloat({x:moonPos.x,y:moonPos.y+moonPos.r+16,txt:"おつきさま",life:1,vy:-0.5,col:"#dff2ff",size:20});
         return;
       }
       tapAt(px,py); },
@@ -544,7 +552,7 @@ function buildIcebreak(api){
         bg.addColorStop(0,"#ffffff"); bg.addColorStop(0.5,"#bfeaff"); bg.addColorStop(1,"#7be0ff");
         g.fillStyle=bg; g.fillText(clearTxt,0,0);
         g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui"; g.fillStyle="#eafaff";
-        g.fillText("つぎは ステージ "+(stage+1)+"！",0,42);
+        g.fillText(nextTxt,0,42);
         g.globalAlpha=1; g.lineJoin="miter"; g.restore(); g.textAlign="left"; }
       // 白飛び防止の保険: フレーム終わりで加算合成を必ず通常に戻す
       g.globalCompositeOperation="source-over"; g.globalAlpha=1; g.shadowBlur=0;
@@ -754,7 +762,7 @@ function buildIcebreak(api){
     else if(kind==="crab"){ k.vx=dir*3.2; k.vy=-4; }
     else { k.vx=dir*rnd(1,2.5); k.vy=-rnd(9,11); k.vr=dir*0.35; }
     critters.push(k);
-    floats.push({x:cx,y:cy-S*0.6,txt:{fish:"ぴょん！",penguin:"すーっ",crab:"ちょきちょき",starfish:"くるくる"}[kind]||"ぴょん！",life:1,vy:-0.9,col:"#ffffff",size:22});
+    addFloat({x:cx,y:cy-S*0.6,txt:{fish:"ぴょん！",penguin:"すーっ",crab:"ちょきちょき",starfish:"くるくる"}[kind]||"ぴょん！",life:1,vy:-0.9,col:"#ffffff",size:22});
   }
   function spawnBall(c){
     balls.push({x:c.x+S/2,y:c.y+S/2,vx:(c.rollDir||1)*8,vy:-2,r:S*0.42,rot:0,life:1,dist:0,col:c.col0||"#bfeaff"});

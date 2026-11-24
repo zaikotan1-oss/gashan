@@ -185,8 +185,8 @@ function buildChain(api){
     if(n>=2)stageScore+=n+bonus;
     // big-chain extra punch (no hitStop here, detonate already added a small one)
     if(n>=6){api.boom(clamp(0.4+n*0.03,0.4,0.7));}
-    if(n>=2)floats.push({x:api.W/2,y:api.H*0.46,txt:n+"れんさ！"+(bonus?" +"+bonus:"")+((isTarget&&!(clearAnim<=0&&stageScore>=stageTarget))?" おだいクリア!":""),
-      col:isTarget?"#ffe27a":n>=8?"#ff3b3b":n>=4?"#ff8c42":"#ffd23f",life:1,vy:-0.3,size:isTarget?44:n>=6?52:38,born:0});
+    if(n>=2){floats=floats.filter(f=>f.tag!=="chain");floats.push({tag:"chain",x:api.W/2,y:api.H*0.46,txt:n+"れんさ！"+(bonus?" +"+bonus:"")+((isTarget&&!(clearAnim<=0&&stageScore>=stageTarget))?" おだいクリア!":""),
+      col:isTarget?"#ffe27a":n>=8?"#ff3b3b":n>=4?"#ff8c42":"#ffd23f",life:1,vy:-0.3,size:isTarget?44:n>=6?52:38,born:0});}
     // ③ 軸3(c) maxQuietSec対策: 大きいチェインを割った直後で場が薄くなったときだけ、
     // spawnGapのタイマーを待たずに即補充する(判定半径・得点係数はそのまま)。
     // 「大きく減った直後だけ無音区間を切る」効果に絞るため、閾値を割った時だけ動く。
@@ -229,8 +229,8 @@ function buildChain(api){
     // ステージ切り替えは90秒中に何度も起きるので、ここが13のままだと毎回そこで無音区間が生まれる。
     orbs=[];for(let i=0;i<orbCap;i++)spawn();
     // 軸6: 字は白で塗り、お題色は光(shadow)だけで伝える=同色のオーブ・木箱の上でも必ず読める。れんさ表示と重ならない上寄りへ。
-    floats.push({x:api.W/2,y:api.H*0.34,txt:"おだいの いろ: "+(COLNAME[targetCol]||""),
-      col:targetCol,fill:"#ffffff",life:1.8,vy:-0.2,size:34,born:0});
+    floats.push({x:api.W/2,y:api.H*0.30,txt:"おだいの いろ: "+(COLNAME[targetCol]||""),
+      col:targetCol,fill:"#ffffff",life:1.5,vy:-0.2,size:34,born:0});
   }
   function spawnStar(){
     const fromLeft=Math.random()<0.5, y=rnd(api.H*0.18,api.H*0.5);
@@ -472,7 +472,7 @@ function buildChain(api){
       }
       // floats
       for(const f of floats){if(f.born<1)f.born=Math.min(1,f.born+0.12*dt);
-        f.y+=f.vy*dt;f.life-=0.014*dt;g.globalAlpha=Math.min(1,Math.max(0,f.life));
+        f.y+=f.vy*dt;f.life-=0.014*dt;g.globalAlpha=Math.min(1,Math.max(0,f.life*2.2));
         const sc=ease?ease(f.born):f.born;const fs=f.size*(0.6+0.4*sc);
         g.save();g.translate(f.x,f.y);g.scale(1,1);
         g.font="800 "+fs+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
