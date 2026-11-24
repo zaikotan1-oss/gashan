@@ -294,7 +294,7 @@ function buildMagma(api){
       // spawn (fever = eruption rush: targets pour out nonstop)
       const paused=clearT>0||endingT>0;
       if(!paused){spawnT-=dt;if(spawnT<=0){spawn();
-        spawnT=fever>0?13:clamp(50-(stage-1)*6,26,50);}}   // 出現を少し速く(7〜8歳向け)
+        spawnT=fever>0?13:clamp(50-(stage-1)*6,26,44);}}   // 出現を少し速く(7〜8歳向け)
       // update + draw targets
       for(const t of targets){
         if(t.flash>0)t.flash-=0.08*dt;
@@ -388,30 +388,40 @@ function buildMagma(api){
         g.shadowColor="hsl("+((tG*9)%360)+",100%,60%)";g.shadowBlur=14;
         g.fillStyle="#fff2c2";g.fillText("なにか くる…！",0,0);
         g.shadowBlur=0;g.restore();g.globalAlpha=1;g.textAlign="left";}
+      // バナーが縦に重ならないよう順番に出す: ステージクリア/ぜんぶクリアの帯が出ている間は他を止め、
+      // その後は にじいろ → フィーバー → ラッキー の順(止めている間はタイマーも減らさない)
+      const bannerQuiet=clearT>0||endingT>0;
+      const feverQuiet=bannerQuiet||rbMsgT>0;
+      const luckyQuiet=feverQuiet||feverBanner>0;
       // ① にじいろマグマ！ 発見バナー(虹色に色替わり)
-      if(rbMsgT>0){rbMsgT-=0.016*dt;const pop=1+Math.max(0,rbMsgT-1)*1.4,col="hsl("+((tG*11)%360)+",95%,65%)";
+      if(!bannerQuiet&&rbMsgT>0){rbMsgT-=0.016*dt;const pop=1+Math.max(0,rbMsgT-1)*1.4,col="hsl("+((tG*11)%360)+",95%,65%)";
         g.save();g.translate(api.W/2,api.H*0.24);g.scale(pop,pop);g.textAlign="center";
         g.globalAlpha=clamp(rbMsgT*1.4,0,1);g.font="900 36px 'Hiragino Maru Gothic ProN',system-ui";
+        g.lineJoin="round";g.lineWidth=7;g.strokeStyle="rgba(50,15,0,.85)";g.strokeText("にじいろ マグマ！",0,0);
         g.shadowColor=col;g.shadowBlur=18;g.fillStyle="#fff";g.fillText("にじいろ マグマ！",0,0);
         g.shadowBlur=0;g.lineWidth=2;g.strokeStyle=col;g.strokeText("にじいろ マグマ！",0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";if(rbMsgT<0)rbMsgT=0;}
       // ② ラッキーあな バナー(初回は「みつけた！」・以降は「ラッキー！」)
-      if(luckyMsgT>0){luckyMsgT-=0.016*dt;const pop=1+Math.max(0,luckyMsgT-1.1)*1.3;
+      if(!luckyQuiet&&luckyMsgT>0){luckyMsgT-=0.016*dt;const pop=1+Math.max(0,luckyMsgT-1.1)*1.3;
         g.save();g.translate(api.W/2,api.H*0.34);g.scale(pop,pop);g.textAlign="center";
         g.globalAlpha=clamp(luckyMsgT*1.4,0,1);g.font="900 24px 'Hiragino Maru Gothic ProN',system-ui";
+        g.lineJoin="round";g.lineWidth=5;g.strokeStyle="rgba(50,15,0,.85)";
+        g.strokeText(luckyMsgT>1.2?"ラッキーな あな みつけた！":"ラッキー！",0,0);
         g.shadowColor="rgba(255,220,80,.9)";g.shadowBlur=14;g.fillStyle="#ffe680";
         g.fillText(luckyMsgT>1.2?"ラッキーな あな みつけた！":"ラッキー！",0,0);
         g.shadowBlur=0;g.restore();g.globalAlpha=1;g.textAlign="left";if(luckyMsgT<0)luckyMsgT=0;}
       // fever entry banner
-      if(feverBanner>0){feverBanner-=0.016*dt;
+      if(!feverQuiet&&feverBanner>0){feverBanner-=0.016*dt;
         const a=clamp(feverBanner*1.5,0,1),pop=1+Math.max(0,feverBanner-1.3)*2+0.06*Math.sin(tG*0.6);
         g.save();g.translate(api.W/2,api.H*0.30);g.scale(pop,pop);g.globalAlpha=a;
         g.textAlign="center";g.font="900 44px 'Hiragino Maru Gothic ProN',system-ui";
+        g.lineJoin="round";g.lineWidth=8;g.strokeStyle="rgba(50,15,0,.85)";g.strokeText("マグマ フィーバー！",0,0);
         g.shadowColor="hsl("+((tG*9)%360)+",100%,60%)";g.shadowBlur=24;
         g.fillStyle="hsl("+((tG*9+180)%360)+",100%,72%)";
         g.fillText("マグマ フィーバー！",0,0);
         g.shadowBlur=0;g.lineWidth=2.5;g.strokeStyle="#fff";g.strokeText("マグマ フィーバー！",0,0);
         g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";g.fillStyle="#fff";
+        g.lineWidth=5;g.strokeStyle="rgba(50,15,0,.85)";g.strokeText("ぜんぶ 1ぱつ！ とくてん 2ばい！",0,38);
         g.fillText("ぜんぶ 1ぱつ！ とくてん 2ばい！",0,38);
         g.restore();g.globalAlpha=1;g.textAlign="left";}
       // HUD
@@ -423,13 +433,16 @@ function buildMagma(api){
         const pop=1+Math.max(0,clearT-1.3)*1.8;
         g.save();g.translate(api.W/2,api.H*0.45);g.scale(pop,pop);g.globalAlpha=a;
         g.textAlign="center";g.font="900 46px 'Hiragino Maru Gothic ProN',system-ui";
+        g.lineJoin="round";g.lineWidth=8;g.strokeStyle="rgba(50,15,0,.85)";g.strokeText("ステージ"+clearStage+" クリア！",0,0);
         g.shadowColor="rgba(255,140,30,.9)";g.shadowBlur=20;g.fillStyle="#ffd23f";
         g.fillText("ステージ"+clearStage+" クリア！",0,0);
         g.shadowBlur=0;g.lineWidth=2;g.strokeStyle="#fff";g.strokeText("ステージ"+clearStage+" クリア！",0,0);
         g.font="800 24px 'Hiragino Maru Gothic ProN',system-ui";g.fillStyle="#fff";
         const NEXT=["","つぎは かたい くろいわ が でてくる！","つぎは きんいろ マグマ が でるよ！",
           "つぎは よる の かざん！ いわ が いっぱい！","さいごは おうごん の だいふんか！"];
-        g.fillText(NEXT[clearStage]||("つぎは ステージ"+(clearStage+1)+"！"),0,42);
+        const nxt=NEXT[clearStage]||("つぎは ステージ"+(clearStage+1)+"！");
+        g.lineWidth=5;g.strokeStyle="rgba(50,15,0,.85)";g.strokeText(nxt,0,42);
+        g.fillText(nxt,0,42);
         g.restore();g.globalAlpha=1;g.textAlign="left";
         if(clearT<=0){clearT=0;spawnT=20;}
       }
@@ -478,7 +491,7 @@ function buildMagma(api){
     drawFeverGauge();
   }
   function drawFeverGauge(){
-    const fw=Math.min(api.W*0.5,260),fh=12,fx=(api.W-fw)/2,fy=api.H-30;
+    const fw=Math.min(api.W*0.5,260),fh=16,fx=(api.W-fw)/2,fy=api.H-34;
     const inF=fever>0,fr=inF?clamp(fever/FEVER_LEN,0,1):clamp(feverGauge,0,1);
     g.save();g.textAlign="center";
     g.fillStyle="rgba(0,0,0,.45)";roundRect(fx-4,fy-3,fw+8,fh+6,(fh+6)/2);g.fill();
@@ -495,10 +508,10 @@ function buildMagma(api){
       roundRect(fx,fy,Math.max(fh,fw*fr),fh,fh/2);g.fill();g.restore();
     }
     g.strokeStyle="rgba(255,255,255,.5)";g.lineWidth=2;roundRect(fx-4,fy-3,fw+8,fh+6,(fh+6)/2);g.stroke();
-    g.font="800 14px 'Hiragino Maru Gothic ProN',system-ui";
+    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
     g.shadowColor="rgba(0,0,0,.7)";g.shadowBlur=5;
     g.fillStyle=inF?"hsl("+((tG*9)%360)+",100%,75%)":fr>0.85?"#ffe680":"#fff";
-    g.fillText(inF?"フィーバーちゅう！ 2ばい！":fr>0.85?"もうすぐ フィーバー！":"フィーバー",api.W/2,fy-7);
+    g.fillText(inF?"フィーバーちゅう！ 2ばい！":fr>0.85?"もうすぐ フィーバー！":"フィーバー",api.W/2,fy-9);
     g.shadowBlur=0;g.restore();g.textAlign="left";
   }
   function drawBlob(t,x,y,sq){
@@ -535,6 +548,10 @@ function buildMagma(api){
       }
       if(src){
         const blinking=t.blink!==999&&Math.floor(t.blink/40)%2===0;   // もうすぐ引っ込む合図(点滅)
+        // 暗い背板: 橙の背景(火山の光)に橙のマグマが溶けないように
+        const pg=g.createRadialGradient(0,-r*0.1,0,0,-r*0.1,Math.max(1,r*1.2));
+        pg.addColorStop(0,"rgba(40,10,0,.34)");pg.addColorStop(0.7,"rgba(40,10,0,.26)");pg.addColorStop(1,"rgba(40,10,0,0)");
+        g.fillStyle=pg;g.beginPath();g.arc(0,-r*0.1,Math.max(0,r*1.2),0,TAU);g.fill();
         api.drawSrc(src,r*0.21,-r*0.2,r*2.4,r*2.4,{center:true,alpha:blinking?0.55:1});
         // ゆらめく炎のふさ(手描きと同じ動き)を頭上に重ねる
         g.save();g.globalCompositeOperation="lighter";

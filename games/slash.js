@@ -93,12 +93,12 @@ function buildSlash(api){
   // big: 4. ステージ1のうちから混ぜる巨大フルーツ(命中でボーナス点)
   // gem: 軸3(歯ごたえ)向け: 小さく速いが高得点の「レアだま」。大きい的=当てやすいが低得点/小さい的=当てにくいが高得点、のトレードオフを作る
   // bigMul: forceBig(開始直後の最初の的)専用の拡大倍率。未指定時は通常の巨大フルーツ倍率(1.5)のまま。
-  function pushFruit(x,extra,big,bigMul){
+  function pushFruit(x,extra,big,bigMul,fixR){
     const gim=curStage().gim;
     const ice=gim==="ice"&&Math.random()<0.55;
     const gem=!ice&&!big&&Math.random()<0.1;
     const col=ice?pick(ICE_COLS):gem?pick(GEM_COLS):pick(FRUIT_COLS);
-    const r=gem?clamp(randR(0.5),16,24):randR(ice?0.9:1)*(big?(bigMul||1.5):1);   // 軸3/軸6向け: 巨大フルーツ倍率 1.8→1.5(通常時)。firstOpenだけbigMulで1.8に拡大
+    const r=gem?clamp(randR(0.5),16,24):fixR?fixR:Math.min(90,randR(ice?0.9:1)*(big?(bigMul||1.5):1));   // 軸3/軸6向け: 巨大フルーツ倍率 1.8→1.5(通常時)。firstOpenだけbigMulで1.8に拡大
     // ice/gem fruits fly faster/higher; later stages add a touch of speed
     const speedMul=(ice?1.18:gem?1.35:1)+stage*0.03;
     const vy=-Math.sqrt(2*grav*(api.H*rnd(0.55,0.82)))*speedMul;
@@ -171,7 +171,8 @@ function buildSlash(api){
     const x=rnd(api.W*0.18,api.W*0.82);
     if(gim==="cluster"&&Math.random()<0.5){
       // connected bunch: a tight cluster a single swipe can clear for a big combo
-      const n=rint(3,4);for(let i=0;i<n;i++)pushFruit(clamp(x+(i-(n-1)/2)*42,api.W*0.12,api.W*0.88),0.4);
+      const rB=clamp(api.W*0.055,24,46),gap=Math.max(42,rB*2.2),n=rint(3,4);   // 軸6: 同じ半径・広めの間隔で重ならないように
+      for(let i=0;i<n;i++)pushFruit(clamp(x+(i-(n-1)/2)*gap,api.W*0.1,api.W*0.9),0.4,false,undefined,rB*0.9);
     }else if(gim==="swarm"){
       const n=rint(2,3);for(let i=0;i<n;i++)pushFruit(rnd(api.W*0.14,api.W*0.86));
     }else{
@@ -269,7 +270,8 @@ function buildSlash(api){
     }
     // 4. 巨大フルーツ 命中: ひときわ大きい表示でボーナスに気づかせる
     if(o.big)floats.push({x:o.x,y:o.y-o.r-14,txt:"おおきい！",life:1,vy:-1.1,col:"#ffd23f",size:36,scl:0});
-    if(combo>1)floats.push({x:o.x,y:o.y-30,txt:"x"+combo,life:1,vy:-1.1,col:fever>0?"#ffd23f":combo>=6?"#ff3b3b":combo>=3?"#ff8c42":"#ffd23f",size:combo>=4?42:30,scl:0});
+    if(combo>1){floats=floats.filter(f=>!/^x\d/.test(f.txt));   // 軸6: 古い「xN」を消してから新しいものだけ出す(重なって読めなくなるのを防ぐ)
+      floats.push({x:api.W/2,y:api.H*0.5,txt:"x"+combo,life:1,vy:-1.1,col:fever>0?"#ffd23f":combo>=6?"#ff3b3b":combo>=3?"#ff8c42":"#ffd23f",size:combo>=4?42:30,scl:0});}
   }
   // 2. 岩の欠片: いびつな向きへ3〜4個飛び散る(丸い果物のhalvesとは別の壊れ方)
   function spawnRockShards(o,ang){
@@ -793,7 +795,7 @@ function buildSlash(api){
     g.fillStyle="#dceeff";g.fillText(sName,api.W/2,m*0.5+fs*0.9+1);
     g.textAlign="left";g.textBaseline="alphabetic";
     // fever gauge (right side, gバーの下に降ろして衝突回避)
-    const gw=clamp(api.W*0.22,90,160),gh=clamp(api.H*0.012,8,14),gx=api.W-m-gw,gy=66+gh*0.4;
+    const gw=clamp(api.W*0.22,90,160),gh=clamp(api.H*0.012,8,14),gx=api.W-m-gw,gy=78+gh*0.4;
     rrect(gx,gy,gw,gh,gh/2);g.fillStyle="rgba(0,0,0,.35)";g.fill();
     const fillW=gw*clamp(fever,0,1);
     if(fillW>2){rrect(gx,gy,fillW,gh,gh/2);
@@ -802,7 +804,7 @@ function buildSlash(api){
       else{fgr.addColorStop(0,"#7de1ff");fgr.addColorStop(1,"#5a8cff");}
       g.fillStyle=fgr;g.fill();}
     rrect(gx,gy,gw,gh,gh/2);g.lineWidth=1.5;g.strokeStyle="rgba(180,220,255,.5)";g.stroke();
-    g.font="700 "+(gh*1.1)+"px system-ui";g.textAlign="right";g.fillStyle=feverT>0?"#ffd23f":"rgba(200,225,255,.8)";
+    g.font="800 "+Math.max(16,gh*1.6)+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="right";g.lineWidth=4;g.lineJoin="round";g.strokeStyle="rgba(10,20,40,.8)";g.strokeText(feverT>0?"フィーバー!":"フィーバー",gx+gw,gy-gh*0.4);g.fillStyle=feverT>0?"#ffd23f":"rgba(200,225,255,.8)";
     g.fillText(feverT>0?"フィーバー!":"フィーバー",gx+gw,gy-gh*0.4);g.textAlign="left";
   }
   function heartPath(s){g.beginPath();g.moveTo(0,s*0.32);
@@ -860,7 +862,7 @@ function buildSlash(api){
     }else{
       const s=Math.max(1,sd.size);
       g.beginPath();g.moveTo(0,-s);g.lineTo(s*0.8,-s*0.1);g.lineTo(s*0.5,s*0.9);g.lineTo(-s*0.6,s*0.7);g.lineTo(-s*0.8,-s*0.3);g.closePath();
-      g.fillStyle=sd.skin;g.fill();
+      g.fillStyle=sd.skin;g.fill();g.lineWidth=2;g.lineJoin="round";g.strokeStyle="rgba(20,20,26,.55)";g.stroke();
       g.fillStyle="rgba(255,255,255,.2)";g.beginPath();g.arc(-s*0.15,-s*0.25,Math.max(0,s*0.25),0,TAU);g.fill();
     }
     g.restore();
@@ -919,7 +921,7 @@ function buildSlash(api){
       const rg=g.createRadialGradient(-Math.max(0,o.r*0.28),-Math.max(0,o.r*0.3),Math.max(0,o.r*0.12),Math.max(0,o.r*0.1),Math.max(0,o.r*0.15),Math.max(0,o.r*1.05));
       rg.addColorStop(0,o.flesh);rg.addColorStop(0.55,o.skin);rg.addColorStop(1,shade(o.skin,-0.3));
       g.fillStyle=rg;g.fill();
-      g.lineWidth=Math.max(1,o.r*0.05);g.strokeStyle="rgba(20,20,26,.4)";g.stroke();
+      g.lineWidth=2;g.strokeStyle="rgba(20,20,26,.55)";g.stroke();
       g.fillStyle="rgba(255,255,255,.18)";g.beginPath();g.arc(-o.r*0.3,-o.r*0.32,Math.max(0,o.r*0.16),0,TAU);g.fill();
     }else if(o.t==="box"){
       // 7. 木箱: 丸・岩・樽とは別の四角い輪郭。バツ印の当て木で"積み荷/建物"らしさを出す
@@ -939,7 +941,7 @@ function buildSlash(api){
         g.fillStyle="rgba(0,0,0,.2)";g.beginPath();g.arc(2,ys[i]+3,rr,0,TAU);g.fill();
         const gr=g.createRadialGradient(-rr*0.3,ys[i]-rr*0.3,Math.max(0.1,rr*0.1),0,ys[i],rr);
         gr.addColorStop(0,tint(cols[i],0.3));gr.addColorStop(1,cols[i]);
-        g.fillStyle=gr;g.beginPath();g.arc(0,ys[i],rr,0,TAU);g.fill();
+        g.fillStyle=gr;g.beginPath();g.arc(0,ys[i],rr,0,TAU);g.fill();g.lineWidth=2;g.strokeStyle="rgba(20,20,26,.55)";g.stroke();
       }
     }else if(o.t==="gem"){
       // 軸3: 小さく速いが高得点のレアだま。4方向にきらめく光条で"特別な的"だと分かるようにする

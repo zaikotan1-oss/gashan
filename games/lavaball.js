@@ -455,7 +455,7 @@ function buildLavaball(api){
             sadT=1.6; api.slide(420,170,0.22,0.12,"sine"); api.noise(0.08,0.05,1800,"lowpass");
             pushFloat({x:startX,y:slopeYAt(startX)-ball.baseR*3.2,txt:"すかっ",life:0.9,vy:-0.4,col:"#fff5d6",size:26});
             if(!laneHintShown){ laneHintShown=true;                // 一度だけ狙い方のヒント(叱らず案内)
-              pushFloat({x:api.W/2,y:api.H*0.42,txt:"うえ したで ねらいを かえてみよう！",life:1.6,vy:-0.3,col:"#fff5d6",size:20});
+              pushFloat({x:api.W/2,y:api.H*0.62,txt:"うえ したで ねらいを かえてみよう！",life:1.6,vy:-0.3,col:"#fff5d6",size:20});
             }
           }
           rebalance(whiffed);
@@ -831,33 +831,35 @@ function buildLavaball(api){
   }
   function drawHUD(){
     const left=clamp(stageGoal-stageKill,0,stageGoal);
-    const bw=Math.min(api.W*0.6,360),bh=16,bx=(api.W-bw)/2,by=api.H*0.05;
+    const bw=Math.min(api.W*0.6,360),bh=26,bx=(api.W-bw)/2,by=api.H*0.05;
     g.save(); g.textAlign="center";
-    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
-    g.fillStyle="#fff"; g.shadowColor="rgba(0,0,0,.55)"; g.shadowBlur=6;
-    g.fillText("ステージ "+stage+"      あと "+left+" こ",api.W/2,by-8);
-    g.shadowBlur=0;
-    g.fillStyle="rgba(0,0,0,.4)"; roundRect(bx,by,bw,bh,bh/2); g.fill();
+    // 軸6: 常時HUDは 2段(文字入りステージバー + フィーバーバー)。文字は バーの中に のせる
+    g.fillStyle="rgba(0,0,0,.45)"; roundRect(bx,by,bw,bh,bh/2); g.fill();
     const fr=clamp(stageKill/stageGoal,0,1);
     if(fr>0){const gg=g.createLinearGradient(bx,0,bx+bw,0);
       gg.addColorStop(0,"#ff8c42"); gg.addColorStop(1,"#ffd23f");
       g.fillStyle=gg; roundRect(bx,by,Math.max(bh,bw*fr),bh,bh/2); g.fill();}
-    g.strokeStyle="rgba(255,255,255,.5)"; g.lineWidth=2; roundRect(bx,by,bw,bh,bh/2); g.stroke();
-    // 軸6: フィーバーのゲージは 溜まりはじめた時(と フィーバー中)だけ出す。ふだんは 文字1行+バー1本。
-    //   出る時は 太めの帯(10px)+ ひだりに ラベル「フィーバー」
+    g.strokeStyle="rgba(255,255,255,.6)"; g.lineWidth=2; roundRect(bx,by,bw,bh,bh/2); g.stroke();
+    g.font="800 17px 'Hiragino Maru Gothic ProN',system-ui"; g.textBaseline="middle";
+    g.lineWidth=4; g.lineJoin="round"; g.strokeStyle="rgba(20,6,4,.85)";
+    const st="ステージ "+stage+"   あと "+left+" こ";
+    g.strokeText(st,api.W/2,by+bh/2+1); g.fillStyle="#fff"; g.fillText(st,api.W/2,by+bh/2+1);
+    // フィーバーのゲージは 溜まりはじめた時(と フィーバー中)だけ出す。
     if(fever>0||feverGauge>0){
-      const fy=by+bh+8, fh=10, ff=fever>0?clamp(fever/12,0,1):clamp(feverGauge,0,1);
-      g.fillStyle="rgba(0,0,0,.45)"; roundRect(bx,fy,bw,fh,fh/2); g.fill();
+      const fy=by+bh+8, fh=14, ff=fever>0?clamp(fever/12,0,1):clamp(feverGauge,0,1);
+      g.fillStyle="rgba(0,0,0,.5)"; roundRect(bx,fy,bw,fh,fh/2); g.fill();
       if(ff>0){ const fg=g.createLinearGradient(bx,0,bx+bw,0);
         if(fever>0){ fg.addColorStop(0,"#ff5da2"); fg.addColorStop(0.5,"#ffd23f"); fg.addColorStop(1,"#5ad1ff"); }
         else { fg.addColorStop(0,"#ff5b2e"); fg.addColorStop(1,"#ff5da2"); }
         g.fillStyle=fg; roundRect(bx,fy,Math.max(fh,bw*ff),fh,fh/2); g.fill(); }
-      g.strokeStyle="rgba(255,255,255,.5)"; g.lineWidth=1.5; roundRect(bx,fy,bw,fh,fh/2); g.stroke();
-      g.font="800 13px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="right";
-      g.lineWidth=4; g.lineJoin="round"; g.strokeStyle="rgba(20,6,4,.85)";
-      g.strokeText("フィーバー",bx-6,fy+fh-0.5); g.fillStyle="#ffe08a"; g.fillText("フィーバー",bx-6,fy+fh-0.5);
+      g.strokeStyle="rgba(255,255,255,.6)"; g.lineWidth=1.5; roundRect(bx,fy,bw,fh,fh/2); g.stroke();
+      g.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";
+      g.lineWidth=5; g.lineJoin="round"; g.strokeStyle="rgba(20,6,4,.9)";
+      const outside=bx>=100;   // 狭い画面では バーの中(左はし)に のせる
+      g.textAlign=outside?"right":"left"; const lx=outside?bx-8:bx+8, ly=fy+fh/2+1;
+      g.strokeText("フィーバー",lx,ly); g.fillStyle="#ffe08a"; g.fillText("フィーバー",lx,ly);
     }
-    g.restore(); g.textAlign="left";
+    g.restore(); g.textAlign="left"; g.textBaseline="alphabetic";
     // bottom hint: 溶岩帯(0.93H)より上の暗い地面に、縁取り付きで大きく(指で押す前提)
     if(!ball.rolling&&clearBanner<=0){
       g.save(); g.textAlign="center"; g.font="800 24px 'Hiragino Maru Gothic ProN',system-ui";

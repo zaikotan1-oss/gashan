@@ -35,7 +35,8 @@ function build_donutfall(api){
   // 第4ラウンド: ステージ1だけ補充間隔を伸ばして同時数を約8個に(どこを押しても当たる密度を下げる)。maxQuietSecを見ながら調整
   // 第5ラウンド: 22→28フレーム(約0.47秒ごと)。同時に画面に出る数を約13個→約10個へ減らし、どこを押しても当たる密度を下げる
   const STAGE1_GAP=28;
-  const IDLE_HELP=180;
+  // 第6ラウンド: 助け舟を約3秒→約2秒(120フレーム)に早める(maxQuietSecを12秒以内へ)。
+  const IDLE_HELP=120;
   function spawnGap(){const g0=stage<=1?STAGE1_GAP:clamp(28-(stage-1)*2.5,10,28);return fever>0?Math.max(8,g0*0.45):g0;}
   // hitStop は大ヒット限定 + 30フレーム以上のクールダウン
   function tryHitStop(f){if(hsCd<=0){api.hitStop(f);hsCd=32;}}
@@ -243,7 +244,7 @@ function build_donutfall(api){
       if(type!=="down")return;
       for(let i=sweets.length-1;i>=0;i--){const s=sweets[i];
         if(s.dead)continue;
-        if(Math.hypot(x-s.x,y-s.y)<Math.max(s.r*HIT_K,HIT_MIN)){crack(s,s.x,s.y);return;}}
+        if(Math.hypot(x-s.x,y-s.y)<Math.max(s.r*HIT_K,HIT_MIN)*(s.help?1.4:1)){crack(s,s.x,s.y);return;}}
       // ④ ふうせん ひみつタップ: お菓子に当たらなかったタップが風船に届いたら、ポンッと割れてキラキラ(減点なし・ごほうび)
       for(const bl of balloons){
         if(Math.hypot(x-bl.x,y-bl.y)<bl.r*1.25){
@@ -339,7 +340,8 @@ function build_donutfall(api){
       if(!paused){idleT+=dt;if(idleT>=IDLE_HELP){idleT=0;spawn();const h=sweets[sweets.length-1];
         if(h.type==="cake"||h.type==="mini"){h.type="donut";h.hp=1;h.r=R;}
         // 第5ラウンド: 助け舟はすでに画面内(上寄り)に出し、すぐ押せるようにする(画面の外から降りてくるのを待たせない)
-        h.x=api.W*rnd(0.4,0.6);h.vx=0;h.y=api.H*0.14;h.vy=fallSpeed()*0.6;}}
+        // 第6ラウンド: 子どものタップが集まる画面中央寄り(H*0.38)に出し、ゆっくり(0.45倍)落とす。少し大きめ(R*1.1)+help印で、判定だけ1.4倍(通常の的は据え置き)
+        h.x=api.W*rnd(0.4,0.6);h.vx=0;h.y=api.H*0.38;h.vy=fallSpeed()*0.45;h.r=R*1.1;h.help=true;}}
 
       // ---- sweets update + draw ----
       for(const s of sweets){

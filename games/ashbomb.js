@@ -588,12 +588,14 @@ function build_ashbomb(api){
   }
   function drawHUD(){
     const left=clamp(stageGoal-stageKill,0,stageGoal);
-    const bw=Math.min(api.W*0.6,360),bh=16,bx=(api.W-bw)/2,by=api.H*0.06;
+    const bw=Math.min(api.W*0.6,360),bh=18,bx=(api.W-bw)/2,by=api.H*0.06;
     g.save();g.textAlign="center";
-    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
+    g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
+    const hudT="ステージ "+stage+"      あと "+left+" こ";
+    g.lineJoin="round";g.lineWidth=5;g.strokeStyle="rgba(40,8,4,.7)";g.strokeText(hudT,api.W/2,by-9);
     g.fillStyle="#fff";g.shadowColor="rgba(0,0,0,.6)";g.shadowBlur=6;
-    g.fillText("ステージ "+stage+"      あと "+left+" こ",api.W/2,by-8);
-    g.shadowBlur=0;
+    g.fillText(hudT,api.W/2,by-9);
+    g.shadowBlur=0;g.lineJoin="miter";
     g.fillStyle="rgba(0,0,0,.4)";roundRect(bx,by,bw,bh,bh/2);g.fill();
     const fr=clamp(stageKill/stageGoal,0,1);
     if(fr>0){const gg=g.createLinearGradient(bx,0,bx+bw,0);
@@ -613,12 +615,13 @@ function build_ashbomb(api){
       else{gg.addColorStop(0,"#ff8a3a");gg.addColorStop(1,"#ffe14a");}
       g.save();if(fever>0){g.shadowBlur=12+6*Math.sin(tsec*8);g.shadowColor="#ff5b3a";}
       g.fillStyle=gg;roundRect(x,y,Math.max(h,w*fr),h,h/2);g.fill();g.restore();}
-    g.font="800 14px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-    g.lineWidth=4;g.lineJoin="round";g.strokeStyle="rgba(40,8,4,.6)";
+    // ラベルの暗い背板(火口の加算発光の上に文字が直接乗らない)
+    g.fillStyle="rgba(20,6,4,.6)";roundRect(x-4,y-28,w+8,23,11);g.fill();
+    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
+    g.lineWidth=6;g.lineJoin="round";g.strokeStyle="rgba(40,8,4,.9)";
     const label=fever>0?"だいふんか タイム！":"ふんかゲージ";
-    g.save();if(fever>0){g.shadowBlur=8+4*Math.sin(tsec*8);g.shadowColor="#ffd23f";}
-    g.strokeText(label,api.W/2,y-7);g.fillStyle=fever>0?"#ffd23f":"#fff";
-    g.fillText(label,api.W/2,y-7);g.restore();
+    g.strokeText(label,api.W/2,y-9);g.fillStyle="#fff";
+    g.fillText(label,api.W/2,y-9);
     g.restore();g.textAlign="left";g.lineJoin="miter";
   }
   function roundRect(x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);

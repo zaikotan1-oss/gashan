@@ -77,7 +77,6 @@ function buildRobot(api){
   function clearStage(){
     // ③ ノンストップ ボーナス: このステージをコンボを切らさずクリアしたら +5 & みどりの祝福。気づくと得する隠し判定。
     if(comboKept){count+=5;api.setScore(count);nonstopT=1.8;
-      addFloat({x:api.W/2,y:api.H*0.56,txt:"ノンストップ！＋5",life:1.3,vy:-0.7,col:"#7be08a",size:38,pop:1.7,keep:true});
       api.tone(1318,0.14,"triangle",0.1);setTimeout(()=>api.tone(1976,0.16,"triangle",0.08),110);}
     comboKept=true;   // 次ステージのノンストップ判定をリセット
     // big payoff: full-screen wash + ファンファーレ, then advance
@@ -424,10 +423,10 @@ function buildRobot(api){
         g.fillStyle=col;g.fillText("にじいろビル！",0,0);
         g.restore();g.globalAlpha=1;g.shadowBlur=0;g.textAlign="left";g.textBaseline="alphabetic";if(rbMsgT<0)rbMsgT=0;}
       // ② きょうのラッキー色 はっけん！ 中央の小ヒント(初回だけ)
-      if(luckyMsgT>0){luckyMsgT-=0.016*dt;
+      if(luckyMsgT>0&&rbMsgT<=0&&stageBannerT<=0){luckyMsgT-=0.016*dt;
         g.save();g.translate(api.W/2,api.H*0.3);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 23px 'Hiragino Maru Gothic ProN',system-ui";
-        const t2="きょうのラッキー色は "+(COLNAME[luckyColor]||"")+"！";
+        const t2="きょうの ラッキーいろは "+(COLNAME[luckyColor]||"")+"！";
         g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText(t2,0,0);
         g.fillStyle=luckyColor;g.fillText(t2,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(luckyMsgT<0)luckyMsgT=0;}
@@ -437,8 +436,8 @@ function buildRobot(api){
         g.save();g.translate(api.W/2,api.H*0.62);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(nonstopT*1.3,0,1);g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor="rgba(123,224,138,.9)";g.shadowBlur=16;
-        g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText("ノンストップ ボーナス！",0,0);
-        g.fillStyle="#c7ffcf";g.fillText("ノンストップ ボーナス！",0,0);
+        g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText("ノンストップ！ ＋5",0,0);
+        g.fillStyle="#c7ffcf";g.fillText("ノンストップ！ ＋5",0,0);
         g.restore();g.globalAlpha=1;g.shadowBlur=0;g.textAlign="left";g.textBaseline="alphabetic";if(nonstopT<0)nonstopT=0;}
       // ④ ながれ星ゲット！ 小バナー(中央上・控えめ)
       if(shootMsgT>0){shootMsgT-=0.016*dt;
@@ -461,7 +460,7 @@ function buildRobot(api){
       g.fillStyle=sc;g.shadowColor=sc;g.shadowBlur=10;roundRect(bx,by,Math.max(bh,bw*prog),bh,bh/2);g.fill();g.shadowBlur=0;
       g.textAlign="center";g.textBaseline="middle";g.font="900 16px 'Hiragino Maru Gothic ProN',system-ui";
       const left=Math.max(0,stageNeed-stageDone);
-      const lbl="ステージ"+stage+"  のこり "+left+"棟！";
+      const lbl="ステージ"+stage+"  のこり "+left+" こ！";
       g.lineWidth=4;g.strokeStyle="rgba(0,0,0,.6)";g.strokeText(lbl,api.W/2,by+bh/2+1);
       g.fillStyle="#fff";g.fillText(lbl,api.W/2,by+bh/2+1);
       g.restore();

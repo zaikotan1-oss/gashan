@@ -32,7 +32,7 @@ function buildCannon(api){
   const SHAPES=[
     {shape:"square",wf:1,hf:1,wgt:0.5},
     {shape:"circle",wf:1.3,hf:1.3,wgt:0.2},
-    {shape:"wide",wf:1.9,hf:0.7,wgt:0.17},
+    {shape:"wide",wf:1.5,hf:0.7,wgt:0.17},
     {shape:"tall",wf:0.7,hf:1.8,wgt:0.13}
   ];
   function pickShape(){
@@ -117,7 +117,7 @@ function buildCannon(api){
   }
   function hitShootStar(x,y){
     count+=6;api.setScore(count);
-    floats.push({x:x,y:y-8,txt:"ながれ星ゲット！",col:"#fff3b0",life:1.3,vy:-0.7,size:30});
+    floats.push({x:x,y:y-8,txt:"ながれぼし ゲット！",col:"#fff3b0",life:1.3,vy:-0.7,size:30});
     burst(x,y,"#fff3b0",16,8);burst(x,y,"#ffd23f",10,7);
     api.tone(1318,0.12,"triangle",0.1);api.tone(1976,0.14,"triangle",0.08);api.shake(6);
   }
@@ -392,7 +392,7 @@ function buildCannon(api){
               // ⑥ 見やすさ: 毎ヒットごとにfloatsへ新規pushしていたのをやめ、1個のフロートを
               //  使い回す(位置も画面上部の固定位置に固定)。ヒットの度に違う座標へ増えていくのをやめれば、
               //  複数の「Nれんさ」が別々の場所に積み重なって衝突すること自体が起きなくなる。
-              const cfx=api.W*0.42,cfy=150; // 王様の「どっかんクリア！」(城の上・右寄り)と横に重ならないよう少し左 // おしろHUD(hudY=58,高さ26)の下に十分な余白を空けて固定
+              const cfx=api.W*0.42,cfy=rbMsgT>0.3?200:175; // 王様の「どっかんクリア！」(城の上・右寄り)と横に重ならないよう少し左 // おしろHUD(hudY=58,高さ26)の下に十分な余白を空けて固定
               if(!comboFloat||floats.indexOf(comboFloat)<0){comboFloat={x:cfx,y:cfy,txt:comboChain+"れんさ！",col:comboChain>=6?"#ff3d9a":"#ffd23f",life:1.2,vy:0,size:clamp(22+comboChain*2,22,44)};floats.push(comboFloat);}
               else{comboFloat.txt=comboChain+"れんさ！";comboFloat.col=comboChain>=6?"#ff3d9a":"#ffd23f";comboFloat.size=clamp(22+comboChain*2,22,44);comboFloat.life=1.2;}
               api.slide(440+comboChain*40,880+comboChain*80,0.14,0.09,"sine");
@@ -501,6 +501,7 @@ function buildCannon(api){
         const perfect=shotsThisCastle<=2;
         // 城クリアの瞬間は、残っている float/バナーを畳んで「ぜんかい！」と重ならないようにする
         for(const f of floats)f.life=Math.min(f.life,0.25);
+        if(comboFloat){comboFloat.life=0;comboFloat=null;}
         rbMsgT=Math.min(rbMsgT,0.3);luckyMsgT=0;
         floats.push({x:api.W*0.6,y:api.H*0.32,txt:"ぜんかい！",col:"#ffd23f",life:1.1,vy:-0.6,size:46});
         starRating=stars;starTimer=1.3;   // canvas手描きの星でレーティング表示
@@ -514,7 +515,7 @@ function buildCannon(api){
         }
         // ③ いちげきクリア: たった1発でお城をぜんぶ倒したら大ボーナス(低く狙う=頭を使う発見)
         if(shotsThisCastle===1){count+=12;api.setScore(count);
-          floats.push({x:api.W/2,y:api.H*0.2,txt:"いちげき！ぜんぶ！",col:"#5ad1ff",life:1.4,vy:-0.5,size:34});
+          floats.push({x:api.W/2,y:api.H*0.4,txt:"いちげき！ぜんぶ！",col:"#5ad1ff",life:1.4,vy:-0.5,size:34});
           burst(api.W*0.6,api.H*0.42,"#bfe9ff",20,9);
           api.tone(784,0.12,"square",0.1);api.tone(1176,0.14,"square",0.08);}
         if(castlesCleared>=GOAL){
@@ -620,7 +621,7 @@ function buildCannon(api){
       // ① にじいろ！ 中央バナー(虹色に色替わり=レアの大きな祝福)
       if(rbMsgT>0){rbMsgT-=0.016*dt;
         const pop=1+Math.max(0,rbMsgT-0.9)*1.3,col=RCOLS[Math.floor(tSky*6)%RCOLS.length];
-        g.save();g.translate(api.W/2,api.H*0.2);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
+        g.save();g.translate(api.W/2,104);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(rbMsgT*1.4,0,1);g.font="900 38px 'Hiragino Maru Gothic ProN',system-ui";
         g.lineWidth=7;g.strokeStyle="rgba(0,0,0,.45)";g.strokeText("にじいろブロック！",0,0);
         g.fillStyle=col;g.fillText("にじいろブロック！",0,0);
@@ -629,7 +630,7 @@ function buildCannon(api){
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
         g.save();g.translate(api.W/2,api.H*0.27);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
-        const t2="きょうのラッキー色は "+(CNAME[luckyColor]||"")+"！";
+        const t2="きょうのラッキーいろは "+(CNAME[luckyColor]||"")+"！";
         g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.4)";g.strokeText(t2,0,0);
         g.fillStyle=luckyColor;g.fillText(t2,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(luckyMsgT<0)luckyMsgT=0;}

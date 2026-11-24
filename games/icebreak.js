@@ -28,7 +28,7 @@ function buildIcebreak(api){
   function ring(x,y,c){rings.push({x,y,r:S*0.35,life:1,col:c});}
   function shatterShards(c){
     // ⑦ 大氷(shape===2)は壊れる規模も大きく見せる(破片数を1.5倍)
-    const shardN=c.shape===2?Math.round(rint(6,9)*1.5):rint(6,9);
+    const shardN=c.shape===2?Math.round(rint(6,9)*1.5):c.shape===5?rint(13,17):rint(6,9);   // 大氷は1.5倍・ゆきだるまはふわふわ多め
     for(let i=shardN;i>0;i--)shards.push({x:c.x+rnd(4,S-4),y:c.y+rnd(4,S-4),
       vx:rnd(-6,6),vy:rnd(-10,-2),s:rnd(S*0.18,S*0.36),col:c.rainbow?pick(RAINBOW):c.col0,
       rot:rnd(0,TAU),vr:rnd(-0.45,0.45),life:1,decay:rnd(0.006,0.013),pts:chunkPts()});
@@ -90,11 +90,14 @@ function buildIcebreak(api){
         // ⑦ 形のバラエティ: 0=ふつうの四角 1=角丸の丸氷 2=ひとまわり大きい大氷 3=中に生き物のシルエット氷
         // (当たり判定・グリッド座標は元のSのまま。見た目の描画だけ shape で変える → 他ロジックは無傷)
         const sr=Math.random();
-        // 0=四角30% 1=まんまるの丸氷15% 2=大氷18% 3=いきもの入り20% 4=ちっちゃい氷(ちび)17%
-        let shape=sr<0.30?0:sr<0.45?1:sr<0.63?2:sr<0.83?3:4;
+        // 0=四角22% 1=まんまるの丸氷15% 2=大氷18% 3=いきもの入り(丸い枠)20% 4=ちび(まるい氷つぶ)16% 5=ゆきだるま9%
+        let shape=sr<0.22?0:sr<0.37?1:sr<0.55?2:sr<0.75?3:sr<0.91?4:5;
+        if(shape===5&&(gem||rainbow)) shape=0;             // 宝石・にじいろ氷はゆきだるまにしない(色の仕掛けを守る)
+        if(shape===5){ hard=false; c0="#f4fbff"; }          // ゆきだるまは1回で ぼふっ！(白い雪)
         // ⑦ 大氷が一度も出ないステージが確率任せで発生しないよう、最後の列の最後の段で保証する
         if(!bigPlaced && col===cols-1 && row===h-1) shape=2;
         if(shape===2) bigPlaced=true;
+        if(shape!==5&&c0==="#f4fbff") c0=pick(ICE);
         arr.push({col,row,x:bx+col*S,y:cellY(row),ty:cellY(row),vy:0,settled:true,
           hp:hard?2:1,hp0:hard?2:1,hard:hard,gem:gem,rainbow:rainbow,col0:c0,wob:0,
           shape:shape,sil:shape===3?pick(["fish","penguin","crab","starfish"]):null});
@@ -103,11 +106,18 @@ function buildIcebreak(api){
     }
     // 大氷(shape2)は2回たたく。ひび→ドカン(隣8方向へ吹き飛ぶ)
     for(const arr of grid) for(const c of arr) if(c.shape===2){ c.hp=2; c.hp0=2; }
+    // 1ステージに1本だけ「つらら柱」(縦3マスのとんがり柱・こわすと3個いっしょに割れ、上の2個がとなりの列へばたーんと倒れて氷を割る)
+    const candP=[];
+    for(let col=0;col<cols;col++){const arr=grid[col];
+      for(let r=0;r<arr.length-2;r++){const t3=[arr[r],arr[r+1],arr[r+2]];
+        if(t3.every(o=>!o.gem&&!o.rainbow&&o.shape!==2&&o.shape!==5&&!o.hard)) candP.push(t3);}}
+    if(candP.length){ const t3=candP[rint(0,candP.length-1)];
+      for(const o of t3){ o.shape=6; o.sil=null; o.col0="#d6f0ff"; o.hp=1; o.hp0=1; o.pil=t3; } }
     // 1ステージに1本だけ「ながい氷柱」(縦2マスぶん・こわすと2個いっしょに割れる)
     const cand=[];
     for(let col=0;col<cols;col++){const arr=grid[col];
       for(let r=0;r<arr.length-1;r++){const a=arr[r],b=arr[r+1];
-        const ok=o=>!o.gem&&!o.rainbow&&o.shape!==2&&!o.hard;
+        const ok=o=>!o.gem&&!o.rainbow&&o.shape!==2&&o.shape!==5&&o.shape!==6&&!o.hard;
         if(ok(a)&&ok(b)) cand.push([a,b]);}}
     if(cand.length){ const pr=cand[rint(0,cand.length-1)];
       for(const o of pr){ o.shape=0; o.sil=null; o.col0="#d6f0ff"; o.hp=1; o.hp0=1; }
@@ -117,7 +127,7 @@ function buildIcebreak(api){
     for(let col=0;col<cols-1;col++){const a1=grid[col],a2=grid[col+1];
       const n=Math.min(a1.length,a2.length);
       for(let r=0;r<n;r++){const a=a1[r],b=a2[r];
-        const ok=o=>!o.gem&&!o.rainbow&&o.shape!==2&&!o.hard&&!o.mate;
+        const ok=o=>!o.gem&&!o.rainbow&&o.shape!==2&&o.shape!==5&&o.shape!==6&&!o.hard&&!o.mate;
         if(ok(a)&&ok(b)) candH.push([a,b]);}}
     if(candH.length){ const pr=candH[rint(0,candH.length-1)];
       for(const o of pr){ o.shape=0; o.sil=null; o.col0="#d6f0ff"; o.hp=1; o.hp0=1; }
@@ -156,6 +166,13 @@ function buildIcebreak(api){
     if(c.shape===3) spawnCritter(c);                       // 中のいきものが飛び出す
     if(c.shape===1){ c.rollDir=(c.col<cols/2?1:-1)*(Math.random()<0.8?1:-1); if(!viaChain) spawnBall(c); }
     if(c.shape===2){ api.shake(viaChain?6:11); api.tone(160,0.16,"square",0.09); for(let k=0;k<2;k++) ring(c.x+S/2,c.y+S/2,"#ffd23f"); }
+    if(c.shape===5){   // ゆきだるま: ふわっと雪けむり・ぼふっ！(氷とちがう やわらかい音・弱い揺れ)
+      api.noise(0.22,0.3,520,"lowpass",0.8); api.shake(viaChain?1:2);
+      for(let i=0;i<10;i++){ sparks.push({x:c.x+S/2+rnd(-S*0.2,S*0.2),y:c.y+S*0.55+rnd(-S*0.3,S*0.2),vx:rnd(-2.2,2.2),vy:rnd(-3,-0.4),life:1,decay:rnd(0.012,0.022),s:rnd(3,5.5),col:"#ffffff"}); }
+      floats.push({x:c.x+S/2,y:c.y-S*0.15,txt:"ぼふっ！",life:1,vy:-0.8,col:"#ffffff",size:24});
+    }
+    if(c.pil){ const grp=c.pil; for(const m of grp) m.pil=null;   // つらら柱: 3個いっしょに割れる
+      for(const m of grp){ if(m!==c&&!m.dead){ m.hp=1; crack(m,true); } } }
     if(c.mate&&!c.mate.dead){ const m=c.mate; c.mate=null; m.mate=null; m.hp=1; crack(m,true); }
     spark(c.x+S/2,c.y+S/2,c.rainbow?pick(RAINBOW):c.col0,viaChain?5:7);
     ring(c.x+S/2,c.y+S/2,c.rainbow?"#ffffff":c.col0);
@@ -208,6 +225,7 @@ function buildIcebreak(api){
     axe.x=px; axe.y=py; axe.t=0; axe.side=px<api.W/2?-1:1;   // アイスピックをタップ位置へ振り下ろす
     flashHue="#cfefff";
     brokeN=0;
+    const pg=target.pil;   // つらら柱をたたいたか(crack で pil が外れるので先に控える)
     // ステージ最初の1発だけは、かたい氷・大氷でもドカンと割れる(最初の成功を確実に)
     if(!stageScored&&target.hp>1) target.hp=1;
     const shattered=crack(target,false);
@@ -218,7 +236,14 @@ function buildIcebreak(api){
     // it broke -> count, combo, chain to neighbours
     // neighbour chain: left/right same row index, up/down within column
     // ちっちゃい氷(ちび)は1個だけぽこっと割れる(まわりには広がらない)
-    const neigh=target.shape===4?[]:neighbours(target);
+    const neigh=target.shape===4?[]:pg?pillarFall(pg,target):neighbours(target);
+    if(pg){   // つらら柱がとなりの列へばたーん！(上の2個ぶんが飛んで、となりの氷を1個ずつ割る)
+      floats.push({x:px,y:py-50,txt:"ばたーん！",life:1,vy:-0.8,col:"#ffe9a8",size:30});
+      api.noise(0.25,0.3,320,"lowpass",0.8); api.tone(130,0.18,"square",0.09);
+      for(const m of pg){ if(m===target)continue;
+        for(let i=0;i<4;i++) shards.push({x:m.x+S/2,y:m.y+S/2,vx:fallDir*rnd(4,9),vy:-rnd(1,6),s:rnd(S*0.2,S*0.36),col:"#d6f0ff",
+          rot:rnd(0,TAU),vr:rnd(-0.45,0.45),life:1,decay:rnd(0.006,0.013),pts:chunkPts()}); }
+      for(const n of neigh){ if(n&&!n.dead) ring(n.x+S/2,n.y+S/2,"#ffd23f"); } }
     for(const n of neigh){ if(n&&!n.dead){ crack(n,true); } }
     const broke=Math.max(1,brokeN);
     // remove dead cells from grid, then settle
@@ -226,14 +251,15 @@ function buildIcebreak(api){
     for(let col=0;col<cols;col++){const arr=grid[col];
       for(let i=arr.length-1;i>=0;i--){ if(arr[i].dead){arr.splice(i,1);removed++;} }}
     if(removed>0) applyGravity();
+    const soft=target.shape===5&&broke<=1;   // ゆきだるま1個だけ: 揺れも音も やわらかく
     count+=(fever>0?broke*2:broke); api.setScore(count); lastScoreT=tsec;
     combo++; comboT=0.9;   // 7〜8歳向け: コンボ猶予をわずかに短く(ノンストップの手応え)
     flash=Math.min(1,flash+0.32+broke*0.06);
-    api.shake(5+broke*1.5);
+    api.shake(soft?2:5+broke*1.5);
     if(broke>=3&&tsec-lastStopT>0.5){ api.hitStop(3); lastStopT=tsec; }
-    api.boom(clamp(0.28+broke*0.06,0.28,0.6));
-    api.slide(520*Math.pow(2,clamp(combo,0,12)/14),120,0.18,0.22,"triangle");
-    api.noise(0.16,0.26,1500,"bandpass",0.7);
+    api.boom(soft?0.14:clamp(0.28+broke*0.06,0.28,0.6));
+    api.slide(520*Math.pow(2,clamp(combo,0,12)/14),120,0.18,soft?0.12:0.22,"triangle");
+    if(!soft) api.noise(0.16,0.26,1500,"bandpass",0.7);
     if(combo>1) floats.push({x:px,y:py-22,txt:"x"+combo,life:1,vy:-1.1,
       col:combo>=8?"#ff8af0":combo>=5?"#7be0ff":"#ffe14a",size:combo>=5?40:30});
     if(broke>=3) floats.push({x:px,y:py-56,txt:"バキバキ！",life:1,vy:-0.7,col:"#9fe8ff",size:24});
@@ -260,6 +286,17 @@ function buildIcebreak(api){
       for(const o of arr){ if(o.dead)continue; const dy=Math.abs(o.y-c.y);
         // 歯ごたえ: ふつうの氷は「同じ色のとなり」にだけ広がる(大氷は8方向のまま)
         if(dy<S*0.6){ if(wide||o.col0===c.col0) res.push(o); if(!wide)break; } else if(wide&&dy<S*1.6) res.push(o); } }
+    return res;
+  }
+  // つらら柱が倒れる: 上の2個ぶんが、となりの列(1列め・2列め)の同じ高さの氷を1個ずつ割る
+  let fallDir=1;
+  function pillarFall(pg,t){
+    const res=[], mem=pg.slice().sort((a,b)=>b.y-a.y);   // 下→上
+    fallDir=t.col<cols/2?1:-1; if(t.col+fallDir*2>=cols||t.col+fallDir*2<0) fallDir=-fallDir;
+    for(let j=1;j<mem.length;j++){ const nc=t.col+fallDir*j; if(nc<0||nc>=cols)break;
+      const arr=grid[nc]; if(!arr)continue; let f=null;
+      for(const o of arr){ if(!o.dead&&!o.pil&&Math.abs(o.y-mem[j].y)<S*0.6){ f=o; break; } }
+      if(f) res.push(f); }
     return res;
   }
   function stageClear(){
@@ -463,10 +500,10 @@ function buildIcebreak(api){
       g.fillStyle=fever>0?"#ffe14a":"#bfeaff"; g.fillRect(0,0,fw,4);
       g.restore();
       // ---- HUD (top center: safe zone) ----
-      g.save(); g.font="800 17px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
+      g.save(); g.font="800 20px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
       g.lineWidth=5; g.lineJoin="round"; g.strokeStyle="rgba(10,30,60,.55)";
       const hud="ステージ "+stage+"   こおり "+totalCells();
-      g.strokeText(hud,api.W/2,30); g.fillStyle="#eafaff"; g.fillText(hud,api.W/2,30);
+      g.strokeText(hud,api.W/2,32); g.fillStyle="#eafaff"; g.fillText(hud,api.W/2,32);
       g.lineJoin="miter"; g.restore(); g.textAlign="left";
       // combo big text (top center, below HUD)
       if(combo>1){ const pop=1+Math.max(0,comboT-0.7)*1.2;
@@ -521,6 +558,9 @@ function buildIcebreak(api){
     if(c.shape===2){ const bs=s*1.45; x=c.x-(bs-s)/2; y=c.y-(bs-s)/2; s=bs; }
     // ちっちゃい氷(shape4): 小さく描いて足元に寄せる(当たり判定は元のマスのまま)
     else if(c.shape===4){ const bs=s*0.62; x=c.x+(s-bs)/2; y=c.y+(s-bs); s=bs; }
+    if(c.shape===5){ drawSnowman(c); return; }   // ゆきだるま: 四角い氷ではなく 白い丸2つの雪の人形
+    if(c.shape===6){ drawIcicle(c); return; }    // つらら柱: とんがった細長い氷
+    const round=c.shape===1||c.shape===3||c.shape===4;   // まるい氷つぶ(丸氷・いきもの入り・ちび)
     // ① にじいろ氷は虹色に色が回る/② 宝石こおりは col0 の鮮やかな色
     let base=c.col0;
     if(c.rainbow) base=RAINBOW[Math.floor(tsec*3+c.col+c.row)%RAINBOW.length];
@@ -529,19 +569,17 @@ function buildIcebreak(api){
     if(c.wob>0)g.translate(wob,0);
     // drop shadow(丸氷はまんまるの影・ちび氷は角丸の影)
     g.fillStyle="rgba(20,50,80,.28)";
-    if(c.shape===1){ g.beginPath(); g.ellipse(x+s/2+2,y+s/2+4,Math.max(0,s/2),Math.max(0,s/2),0,0,TAU); g.fill(); }
-    else if(c.shape===4){ roundRectPath(g,x+3,y+4,s,s,Math.max(0,s*0.22)); g.fill(); }
+    if(round){ g.beginPath(); g.ellipse(x+s/2+2,y+s/2+4,Math.max(0,s/2),Math.max(0,s/2),0,0,TAU); g.fill(); }
     else g.fillRect(x+3,y+4,s,s);
-    // 丸氷はほんとうの円、ちび氷は角丸で以降の描画をクリップ
-    if(c.shape===1){ g.beginPath(); g.arc(x+s/2,y+s/2,Math.max(0,s/2),0,TAU); g.clip(); }
-    else if(c.shape===4){ roundRectPath(g,x,y,s,s,Math.max(0,s*0.22)); g.clip(); }
+    // 丸氷・いきもの入り・ちび氷は ほんとうの円で以降の描画をクリップ(四角い枠だらけにしない)
+    if(round){ g.beginPath(); g.arc(x+s/2,y+s/2,Math.max(0,s/2),0,TAU); g.clip(); }
     // ※氷ブロックは手描きのまま(生成画像は床影/欠け/縁の残りが直らず不採用。色分け仕掛けも手描きで無傷)
     // body gradient (translucent ice)
     let bg=g.createLinearGradient(x,y,x+s*0.4,y+s);
     bg.addColorStop(0,shade(base,40)); bg.addColorStop(0.55,base); bg.addColorStop(1,shade(base,-25));
     g.fillStyle=bg; g.fillRect(x,y,s,s);
     // bright top-left facets(丸氷は四角の面を描かない)
-    if(c.shape!==1){
+    if(!round){
     g.fillStyle="rgba(255,255,255,.4)";
     g.beginPath(); g.moveTo(x,y); g.lineTo(x+s,y); g.lineTo(x+s-7,y+7); g.lineTo(x+7,y+7); g.closePath(); g.fill();
     g.beginPath(); g.moveTo(x,y); g.lineTo(x+7,y+7); g.lineTo(x+7,y+s-7); g.lineTo(x,y+s); g.closePath(); g.fill();
@@ -567,13 +605,15 @@ function buildIcebreak(api){
     // ③ 生き物シルエット氷: 氷にとじこめられたペンギン/さかな/かに/ひとでのかげ(壊す対象のバラエティ)
     if(c.shape===3){
       g.save(); g.globalAlpha=0.9;
+      // 白いふち(背景の濃い青にうもれない): 少し大きい白いかげを先に敷く
+      drawSil(c.sil,x+s*0.5,y+s*0.58,s*1.3,"rgba(255,255,255,.75)","rgba(255,255,255,.75)",false,false);
       drawSil(c.sil,x+s*0.5,y+s*0.58,s*1.15,"rgba(15,35,65,.8)","rgba(15,35,65,.8)",false,false);
       g.restore(); g.globalAlpha=1;
     }
     // neon edge
     g.save(); g.globalCompositeOperation="lighter"; g.globalAlpha=0.3+0.12*Math.sin(tsec*2+c.col+c.row*0.6);
     g.lineWidth=2; g.strokeStyle="#dff4ff"; g.shadowBlur=6; g.shadowColor="#9fdcff";
-    if(c.shape===1){ g.beginPath(); g.arc(x+s/2,y+s/2,Math.max(0,s/2-2),0,TAU); g.stroke(); }
+    if(round){ g.beginPath(); g.arc(x+s/2,y+s/2,Math.max(0,s/2-2),0,TAU); g.stroke(); }
     else g.strokeRect(x+1.5,y+1.5,s-3,s-3);
     g.restore();
     // ② 宝石こおり: 中心にきらめく小さな星(色ではっきり見分けられる)
@@ -583,7 +623,7 @@ function buildIcebreak(api){
     // ① にじいろ氷: 虹の光の縁取りで目立たせる(発見のドキドキ)
     if(c.rainbow){ g.save(); g.globalCompositeOperation="lighter"; g.globalAlpha=0.3+0.22*Math.sin(tsec*4+c.col);
       g.lineWidth=3; g.strokeStyle=base; g.shadowBlur=10; g.shadowColor=base;
-      if(c.shape===1){ g.beginPath(); g.arc(x+s/2,y+s/2,Math.max(0,s/2-2),0,TAU); g.stroke(); }
+      if(round){ g.beginPath(); g.arc(x+s/2,y+s/2,Math.max(0,s/2-2),0,TAU); g.stroke(); }
       else g.strokeRect(x+2,y+2,s-4,s-4);
       g.restore(); g.globalAlpha=1; g.shadowBlur=0; }
     // ⑦ 大氷(shape===2): 金色に光る太い縁取りで「大きい」だけでなく「特別」なのが一目で分かるようにする
@@ -612,6 +652,52 @@ function buildIcebreak(api){
       g.beginPath(); g.moveTo(x+S*0.28,c.y+th*0.1); g.lineTo(x+S*0.28,c.y+th*0.9); g.stroke();
       g.restore(); g.globalAlpha=1; g.shadowBlur=0;
     }
+    g.restore();
+  }
+  // ゆきだるま(shape5): 白い大小2つの丸+にんじんの鼻+黒い目。四角い下地は描かない
+  function drawSnowman(c){
+    const x=c.x,y=c.y,cx=x+S/2, rb=S*0.32, rt=S*0.23, by=y+S*0.66, ty=y+S*0.27;
+    g.save(); if(c.wob>0)g.translate(c.wob*Math.sin(tsec*40)*2,0);
+    g.fillStyle="rgba(20,50,80,.28)"; g.beginPath(); g.ellipse(cx+2,y+S*0.97,Math.max(0,S*0.34),Math.max(0,S*0.07),0,0,TAU); g.fill();
+    const ball=(bx2,by2,r)=>{
+      let gr=g.createRadialGradient(bx2-r*0.35,by2-r*0.35,0,bx2,by2,Math.max(0.1,r*1.1));
+      gr.addColorStop(0,"#ffffff"); gr.addColorStop(0.7,"#e4f1fb"); gr.addColorStop(1,"#b4cfe6");
+      g.fillStyle=gr; g.beginPath(); g.arc(bx2,by2,Math.max(0,r),0,TAU); g.fill();
+      g.lineWidth=2.5; g.strokeStyle="rgba(50,90,140,.85)"; g.stroke(); };
+    ball(cx,by,rb); ball(cx,ty,rt);
+    // マフラー(あか)
+    g.fillStyle="#ff5b5b"; g.fillRect(cx-rt*0.95,ty+rt*0.78,rt*1.9,Math.max(3,S*0.08));
+    // 目・鼻・ボタン
+    g.fillStyle="#1b2433";
+    g.beginPath(); g.arc(cx-rt*0.38,ty-rt*0.15,Math.max(0,S*0.035),0,TAU); g.fill();
+    g.beginPath(); g.arc(cx+rt*0.38,ty-rt*0.15,Math.max(0,S*0.035),0,TAU); g.fill();
+    g.beginPath(); g.arc(cx,by-rb*0.05,Math.max(0,S*0.03),0,TAU); g.fill();
+    g.beginPath(); g.arc(cx,by+rb*0.38,Math.max(0,S*0.03),0,TAU); g.fill();
+    g.fillStyle="#ff8c2a"; g.beginPath(); g.moveTo(cx-rt*0.1,ty+rt*0.05); g.lineTo(cx+rt*1.15,ty+rt*0.25); g.lineTo(cx-rt*0.1,ty+rt*0.4); g.closePath(); g.fill();
+    g.restore();
+  }
+  // つらら柱(shape6): 細めのとんがった氷。いちばん上の1個は先がとがる。金のふちで特別感
+  function drawIcicle(c){
+    const x=c.x,y=c.y,w=S*0.68,x0=x+(S-w)/2,x1=x0+w,cx=x+S/2;
+    let top=true,bottom=true;
+    if(c.pil){ for(const m of c.pil){ if(m===c||m.dead)continue; if(m.y<c.y)top=false; if(m.y>c.y)bottom=false; } }
+    g.save(); if(c.wob>0)g.translate(c.wob*Math.sin(tsec*40)*2,0);
+    const path=()=>{ g.beginPath();
+      if(top){ g.moveTo(cx,y-S*0.1); g.lineTo(x1,y+S*0.42); } else { g.moveTo(x0,y); g.lineTo(x1,y); }
+      g.lineTo(x1,y+S); g.lineTo(x0,y+S);
+      if(top) g.lineTo(x0,y+S*0.42);
+      g.closePath(); };
+    g.fillStyle="rgba(20,50,80,.28)"; g.save(); g.translate(3,4); path(); g.fill(); g.restore();
+    let bg=g.createLinearGradient(x0,y,x1,y);
+    bg.addColorStop(0,"#f2fbff"); bg.addColorStop(0.5,"#bfeaff"); bg.addColorStop(1,"#86c4ec");
+    path(); g.fillStyle=bg; g.fill();
+    g.lineWidth=2.5; g.strokeStyle="rgba(50,90,140,.85)"; g.stroke();
+    g.fillStyle="rgba(255,255,255,.55)"; g.fillRect(x0+w*0.16,y+(top?S*0.4:S*0.06),Math.max(2,w*0.12),S*(top?0.5:0.88));
+    if(!bottom){ g.fillStyle="rgba(255,255,255,.65)"; g.fillRect(x0,y+S-2,w,4); }
+    g.save(); g.globalCompositeOperation="lighter"; g.globalAlpha=0.45+0.25*Math.sin(tsec*2.4+c.col);
+    g.lineWidth=Math.max(3,S*0.05); g.strokeStyle="#ffd23f"; g.shadowBlur=10; g.shadowColor="#ffd23f";
+    g.beginPath(); g.moveTo(x0,y+S); g.lineTo(x0,y+(top?S*0.42:0)); if(top) g.lineTo(cx,y-S*0.1); g.lineTo(x1,y+(top?S*0.42:0)); g.lineTo(x1,y+S); g.stroke();
+    g.restore(); g.globalAlpha=1; g.shadowBlur=0;
     g.restore();
   }
   // よこながの氷柱(c と右どなりの mate): 金の縁取り＋横のきらめき。幅は S*2

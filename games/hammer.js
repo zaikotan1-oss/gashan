@@ -51,7 +51,7 @@ function buildHammer(api){
   const TCNAME=["あか","あお","きいろ","みどり","むらさき"];
   // ⑤⑥⑦ 壊す物のバラエティ: ロボ以外の新シルエット(いわ=丸くて小さい/きばこ=四角/やぐら=積み箱で大きい)。
   // 型ごとの倍率テーブル(未掲載の型=1)。0.62〜1.58まで一目で分かる大小差をつける。
-  const SIZE_MUL={rock:0.62,big:1.18,tower:1.58,crate:1.5};
+  const SIZE_MUL={rock:0.8,big:1.18,tower:1.58,crate:1.5};
   // ---- 隠し発見レイヤー(クレーン/パンチと同じ思想) ----
   let luckyColor=pick(TC),luckyMsgT=0,luckySeen=false;  // ② きょうのラッキー色: 秘密の1色。叩くとボーナス
   let rbMsgT=0;                                         // ① にじいろロボ 発見バナー
@@ -84,7 +84,7 @@ function buildHammer(api){
     const gw=api.W*0.84, gx=(api.W-gw)/2, gh=api.H*0.5, gy=api.H*0.28;
     for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)
       holes.push({x:gx+gw*(c+0.5)/cols, y:gy+gh*(r+0.5)/rows, occ:false});
-    targets.forEach(t=>{const h=holes[t.hi];if(h){t.x=h.x;t.baseY=h.y;}});
+    targets.forEach(t=>{const h=holes[t.hi];if(h){t.x=h.x;t.baseY=h.y+R*0.45;}});
     // ④ 太陽ひみつタップの当たり判定(描画位置と一致・寛容に大きめ)
     sunPos.x=api.W*0.78;sunPos.y=api.H*0.13;sunPos.r=Math.max(40,api.W*0.09);
     positionBoss();
@@ -130,7 +130,7 @@ function buildHammer(api){
     else if(type==="crate"){color="#b5793a";}      // きばこ: 四角い木箱(1回で割れる)
     else if(type==="tower"){color="#c98a4a";hp=3;life=dur*1.6;} // やぐら: 積み箱3段、1段ずつ崩す(でかい・長めに出る)
     if(count===0&&targets.length===0)life=Math.max(life,3600);   // 最初の1匹は長めに居る(最初の成功を逃さない)
-    targets.push({hi,x:holes[hi].x,baseY:holes[hi].y,up:0,state:"rise",
+    targets.push({hi,x:holes[hi].x,baseY:holes[hi].y+R*0.45,up:0,state:"rise",
       type,color,hp,life,squash:1,blink:0,bob:rnd(0,TAU),flash:0});
   }
   function hitFx(hx,hy,col,big,shape){
@@ -187,7 +187,7 @@ function buildHammer(api){
     for(const t of targets){
       if(t.state==="smashed"||t.type==="bomb")continue;
       t.state="smashed";t.squash=1;holes[t.hi].occ=false;
-      count++;stageKill++;hitFx(t.x,t.baseY-R*0.5,t.color,true,debrisShape(t.type));
+      count++;stageKill++;hitFx(t.x,t.baseY-R*0.8,t.color,true,debrisShape(t.type));
     }
     api.setScore(count);checkStage();
   }
@@ -220,7 +220,7 @@ function buildHammer(api){
     api.slide(700,80,0.6,0.4,"sawtooth");
     // 手下をまとめてドカン + 盛大な破片
     for(const t of targets){if(t.state==="smashed"||t.type==="bomb")continue;
-      t.state="smashed";t.squash=1;holes[t.hi].occ=false;count++;hitFx(t.x,t.baseY-R*0.5,t.color,true,debrisShape(t.type));}
+      t.state="smashed";t.squash=1;holes[t.hi].occ=false;count++;hitFx(t.x,t.baseY-R*0.8,t.color,true,debrisShape(t.type));}
     for(let i=0;i<10;i++)hitFx(boss.x+rnd(-boss.r,boss.r),boss.y+rnd(-boss.r*0.5,boss.r*0.5),TC[i%TC.length],true);
     api.setScore(count);endingT=2.8;
     api.slide(523,1046,0.5,0.22,"triangle");
@@ -251,12 +251,12 @@ function buildHammer(api){
     t.state="smashed";t.squash=1;holes[t.hi].occ=false;
     combo=0;comboT=0;climax=0;stageMiss++;   // ③ ノーミス判定: ばくだんを叩いたら記録
     api.noise(0.18,0.2,400,"lowpass",1);api.slide(200,80,0.18,0.18,"sawtooth");api.shake(6);
-    const hx=t.x,hy=t.baseY-R*0.5;
+    const hx=t.x,hy=t.baseY-R*0.8;
     rings.push({x:hx,y:hy,r:R*0.4,vr:R*0.4,life:1,decay:0.05,col:"#555"});
     for(let i=0;i<12;i++){const a=rnd(0,TAU),s=rnd(2,5);
       stars.push({x:hx,y:hy,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1.5,r:rnd(3,6),
         rot:rnd(0,TAU),vr:rnd(-0.3,0.3),life:1,decay:rnd(0.02,0.03),col:i%2?"#888":"#444"});}
-    hammer.x=t.x;hammer.y=t.baseY-R;hammer.t=0;
+    hammer.x=t.x;hammer.y=t.baseY-R*0.5;hammer.t=0;
   }
   function zapChain(src){
     // でんきロボを叩くと、同じ「たて列 / よこ列」に出ているロボへ電気が走って一緒にドカン。
@@ -272,8 +272,8 @@ function buildHammer(api){
       t.state="smashed";t.squash=1;holes[t.hi].occ=false;
       const gain=t.type==="gold"?3:1;
       count+=gain;stageKill++;combo++;comboT=0.9;
-      hitFx(t.x,t.baseY-R*0.5,t.color,true);
-      arcs.push({x1:src.x,y1:src.baseY-R*0.5,x2:t.x,y2:t.baseY-R*0.5,life:1});
+      hitFx(t.x,t.baseY-R*0.8,t.color,true);
+      arcs.push({x1:src.x,y1:src.baseY-R*0.8,x2:t.x,y2:t.baseY-R*0.8,life:1});
       hit++;
     }
     if(hit>0){
@@ -290,14 +290,14 @@ function buildHammer(api){
     if(t.type==="big"&&t.hp>1){t.hp--;t.flash=1;t.squash=0.82;
       api.slide(260,180,0.08,0.2,"square");api.noise(0.06,0.12,1400);
       api.tone(300,0.08,"square",0.1);api.shake(4);
-      hammer.x=t.x;hammer.y=t.baseY-R;hammer.t=0;
-      hitFx(t.x,t.baseY-R*0.5,"#cfd8e0",false);return;}
+      hammer.x=t.x;hammer.y=t.baseY-R*0.5;hammer.t=0;
+      hitFx(t.x,t.baseY-R*0.8,"#cfd8e0",false);return;}
     // やぐら: 積み箱が1段ずつ崩れ落ちる(3回叩いて全部崩す。段が消えるたび軽い着地音+破片)
     if(t.type==="tower"&&t.hp>1){t.hp--;t.flash=1;t.squash=0.88;
       api.slide(240,120,0.1,0.22,"square");api.noise(0.07,0.14,900);
       api.tone(260,0.09,"square",0.1);api.shake(5);
-      hammer.x=t.x;hammer.y=t.baseY-R;hammer.t=0;
-      hitFx(t.x,t.baseY-R*0.5,"#e0b070",false,"square");return;}
+      hammer.x=t.x;hammer.y=t.baseY-R*0.5;hammer.t=0;
+      hitFx(t.x,t.baseY-R*0.8,"#e0b070",false,"square");return;}
     t.state="smashed";t.squash=1;holes[t.hi].occ=false;
     let gain=t.type==="gold"?3:(t.type==="rainbow"?5:(t.type==="tower"?3:1));
     // ② ラッキー色: 今日の秘密の色(ふつう/でかロボ)を叩くと +1 の隠しボーナス。気づくと得する。
@@ -308,14 +308,14 @@ function buildHammer(api){
     api.tone(500*Math.pow(2,clamp(combo,0,10)/12),0.12,"triangle",0.12);api.boom(0.4);
     api.shake(6+Math.min(combo,8));api.hitStop(2);
     if(t.type==="gold"){api.tone(1046,0.18,"triangle",0.14);api.tone(1318,0.2,"triangle",0.1);}
-    hammer.x=t.x;hammer.y=t.baseY-R;hammer.t=0;
+    hammer.x=t.x;hammer.y=t.baseY-R*0.5;hammer.t=0;
     // big-hit climax: color-wash flash that grows with the combo
     if(combo>=3){climax=Math.min(0.7,0.32+combo*0.05);api.hitStop(combo>=6?4:3);
       api.tone(220,0.22,"sawtooth",0.07);}
-    hitFx(t.x,t.baseY-R*0.5,t.type==="rainbow"?"#ffffff":t.color,combo>=5||t.type==="rainbow",debrisShape(t.type));
+    hitFx(t.x,t.baseY-R*0.8,t.type==="rainbow"?"#ffffff":t.color,combo>=5||t.type==="rainbow",debrisShape(t.type));
     // ① にじいろロボ / ② ラッキー色 の特別演出
-    if(t.type==="rainbow")rainbowBurst(t.x,t.baseY-R*0.5);
-    if(isLucky)luckySparkle(t.x,t.baseY-R*0.5);
+    if(t.type==="rainbow")rainbowBurst(t.x,t.baseY-R*0.8);
+    if(isLucky)luckySparkle(t.x,t.baseY-R*0.8);
     // でんきロボ: たて/よこ列の仲間へ連鎖 (考えどころ = 出そろってから叩くと大連鎖)
     if(t.type==="zap")zapChain(t);
     // combo reward: every 8th combo unleashes the screen-clearing 必殺どっかん
@@ -335,7 +335,7 @@ function buildHammer(api){
       let best=null,bd=1e9;
       for(let i=targets.length-1;i>=0;i--){const t=targets[i];
         if(t.state==="smashed")continue;
-        const ty=t.baseY-t.up*R*1.6;
+        const ty=t.baseY-t.up*R*0.95;
         const d=Math.hypot(px-t.x,py-ty);
         if(t.type==="bomb"){if(d<R*1.05){bombHit(t);return;}continue;}
         if(d<bd){bd=d;best=t;}}
@@ -475,12 +475,12 @@ function buildHammer(api){
         t.bob+=0.08*dt;
         const ease=t.state==="rise"?api.ease(t.up):1;
         const bob=t.state==="up"?Math.sin(t.bob)*R*0.05:0;
-        const ty=t.baseY-((t.state==="rise"?ease:t.up)*R*1.6)-bob;
+        const _up=(t.state==="rise"?ease:t.up);const ty=t.baseY-_up*R*0.95-bob+(1-_up)*R*1.1;
         g.save();
         // clip so it emerges from hole (でかい型=やぐら/きばこ は隣接ホールに軽く食い込む分だけ枠を広げる)
         const _cr=R*0.92*(SIZE_MUL[t.type]||1);
         const _cw=Math.max(R*1.4,_cr*1.7),_ch=Math.max(R*0.7,_cr*1.0);
-        g.beginPath();g.rect(t.x-_cw,0,_cw*2,t.baseY+_ch);g.clip();
+        g.beginPath();g.rect(t.x-_cw,0,_cw*2,holes[t.hi]?holes[t.hi].y+R*0.7:t.baseY+_ch);g.clip();
         const _sq=t.state==="smashed"?t.squash:1;
         if(t.type==="bomb")drawBomb(t,t.x,ty,_sq);
         else if(t.type==="crate")drawCrate(t,t.x,ty,_sq);
@@ -595,7 +595,7 @@ function buildHammer(api){
       // 軸6: 3種のバナー(でんき/ボス教示/にじいろ/ラッキー)は同時に出ても重ならないよう縦に40pxずつずらして積む。
       // クリア帯・エンディング中は描かない(タイマーだけ進める)。ボス戦はボス絵の下から始める。
       const bannerHide=clearT>0||endingT>0;
-      let slotY=(boss&&!boss.dead)?Math.max(api.H*0.4,boss.y+boss.r*1.35+18):api.H*0.4;
+      let slotY=(boss&&!boss.dead)?Math.max(api.H*0.46,boss.y+boss.r*1.35+18):api.H*0.46;
       // でんき チェイン! banner (teaches the row/col chain across plays; center = HUD安全帯)
       if(zapMsgT>0){zapMsgT-=0.016*dt;
         const pop=1+Math.max(0,zapMsgT-0.8)*1.4;
@@ -766,9 +766,13 @@ function buildHammer(api){
       g.restore();g.shadowBlur=0;}
     g.fillStyle="rgba(0,0,0,.22)";g.beginPath();g.ellipse(0,r*0.72,r*0.82,r*0.3,0,0,TAU);g.fill();
     // 画像ロボ: 白ベースのスプライトを体色で着色(ラッキー色/にじいろの色替えを画像でも維持)
-    const spr=api.tinted("robot.png",baseCol,0.75);
+    const spr=api.tinted("robot.png",baseCol,0.88);
     if(spr){
       // 白い縁取り(ふちどり)で草原や岩の色から切り離す
+      // 暗い縁(雲や明るい背景の上でも輪郭が読めるように)→ 白い縁取り の2段
+      g.save();g.shadowColor="rgba(30,40,80,.75)";g.shadowBlur=6;
+      api.drawSrc(spr,0,-r*0.05,r*2.25,r*2.25,{center:true});
+      g.restore();
       g.save();g.shadowColor="rgba(255,255,255,.95)";g.shadowBlur=12;
       api.drawSrc(spr,0,-r*0.05,r*2.25,r*2.25,{center:true});
       g.restore();
@@ -864,6 +868,7 @@ function buildHammer(api){
     g.fillStyle=grd;
     g.beginPath();pts.forEach(([px,py],i)=>{const xx=px*r,yy=py*r;if(i===0)g.moveTo(xx,yy);else g.lineTo(xx,yy);});
     g.closePath();g.fill();
+    g.strokeStyle="rgba(40,40,40,.45)";g.lineWidth=6;g.lineJoin="round";g.stroke();
     g.strokeStyle="rgba(255,255,255,.7)";g.lineWidth=3;g.stroke();
     // ひび割れ(いわの質感)
     g.strokeStyle="rgba(0,0,0,.28)";g.lineWidth=Math.max(1,r*0.05);g.lineCap="round";

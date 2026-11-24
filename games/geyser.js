@@ -228,6 +228,7 @@ function build_geyser(api){
     [0,4,7,12,16].forEach((s,i)=>setTimeout(()=>api.tone(523*Math.pow(2,s/12),0.18,"triangle",0.14),i*80));
     // 軸6: ゴールド/にじいろの浮遊文字と同時に出て重ならないよう 0.65秒 遅らせる
     setTimeout(()=>{
+      if(clearT>0||endingT>0)return; // 軸6: ステージバナーと重ねない
       floats.push({x:api.W/2,y:api.H*0.42,txt:"フィーバータイム！",life:1,vy:-0.5,col:"#ffd23f",size:44});
       floats.push({x:api.W/2,y:api.H*0.42+46,txt:"てんすう 2ばい！ ぜんぶ 1ぱつ！",life:1,vy:-0.5,col:"#fff",size:22});
     },650);
@@ -458,7 +459,7 @@ function build_geyser(api){
         if(feverT<=0){
           feverT=0;
           api.tone(659,0.18,"triangle",0.12);api.tone(523,0.28,"triangle",0.1);
-          floats.push({x:api.W/2,y:api.H*0.4,txt:"フィーバー おわり！ またためよう",life:1,vy:-0.5,col:"#fff",size:22});
+          if(clearT<=0&&endingT<=0)floats.push({x:api.W/2,y:api.H*0.4,txt:"フィーバー おわり！ またためよう",life:1,vy:-0.5,col:"#fff",size:22});
         }
       }
 
@@ -572,7 +573,9 @@ function build_geyser(api){
       g.globalAlpha=1;chunks=chunks.filter(c=>c.life>0&&c.y<api.H+20);
 
       // ---- floats (combo / event text) ----
+      const hideTxt=clearT>0||endingT>0; // 軸6: バナーの帯の上に他の文字を出さない
       for(const f of floats){f.y+=f.vy*dt;f.life-=0.018*dt;
+        if(hideTxt)continue;
         g.save();g.globalAlpha=Math.max(0,f.life);
         g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.lineWidth=6;g.strokeStyle="rgba(60,10,0,.6)";g.strokeText(f.txt,f.x,f.y);
@@ -626,6 +629,7 @@ function build_geyser(api){
         g.restore();g.globalAlpha=1;g.textAlign="left";if(rbMsgT<0)rbMsgT=0;}
       // ---- ② きょうのラッキー色 はっけん！(初回だけ大きく・上部中央) ----
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
+        if(hideTxt){if(luckyMsgT<0)luckyMsgT=0;}else{
         const pop=1+Math.max(0,luckyMsgT-1)*1.2;
         g.save();g.translate(api.W/2,api.H*0.40);g.scale(pop,pop);
         g.font="800 24px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
@@ -633,7 +637,7 @@ function build_geyser(api){
         const t2=luckyIntro?"きょうの ラッキーいろは "+(LUCKYNAME[luckyColor]||"")+"！":"ラッキー！";
         g.lineWidth=5;g.strokeStyle="rgba(60,10,0,.5)";g.strokeText(t2,0,0);
         g.fillStyle="#fff0a0";g.fillText(t2,0,0);
-        g.restore();g.globalAlpha=1;g.textAlign="left";if(luckyMsgT<0)luckyMsgT=0;}
+        g.restore();g.globalAlpha=1;g.textAlign="left";if(luckyMsgT<0)luckyMsgT=0;}}
       // ---- HUD (top-center) + フィーバーゲージ (bottom-center) ----
       drawHUD();
       drawFever();
@@ -715,12 +719,12 @@ function build_geyser(api){
       g.save();rrect(x,y,fw,h,h/2);g.clip();g.fillStyle="rgba(255,255,255,.3)";
       g.fillRect(x,y+1,fw,h*0.35);g.restore();
     }
-    g.font="800 14px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
+    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
     g.lineWidth=4;g.lineJoin="round";g.strokeStyle="rgba(60,10,0,.65)";
     const label=active?"フィーバーちゅう！ 2ばい！":feverG>0.85?"もうすぐ フィーバー！":"フィーバーゲージ";
     g.save();if(active||feverG>0.85){g.shadowBlur=8+4*Math.sin(tsec*8);g.shadowColor="#ffd23f";}
-    g.strokeText(label,api.W/2,y-7);
-    g.fillStyle=active?"#fff":"#ffe9c2";g.fillText(label,api.W/2,y-7);g.restore();
+    g.strokeText(label,api.W/2,y-9);
+    g.fillStyle=active?"#fff":"#ffe9c2";g.fillText(label,api.W/2,y-9);g.restore();
     g.restore();g.textAlign="left";g.lineJoin="miter";
   }
 

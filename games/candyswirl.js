@@ -404,11 +404,11 @@ function build_candyswirl(api){
       sweets=sweets.filter(s=>s.state!=="dead");
       fill();
 
+      // ---- draw vortices (under sweets so targets never get hidden by the swirl) ----
+      for(const v of vortices) drawVortex(v);
+
       // ---- draw sweets ----
       for(const s of sweets){ if(s.state!=="dead") drawSweet(s); }
-
-      // ---- draw vortices (above sweets so the swirl reads on top) ----
-      for(const v of vortices) drawVortex(v);
 
       // ---- puffs (sugar dust) ----
       for(const p of puffs){ p.r+=p.vr*dt; p.life-=p.decay*dt;
@@ -476,56 +476,67 @@ function build_candyswirl(api){
         const pop=1+Math.max(0,rbMsgT-1)*1.4, col=SWIRLCOL[Math.floor(tsec*6)%SWIRLCOL.length];
         g.save(); g.translate(api.W/2,api.H*0.52); g.scale(pop,pop);
         g.font="900 34px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
-        g.globalAlpha=clamp(rbMsgT*1.4,0,1); g.shadowColor=col; g.shadowBlur=18;
+        g.globalAlpha=clamp(rbMsgT*1.4,0,1);
+        g.lineJoin="round"; g.lineWidth=7; g.strokeStyle="rgba(120,40,90,.85)"; g.shadowBlur=0; g.strokeText("にじいろキャンディ!",0,0);
+        g.shadowColor=col; g.shadowBlur=18;
         g.fillStyle="#ffffff"; g.fillText("にじいろキャンディ!",0,0);
-        g.shadowBlur=0; g.lineWidth=2; g.strokeStyle=col; g.strokeText("にじいろキャンディ!",0,0);
+        g.shadowBlur=0;
         g.restore(); g.globalAlpha=1; g.textAlign="left"; } if(rbMsgT<0)rbMsgT=0; }
       // ② きょうのラッキーいろは◯! (初回だけ中央上に教える)
       if(luckyTeachT>0){ luckyTeachT-=0.016*dt; if(clearT<=0){
         const pop=1+Math.max(0,luckyTeachT-1.5)*1.4;
         g.save(); g.translate(api.W/2,api.H*0.20); g.scale(pop,pop);
         g.font="900 28px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
-        g.globalAlpha=clamp(luckyTeachT,0,1); g.shadowColor=luckyColor; g.shadowBlur=16;
-        g.fillStyle="#fff7c2"; g.fillText("きょうの ラッキーいろは "+(SWNAME[luckyColor]||"")+"!",0,0);
-        g.shadowBlur=0; g.lineWidth=1.5; g.strokeStyle="rgba(120,40,90,.6)";
-        g.strokeText("きょうの ラッキーいろは "+(SWNAME[luckyColor]||"")+"!",0,0);
+        g.globalAlpha=clamp(luckyTeachT,0,1);
+        const ltxt="きょうの ラッキーいろは "+(SWNAME[luckyColor]||"")+"!";
+        g.lineJoin="round"; g.lineWidth=7; g.strokeStyle="rgba(120,40,90,.85)"; g.shadowBlur=0; g.strokeText(ltxt,0,0);
+        g.shadowColor=luckyColor; g.shadowBlur=16;
+        g.fillStyle="#fff7c2"; g.fillText(ltxt,0,0); g.shadowBlur=0;
         g.restore(); g.globalAlpha=1; g.textAlign="left"; } if(luckyTeachT<0)luckyTeachT=0; }
       // ② ラッキー! 小バナー(2回目以降)
       if(luckyMsgT>0){ luckyMsgT-=0.016*dt; if(clearT<=0){
         const pop=1+Math.max(0,luckyMsgT-0.6)*1.3;
         g.save(); g.translate(api.W/2,api.H*0.44); g.scale(pop,pop);
         g.font="900 26px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
-        g.globalAlpha=clamp(luckyMsgT*1.5,0,1); g.shadowColor=luckyColor; g.shadowBlur=14;
-        g.fillStyle="#fff7c2"; g.fillText("ラッキー! "+(SWNAME[luckyColor]||"")+"は あたり",0,0);
+        g.globalAlpha=clamp(luckyMsgT*1.5,0,1);
+        const lmtxt="ラッキー! "+(SWNAME[luckyColor]||"")+"は あたり";
+        g.lineJoin="round"; g.lineWidth=7; g.strokeStyle="rgba(120,40,90,.85)"; g.shadowBlur=0; g.strokeText(lmtxt,0,0);
+        g.shadowColor=luckyColor; g.shadowBlur=14;
+        g.fillStyle="#fff7c2"; g.fillText(lmtxt,0,0); g.shadowBlur=0;
         g.restore(); g.globalAlpha=1; g.textAlign="left"; } if(luckyMsgT<0)luckyMsgT=0; }
       // ④ ながれ星 キャッチ! バナー
       if(catchMsgT>0){ catchMsgT-=0.016*dt; if(clearT<=0){
         const pop=1+Math.max(0,catchMsgT-0.9)*1.3;
         g.save(); g.translate(api.W/2,api.H*0.36); g.scale(pop,pop);
         g.font="900 28px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
-        g.globalAlpha=clamp(catchMsgT*1.4,0,1); g.shadowColor="rgba(255,210,60,.9)"; g.shadowBlur=16;
-        g.fillStyle="#ffd23f"; g.fillText("ながれ星 キャッチ!",0,0);
-        g.shadowBlur=0; g.lineWidth=1.5; g.strokeStyle="rgba(120,40,90,.6)";
-        g.strokeText("ながれ星 キャッチ!",0,0);
+        g.globalAlpha=clamp(catchMsgT*1.4,0,1);
+        g.lineJoin="round"; g.lineWidth=7; g.strokeStyle="rgba(120,40,90,.85)"; g.shadowBlur=0; g.strokeText("ながれ星 キャッチ!",0,0);
+        g.shadowColor="rgba(255,210,60,.9)"; g.shadowBlur=16;
+        g.fillStyle="#ffd23f"; g.fillText("ながれ星 キャッチ!",0,0); g.shadowBlur=0;
         g.restore(); g.globalAlpha=1; g.textAlign="left"; } if(catchMsgT<0)catchMsgT=0; }
       // フィーバー! バナー(クリア帯・他バナーと重ならない高さ H*0.28)
       if(feverBanner>0 && clearT<=0){
         const pop=1+Math.max(0,feverBanner-1.6)*1.2, col=SWIRLCOL[Math.floor(tsec*8)%SWIRLCOL.length];
+        const fvA=clamp(feverBanner*1.4,0,1);
+        g.save(); g.globalAlpha=fvA*0.35; g.fillStyle="#7a1f55"; g.shadowBlur=0;
+        g.fillRect(0,api.H*0.28-26,api.W,52); g.restore();
         g.save(); g.translate(api.W/2,api.H*0.28); g.scale(pop,pop);
         g.font="900 32px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
-        g.globalAlpha=clamp(feverBanner*1.4,0,1); g.shadowColor=col; g.shadowBlur=16;
+        g.globalAlpha=fvA;
+        g.lineJoin="round"; g.lineWidth=7; g.strokeStyle="rgba(120,40,90,.85)"; g.shadowBlur=0; g.strokeText("フィーバー! ぜんぶ 2ばい!",0,0);
+        g.shadowColor=col; g.shadowBlur=16;
         g.fillStyle="#fff"; g.fillText("フィーバー! ぜんぶ 2ばい!",0,0);
-        g.shadowBlur=0; g.lineWidth=2; g.strokeStyle=col; g.strokeText("フィーバー! ぜんぶ 2ばい!",0,0);
+        g.shadowBlur=0;
         g.restore(); g.globalAlpha=1; g.textAlign="left"; }
       // ③ ノンストップ ボーナス! バナー(クリア文字の下=重ねない)
       if(nonstopT>0){ nonstopT-=0.014*dt;
         const pop=1+Math.max(0,nonstopT-1.3)*1.4;
         g.save(); g.translate(api.W/2,api.H*0.60); g.scale(pop,pop);
         g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
-        g.globalAlpha=clamp(nonstopT*1.3,0,1); g.shadowColor="rgba(255,210,60,.9)"; g.shadowBlur=16;
-        g.fillStyle="#ffe6a0"; g.fillText("ノンストップ ボーナス!",0,0);
-        g.shadowBlur=0; g.lineWidth=1.5; g.strokeStyle="rgba(120,40,90,.7)";
-        g.strokeText("ノンストップ ボーナス!",0,0);
+        g.globalAlpha=clamp(nonstopT*1.3,0,1);
+        g.lineJoin="round"; g.lineWidth=7; g.strokeStyle="rgba(120,40,90,.85)"; g.shadowBlur=0; g.strokeText("ノンストップ ボーナス!",0,0);
+        g.shadowColor="rgba(255,210,60,.9)"; g.shadowBlur=16;
+        g.fillStyle="#ffe6a0"; g.fillText("ノンストップ ボーナス!",0,0); g.shadowBlur=0;
         g.restore(); g.globalAlpha=1; g.textAlign="left"; if(nonstopT<0)nonstopT=0; }
 
       // ---- HUD: stage + progress (top center safe band) ----

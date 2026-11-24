@@ -38,6 +38,7 @@ function build_icecream(api){
   let luckySeen=false,luckyMsgT=0,luckyMsg="";
   let rbMsgT=0;                        // ① にじいろアイス 発見バナー
   let nonstopBroken=false,perfectT=0;  // ③ ノンストップ判定(このタワー中にコンボが切れたか)
+  let firstHintShown=false;
   let sunWink=0; const sunPos={x:0,y:0,r:0}; // ④ おひさま ひみつタップ
 
   function buildBg(){
@@ -105,6 +106,10 @@ function build_icecream(api){
     rebuild(Math.min(stageGoal,maxTower));
     nonstopBroken=false; // ③ 新しいタワーは ノンストップ 判定リセット
     announceBatch();
+    // はじめの1回だけ、何も押さない子にも「ここを タップ！」を塔の横に出す(吸着・当たり判定は変えない)
+    if(stage===1&&!firstHintShown){firstHintShown=true;
+      const tp=scoops[scoops.length-1];
+      if(tp)floats.push({x:Math.min(towerX+R*3.2,api.W-90),y:tp.baseY,txt:'ここを タップ！',vy:0,life:1.6,col:'#ff5b8a',size:24});}
   }
 
   function spawnBall(tx,ty,tgt){
@@ -156,15 +161,15 @@ function build_icecream(api){
     if(isLucky)base+=1;
     const pts=base*(fever>0?2:1);
     count+=pts;stageBroken++;combo++;comboT=0.9;api.setScore(count);
-    if(s.rb)rainbowScoop(hx,hy,pts); // ① にじいろアイス 大盤振る舞い
-    if(isLucky)luckyHit(hx,hy);      // ② ラッキー色 小さめ祝福＋星のキラッ
+    if(s.rb)rainbowScoop(hx,hy,pts,s.r); // ① にじいろアイス 大盤振る舞い
+    if(isLucky)luckyHit(hx,hy,s.r);      // ② ラッキー色 小さめ祝福＋星のキラッ
     if(s.gold){
       // rainbow burst + fanfare for the golden scoop
       for(let k=0;k<14&&shards.length<90;k++){const a=rnd(0,TAU),sp2=rnd(3,9);
         shards.push({x:hx,y:hy,vx:Math.cos(a)*sp2,vy:Math.sin(a)*sp2-3.5,r:rnd(R*0.14,R*0.3),
           rot:rnd(0,TAU),vr:rnd(-0.4,0.4),life:1,decay:rnd(0.008,0.014),col:RAINBOW[k%RAINBOW.length]});}
       rings.push({x:hx,y:hy,r:s.r*0.3,vr:s.r*0.9,life:1,decay:0.035,col:"#ffd23f"});
-      floats.push({x:hx,y:hy-s.r*1.4,txt:"ゴールド！ +"+pts,vy:-0.9,life:1.2,col:"#ffb400",size:34});
+      floats.push({x:hx,y:Math.max(api.H*0.15,hy-s.r*1.4),txt:"ゴールド！ +"+pts,vy:-0.9,life:1.2,col:"#ffb400",size:34});
       api.tone(1046,0.12,"triangle",0.16);
       setTimeout(()=>api.tone(1318,0.12,"triangle",0.14),90);
       setTimeout(()=>api.tone(1568,0.2,"triangle",0.14),180);
@@ -177,7 +182,7 @@ function build_icecream(api){
     api.noise(0.1,0.16,1500,"bandpass",1);
     api.tone(520*Math.pow(2,clamp(combo,0,10)/12),0.12,"triangle",0.12);
     api.boom(0.4+Math.min(combo,6)*0.03);api.shake(6+Math.min(combo,8));api.hitStop(2);
-    if(combo>1)floats.push({x:hx,y:hy-s.r,txt:"x"+combo,vy:-1.1,life:1,
+    if(combo>1)floats.push({x:hx+s.r*1.3,y:hy-s.r*0.2,txt:"x"+combo,vy:-1.1,life:1,
       col:combo>=8?"#ff2bff":combo>=5?"#ff5b5b":combo>=3?"#ff8c42":"#ffd23f",size:combo>=4?40:30});
     if(combo>=3){celebrate=Math.min(2,celebrate+0.5);}
     // 上の段は消さずに 1 段ぶん下へ詰める(ねらい撃ちで中段を壊しても損に見えない)。ぽんと跳ねてから すとんと落ちる。
@@ -194,7 +199,7 @@ function build_icecream(api){
     setTimeout(()=>api.tone(1568,0.28,"triangle",0.14),380);
   }
 
-  function rainbowScoop(hx,hy,pts){
+  function rainbowScoop(hx,hy,pts,sr){
     // ① にじいろアイス撃破: 虹の輪＋大量きらきら＋祝福バナー(激レアの大盤振る舞い)
     rbMsgT=1.5;celebrate=Math.min(2.2,celebrate+0.9);
     api.boom(0.6);api.shake(16);api.hitStop(4);
@@ -205,16 +210,16 @@ function build_icecream(api){
     for(let k=0;k<22&&shards.length<90;k++){const a=rnd(0,TAU),sp=rnd(3,10);
       shards.push({x:hx,y:hy,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-3.5,r:rnd(R*0.16,R*0.34),
         rot:rnd(0,TAU),vr:rnd(-0.4,0.4),life:1,decay:rnd(0.008,0.014),col:RAINBOW[k%RAINBOW.length]});}
-    floats.push({x:hx,y:hy-R*1.5,txt:"にじいろ！ +"+pts,vy:-0.9,life:1.3,col:"#ff5b8a",size:34});
+    floats.push({x:hx,y:Math.max(api.H*0.15,hy-sr*1.8),txt:"にじいろ！ +"+pts,vy:-0.9,life:1.3,col:"#ff5b8a",size:34});
   }
-  function luckyHit(hx,hy){
+  function luckyHit(hx,hy,sr){
     // ② ラッキー色命中: 小さめの祝福。初回だけ中央上で「きょうの ラッキーは ◯」を教える。
     if(!luckySeen){luckySeen=true;luckyMsg="きょうの ラッキーは "+(SCOOPNAME[luckyColor]||"?")+"！";luckyMsgT=1.9;}
     else{luckyMsg="ラッキー！";luckyMsgT=Math.max(luckyMsgT,0.8);}
     api.tone(1046,0.12,"triangle",0.1);setTimeout(()=>api.tone(1568,0.14,"triangle",0.08),70);
     for(let k=0;k<8;k++){const a=rnd(0,TAU),sp=rnd(2,6);
       sparks.push({x:hx,y:hy,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1.5,len:rnd(6,12),life:1,decay:rnd(0.05,0.08)});}
-    floats.push({x:hx,y:hy-R*0.9,txt:"ラッキー！",vy:-0.9,life:1,col:luckyColor,size:24});
+    floats.push({x:hx,y:Math.max(api.H*0.15,hy-sr*2.0),txt:"ラッキー！",vy:-0.9,life:1,col:luckyColor,size:24});
   }
 
   function checkStage(){
@@ -281,7 +286,7 @@ function build_icecream(api){
         api.tone(220,0.06,"sine",0.05);
         // 外しても『どこを押せばいいか』が見えるように、押した所の小さな波紋と「ここを タップ！」を出す
         rings.push({x:px,y:py,r:6,vr:3,life:1,decay:0.06,col:'#ffffff'});
-        if(tsec-lastHintAt>0.8){lastHintAt=tsec;
+        if(tsec-lastHintAt>0.8&&!floats.some(f=>f.life>0.3&&/ラッキー|ゴールド|にじいろ/.test(f.txt))){lastHintAt=tsec;
           floats.push({x:top.x,y:top.baseY-top.r*1.8,txt:'ここを タップ！',vy:0,life:0.9,col:'#ff5b8a',size:22});}
         return;
       }
@@ -297,7 +302,7 @@ function build_icecream(api){
       if(fever>0){
         const nf=Math.max(0,fever-0.016*dt);
         if(nf<=0){ // fever just ended
-          floats.push({x:api.W/2,y:api.H*0.35,txt:"フィーバー おわり",vy:-0.5,life:1,col:"#ff8ac4",size:26});
+          floats.push({x:api.W/2,y:api.H*0.27,txt:"フィーバー おわり",vy:-0.5,life:1,col:"#ffffff",size:32});
           api.slide(880,440,0.3,0.12,"triangle");
         }
         fever=nf;
@@ -545,10 +550,18 @@ function build_icecream(api){
         g.shadowColor=col;g.shadowBlur=18;g.fillStyle="#ffffff";g.fillText("にじいろアイス！",0,0);
         g.shadowBlur=0;g.lineWidth=2;g.strokeStyle=col;g.strokeText("にじいろアイス！",0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";if(rbMsgT<0)rbMsgT=0;}
+      // フィーバー！ はじまりバナー(にじいろバナーと重ならないよう、出ている間は一段下へ)
+      if(feverBanner>0){
+        const a=clamp(feverBanner*1.4,0,1),pop=1+Math.max(0,feverBanner-1.5)*1.2,col=RAINBOW[Math.floor(tsec*8)%RAINBOW.length];
+        g.save();g.translate(api.W/2,rbMsgT>0?bannerY2():bannerY1());g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";
+        g.font="900 36px 'Hiragino Maru Gothic ProN',system-ui";g.lineJoin="round";
+        g.lineWidth=8;g.strokeStyle="rgba(60,20,50,.7)";g.strokeText("フィーバー！",0,0);
+        g.shadowColor=col;g.shadowBlur=18;g.fillStyle="#ffffff";g.fillText("フィーバー！",0,0);
+        g.restore();g.globalAlpha=1;g.lineJoin="miter";g.textAlign="left";}
       // ② きょうの ラッキーいろ バナー(上部中央=安全帯)
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
         const a=clamp(luckyMsgT*1.5,0,1),pop=1+Math.max(0,luckyMsgT-1.2)*1.3;
-        g.save();g.translate(api.W/2,bannerY2());g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";
+        g.save();g.translate(api.W/2,bannerY2()+((feverBanner>0&&rbMsgT>0)?Math.max(api.H*0.06,34):0));g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";
         g.font="900 24px 'Hiragino Maru Gothic ProN',system-ui";g.shadowColor=luckyColor;g.shadowBlur=14;
         g.fillStyle="#fff7c2";g.fillText(luckyMsg,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";if(luckyMsgT<0)luckyMsgT=0;}

@@ -92,7 +92,7 @@ function buildAvalanche(api){
   // 的の帯より左(坂の入口側)は -1 =どの的も狙っていない(左の3割を押しても得点になる穴をふさぐ)
   function laneOfX(x){const L=laneBand();if(x<L.minX)return -1;return clamp(Math.floor((x-L.minX)/L.laneW),0,LANE_N-1);}
   // 見た目の横幅(重なり避け用)
-  function extW(o){return o.w*(o.kind==="car"?1.7:o.kind==="wall"?1.6:1.15);}
+  function extW(o){return o.w*(o.kind==="car"?2.3:o.kind==="wall"?2.2:1.55);}
   function spawnObstacle(){
     // obstacles sit ON the surface all along the ball's path (mid-slope to right edge)
     const {minX,maxX,laneW}=laneBand();
@@ -185,7 +185,7 @@ function buildAvalanche(api){
     const laneNudge=(nudgeLane-(LANE_N-1)/2)*unit*0.9;
     const sx=slopeX0+laneNudge+rnd(-unit*0.3,unit*0.6);
     balls.push({x:sx,y:slopeYAt(sx)-unit*0.6,vx:rnd(2.2,3.4),vy:0,
-      r:unit*rnd(0.5,0.7),grew:0,spin:0,onGround:false,life:1,lane});
+      r:unit*rnd(0.42,0.58),grew:0,spin:0,onGround:false,life:1,lane});
     // puff of snow kicked up at the launch
     for(let i=0;i<10;i++){const a=rnd(-2.4,-0.6),s=rnd(1.5,4);
       puffs.push({x:sx,y:slopeYAt(sx),vx:Math.cos(a)*s,vy:Math.sin(a)*s,
@@ -195,7 +195,7 @@ function buildAvalanche(api){
     api.shake(3);
     // ねらいが外れた時は叱らず、玉の頭上に小さく「ころころ」(得点は0でも雪けむりと音は残す)
     if(lane<0&&fever<=0)feverGauge=Math.max(0,feverGauge-0.06); // ねらわず外すとフィーバーゲージが少し減る(狙いが報われる)
-    if(lane<0&&floats.length<2)pushFloat({x:sx,y:slopeYAt(sx)-unit*1.8,txt:"ころころ",life:0.8,vy:-0.6,col:"#ffffff",size:18});
+    if(lane<0&&floats.length<2)pushFloat({x:Math.max(sx,unit*3),y:slopeYAt(sx)-unit*2.4,txt:"ころころ",life:1.1,vy:-0.6,col:"#ffffff",size:28});
   }
 
   function hitObstacle(b,o){
@@ -780,7 +780,7 @@ function buildAvalanche(api){
     return "つぎは "+STAGE_BG[(s-1)%STAGE_BG.length].name+"!";
   }
   function drawObstacle(o,wob){
-    const w=o.w,x=o.x,y=o.by;
+    const w=o.w*1.35,x=o.x,y=o.by;
     const kind=o.kind||"wall";
     // ⑦ 種類ごとに見た目の大きさを変える(丸=横幅いっぱいの岩,タワー=背の高い2段,壁=横広で低い)
     let bw=w,bh=w*1.2;
@@ -797,7 +797,7 @@ function buildAvalanche(api){
     g.save();g.translate(x,y);g.rotate(wob*((o.gold||o.rainbow)?0.12:0.04)); // gold/rainbow jiggle harder
     if(o.sq>0)g.scale(1+o.sq*0.16,1-o.sq*0.22); // かたいブロックは叩かれると ぺこっと へこむ
     // shadow
-    g.fillStyle="rgba(60,90,130,.2)";
+    g.fillStyle="rgba(60,90,130,.32)";
     g.beginPath();g.ellipse(0,0,Math.max(0,bw*0.7),Math.max(0,bw*0.22),0,0,TAU);g.fill();
     // ブロックは全て手描き(色つき/にじいろは色バリエーションが要る。金は生成画像が不良だったので同じ描き方)
     {
@@ -808,24 +808,24 @@ function buildAvalanche(api){
         // ⑦ 丸い岩/雪玉: 円形の輪郭にして角ブロックとはっきり違う形にする
         const rr=Math.max(0,bh*0.5);
         g.beginPath();g.arc(0,-rr,rr,0,TAU);g.fill();
-        g.strokeStyle="rgba(255,255,255,.4)";g.lineWidth=2;
+        g.strokeStyle="rgba(30,50,90,.7)";g.lineWidth=3;
         g.beginPath();g.arc(0,-rr,rr,0,TAU);g.stroke();
         g.fillStyle=shadeHex(base,-20);g.globalAlpha=0.45;
         g.beginPath();g.arc(rr*0.35,-rr*0.7,Math.max(0,rr*0.3),0,TAU);g.fill();g.globalAlpha=1;
       } else if(kind==="tower"){
         // ⑦ 背の高い2段タワー: 継ぎ目を入れて重ねブロック感を出す(硬そうな見た目=hp2と合う)
         roundRect(-bw*0.5,-bh,bw,bh,bw*0.16);g.fill();
-        g.strokeStyle="rgba(255,255,255,.4)";g.lineWidth=2;roundRect(-bw*0.5,-bh,bw,bh,bw*0.16);g.stroke();
+        g.strokeStyle="rgba(30,50,90,.7)";g.lineWidth=3;roundRect(-bw*0.5,-bh,bw,bh,bw*0.16);g.stroke();
         g.strokeStyle="rgba(20,30,50,.5)";g.lineWidth=Math.max(2,bw*0.09);
         g.beginPath();g.moveTo(-bw*0.5,-bh*0.5);g.lineTo(bw*0.5,-bh*0.5);g.stroke();
       } else if(kind==="house"){
         // ⑦ 氷の家: 四角い壁+三角の屋根+窓2つで「建物」のシルエットにする(丸/タワー/壁と別カテゴリ)
         const wallH=bh*0.62;
         roundRect(-bw*0.5,-wallH,bw,wallH,bw*0.08);g.fill();
-        g.strokeStyle="rgba(255,255,255,.4)";g.lineWidth=2;roundRect(-bw*0.5,-wallH,bw,wallH,bw*0.08);g.stroke();
+        g.strokeStyle="rgba(30,50,90,.7)";g.lineWidth=3;roundRect(-bw*0.5,-wallH,bw,wallH,bw*0.08);g.stroke();
         g.beginPath();g.moveTo(-bw*0.62,-wallH);g.lineTo(0,-bh);g.lineTo(bw*0.62,-wallH);g.closePath();
         g.fillStyle=shadeHex(base,20);g.fill();
-        g.strokeStyle="rgba(255,255,255,.4)";g.stroke();
+        g.strokeStyle="rgba(30,50,90,.7)";g.stroke();
         // 窓2つ+ドア(建物と分かる目印)
         g.fillStyle="rgba(255,255,240,.8)";
         g.fillRect(-bw*0.34,-wallH*0.86,bw*0.18,bw*0.18);
@@ -835,8 +835,8 @@ function buildAvalanche(api){
       } else if(kind==="snowman"){
         // ⑦ ゆきだるま: 大中小の丸を3段に積み、帽子とマフラーに的の色を使う
         const r1=bh*0.24,r2=bh*0.19,r3=bh*0.14,y1=-r1,y2=-(r1*1.7+r2),y3=-(r1*1.7+r2*1.7+r3);
-        const sb=tint(base,0.62);
-        g.fillStyle=sb;g.strokeStyle="rgba(40,60,100,.5)";g.lineWidth=2;
+        const sb=tint(base,0.3);
+        g.fillStyle=sb;g.strokeStyle="rgba(30,50,90,.85)";g.lineWidth=3;
         for(const c of [[y1,r1],[y2,r2],[y3,r3]]){g.beginPath();g.arc(0,c[0],Math.max(0,c[1]),0,TAU);g.fill();g.stroke();}
         g.fillStyle="rgba(255,255,255,.7)";g.beginPath();g.arc(-r3*0.4,y3-r3*0.4,Math.max(0,r3*0.3),0,TAU);g.fill();
         g.fillStyle=base;
@@ -851,9 +851,9 @@ function buildAvalanche(api){
         // ⑦ そり/くるま: 横長の車体+窓の付いた小屋根+まる車輪2つ
         const wr=bh*0.2;
         roundRect(-bw*0.5,-bh*0.62,bw,bh*0.34,bh*0.1);g.fill();
-        g.strokeStyle="rgba(255,255,255,.4)";g.lineWidth=2;roundRect(-bw*0.5,-bh*0.62,bw,bh*0.34,bh*0.1);g.stroke();
+        g.strokeStyle="rgba(30,50,90,.7)";g.lineWidth=3;roundRect(-bw*0.5,-bh*0.62,bw,bh*0.34,bh*0.1);g.stroke();
         g.beginPath();g.moveTo(-bw*0.28,-bh*0.62);g.lineTo(-bw*0.16,-bh);g.lineTo(bw*0.16,-bh);g.lineTo(bw*0.3,-bh*0.62);g.closePath();
-        g.fillStyle=shadeHex(base,15);g.fill();g.strokeStyle="rgba(255,255,255,.4)";g.stroke();
+        g.fillStyle=shadeHex(base,15);g.fill();g.strokeStyle="rgba(30,50,90,.7)";g.stroke();
         g.fillStyle="rgba(235,248,255,.85)";
         g.beginPath();g.moveTo(-bw*0.2,-bh*0.66);g.lineTo(-bw*0.12,-bh*0.93);g.lineTo(-bw*0.01,-bh*0.93);g.lineTo(-bw*0.01,-bh*0.66);g.closePath();g.fill();
         g.beginPath();g.moveTo(bw*0.03,-bh*0.66);g.lineTo(bw*0.03,-bh*0.93);g.lineTo(bw*0.13,-bh*0.93);g.lineTo(bw*0.22,-bh*0.66);g.closePath();g.fill();
@@ -875,7 +875,7 @@ function buildAvalanche(api){
       } else {
         // 横広の壁
         roundRect(-bw*0.5,-bh,bw,bh,bw*0.18);g.fill();
-        g.strokeStyle="rgba(255,255,255,.4)";g.lineWidth=2;roundRect(-bw*0.5,-bh,bw,bh,bw*0.18);g.stroke();
+        g.strokeStyle="rgba(30,50,90,.7)";g.lineWidth=3;roundRect(-bw*0.5,-bh,bw,bh,bw*0.18);g.stroke();
       }
       // crack overlay for tough (2-hp, already chipped) blocks
       if(o.hp<2&&!simple){

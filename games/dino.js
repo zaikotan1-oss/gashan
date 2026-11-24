@@ -153,7 +153,7 @@ function buildDino(api){
     arcs.push({dir:sweepDir,life:1});
     for(const o of objs){if(o.state!=="stand")continue;
       // 当たり判定=見えている物の幅+指の太さ(約8px)。ビルの間(約0.18スロット)を押すと空振り=ねらう遊びに(軸3)
-      const hw=count<=0?slotW*0.55:Math.max(slotW*0.32,o.w*0.5+slotW*0.1); // 最初の1回だけは隙間なし=最初の成功は必ず来る
+      const hw=count<=0?slotW*0.55:Math.max(slotW*0.32,o.w*0.5+slotW*0.07); // 最初の1回だけは隙間なし=最初の成功は必ず来る
       if(Math.abs(o.x-tapX)<hw){
         contact=true;
         // 硬いビル/お城は複数回ヒット
@@ -291,13 +291,17 @@ function buildDino(api){
         o.sway+=0.03*dt;
       }
       // draw objects behind dino
-      for(const o of objs)drawObj(o);
+      // 恐竜の真ん中にいる立っている物は、恐竜より手前に描く(標的が隠れない・軸6)
+      const dsFront=dinoSize()*1.95;
+      const inFront=o=>(o.state==="stand"||o.state==="rise")&&Math.abs(o.x-cx)<dsFront*0.4;
+      for(const o of objs)if(!inFront(o))drawObj(o);
       // sweep animation
       bob*=Math.pow(0.85,dt);
       squash*=Math.pow(0.82,dt);
       if(sweeping){sweepT+=0.08*dt;if(sweepT>=0.5&&!sweepHit){applyHits();sweepHit=true;bob=8;}
         if(sweepT>=1){sweeping=false;}}
       drawDino();
+      for(const o of objs)if(inFront(o))drawObj(o);
       // arcs (sweep trail, glowing)
       for(const a of arcs){a.life-=0.06*dt;const al=Math.max(0,a.life);
         g.save();g.globalAlpha=al*0.45;g.strokeStyle="#bfe9ff";g.lineWidth=16;g.lineCap="round";g.shadowColor="#7fd0ff";g.shadowBlur=24;
@@ -378,9 +382,9 @@ function buildDino(api){
       // ② きょうのラッキー色 はっけん！ 中央の小ヒント(初回だけ・下側でクリア文字と重ねない)
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
         g.save();g.translate(api.W/2,api.H*0.40);g.textAlign="center";g.textBaseline="middle";
-        g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 23px 'Hiragino Maru Gothic ProN',system-ui";
-        const t2="きょうのラッキー色は "+(COLNAME[luckyColor]||"")+"！";
-        g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.4)";g.strokeText(t2,0,0);
+        g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 26px 'Hiragino Maru Gothic ProN',system-ui";
+        const t2="きょうのラッキーいろは "+(COLNAME[luckyColor]||"")+"！";
+        g.lineWidth=8;g.strokeStyle="rgba(0,0,0,.8)";g.strokeText(t2,0,0);
         g.fillStyle=luckyColor;g.fillText(t2,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(luckyMsgT<0)luckyMsgT=0;}
       // 必殺ゲージ + ステージ進捗HUD
@@ -428,6 +432,7 @@ function buildDino(api){
       let bg=g.createLinearGradient(x,y,x+o.w,y);
       bg.addColorStop(0,shade(o.color,1.18));bg.addColorStop(0.5,o.color);bg.addColorStop(1,shade(o.color,0.78));
       g.fillStyle=bg;g.fillRect(x,y,o.w,o.h);
+      g.strokeStyle="rgba(0,0,0,.45)";g.lineWidth=2.5;g.strokeRect(x,y,o.w,o.h); // 輪郭で背景から浮かせる
       // roof highlight
       g.fillStyle="rgba(255,255,255,.25)";g.fillRect(x,y,o.w,3);
       g.fillStyle="rgba(255,255,255,.16)";g.fillRect(x,y,o.w*0.28,o.h);
@@ -513,7 +518,7 @@ function buildDino(api){
   }
   // ③ 街灯(lamp): 箱型ビルばかりにならないよう、丸い頭+細長い柱のシルエットを追加(軸7対策)
   function drawLamp(o,yo){
-    const x=o.x,topY=groundY-o.h+yo,poleW=Math.max(3,o.w*0.16);
+    const x=o.x,topY=groundY-o.h+yo,poleW=Math.max(8,o.w*0.3);
     // pole (縦長)
     g.fillStyle="rgba(0,0,0,.2)";g.fillRect(x-poleW/2+2,topY+o.h*0.16+2,poleW,o.h*0.84);
     let pg=g.createLinearGradient(x-poleW/2,0,x+poleW/2,0);
@@ -525,6 +530,7 @@ function buildDino(api){
     let lg=g.createRadialGradient(x-headR*0.3,headY-headR*0.3,Math.max(0,headR*0.1),x,headY,headR);
     lg.addColorStop(0,shade(o.color,1.3));lg.addColorStop(1,shade(o.color,0.8));
     g.fillStyle=lg;g.beginPath();g.arc(x,headY,headR,0,TAU);g.fill();
+    g.lineWidth=2.5;g.strokeStyle="rgba(0,0,0,.45)";g.stroke();
     g.fillStyle="rgba(255,255,255,.4)";g.beginPath();g.arc(x-headR*0.32,headY-headR*0.32,Math.max(0,headR*0.32),0,TAU);g.fill();
     // ほんのり灯る光(常時・加算で短く)
     g.save();g.globalCompositeOperation="lighter";g.globalAlpha=0.25+0.15*Math.sin(tNow*0.1+o.seed);
@@ -535,14 +541,14 @@ function buildDino(api){
   }
   function drawHUD(){
     // ステージ表示（上部中央＝engine HUDと衝突しない安全帯）
-    g.save();g.font="800 15px 'Hiragino Maru Gothic ProN',system-ui";g.textBaseline="middle";g.textAlign="left";
+    g.save();g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";g.textBaseline="middle";g.textAlign="left";
     const st="ステージ "+(stage+1)+"／"+STAGE_MAX+"  「"+stageDef().name+"」";
-    const m=g.measureText(st),tw=(m&&m.width)||120,pw=tw+24,px=api.W/2-pw/2,py=8,ph=34;
+    const m=g.measureText(st),tw=(m&&m.width)||120,pw=tw+24,px=api.W/2-pw/2,py=8,ph=40;
     g.fillStyle="rgba(58,142,74,.88)";roundRect(px,py,pw,ph,14);g.fill();
-    g.fillStyle="#fffce8";g.fillText(st,px+12,py+13);
+    g.fillStyle="#fffce8";g.fillText(st,px+12,py+14);
     // 進捗バー（ステージ帯の中の下端に入れて1段にまとめる）
     const prog=clamp(stageHits/stageGoal,0,1);
-    const bx=px+12,by=py+ph-12,bw=pw-24,bh=6;
+    const bx=px+12,by=py+ph-14,bw=pw-24,bh=8;
     g.fillStyle="rgba(0,0,0,.32)";roundRect(bx,by,bw,bh,bh/2);g.fill();
     if(prog>0){g.fillStyle="#ffd23f";roundRect(bx,by,Math.max(bh,bw*prog),bh,bh/2);g.fill();}
     g.restore();
@@ -588,8 +594,8 @@ function buildDino(api){
   }
   function drawHint(){
     const txt="ビルを タップ！ しっぽで なぎはらう！";
-    g.save();g.font="800 15px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";g.textBaseline="middle";
-    const m=g.measureText(txt),tw=(m&&m.width)||txt.length*8,pw=tw+34,ph=34,px=api.W/2-pw/2,py=api.H-ph-8;
+    g.save();g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";g.textBaseline="middle";
+    const m=g.measureText(txt),tw=(m&&m.width)||txt.length*8,pw=tw+34,ph=40,px=api.W/2-pw/2,py=api.H-ph-8;
     const bobY=Math.sin(tNow*0.06)*2;
     g.translate(0,bobY);
     g.shadowColor="rgba(0,0,0,.28)";g.shadowBlur=10;g.shadowOffsetY=3;
@@ -602,8 +608,9 @@ function buildDino(api){
     g.restore();g.textAlign="left";g.textBaseline="alphabetic";
   }
   function roundRect(x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
+  function dinoSize(){return clamp(api.W*0.13,80,160)*(1+(grow||0)*0.35+(roar||0)*0.06);}
   function drawDino(){
-    const s=clamp(api.W*0.16,90,200)*(1+(grow||0)*0.35+(roar||0)*0.06);
+    const s=dinoSize();
     // idle breathing/sway when not sweeping
     const breathe=sweeping?0:Math.sin(tNow*0.07)*0.022;
     const idleBob=sweeping?0:Math.sin(tNow*0.07+1)*3;

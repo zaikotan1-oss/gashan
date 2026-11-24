@@ -103,7 +103,7 @@ function buildSnowplow(api){
     else if(type==="cone"){h=truckH*0.7;w=h*0.55;col="#ff8a3a";}
     else if(type==="block"){h=rnd(truckH*0.5,truckH*0.85);w=h*rnd(0.82,1.05);col=pick(BLOCKCOLS);}
     else if(type==="snowman"){h=truckH*1.6;w=h*0.56;hp=3;col="#ffffff";}   // 軸7: 大きい・3段(段ごとに崩れる)
-    else if(type==="icicle"){h=truckH*0.3;w=h*0.55;hp=1;col="#d8f4ff";}    // 軸7: 小さい・一撃で壊れる
+    else if(type==="icicle"){h=truckH*0.45;w=h*0.6;hp=1;col="#d8f4ff";}    // 軸7: 小さい・一撃で壊れる
     else if(type==="gold"){h=truckH*0.85;w=h*0.9;col="#ffd23f";
       api.tone(1318,0.14,"triangle",0.12);api.tone(1568,0.2,"triangle",0.1);} // "!" chime on appear
     else if(type==="rainbow"){h=truckH*0.9;w=h*0.95;col="#ff5b5b";
@@ -475,7 +475,7 @@ function buildSnowplow(api){
         g.save();g.translate(api.W/2,api.H*0.13);g.scale(pop,pop);
         g.font="800 32px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.globalAlpha=clamp(comboT,0,1);
-        g.shadowColor="rgba(80,160,220,.8)";g.shadowBlur=14;g.fillStyle="#4db8ff";
+        g.shadowColor="rgba(255,170,30,.8)";g.shadowBlur=14;g.fillStyle="#ffd23f";
         g.fillText("コンボ x"+combo,0,0);
         g.shadowBlur=0;g.lineWidth=4;g.lineJoin="round";g.strokeStyle="rgba(10,42,58,.85)";
         g.strokeText("コンボ x"+combo,0,0);g.fillText("コンボ x"+combo,0,0);
@@ -534,13 +534,16 @@ function buildSnowplow(api){
         g.shadowBlur=0;g.lineWidth=2;g.strokeStyle=col;g.strokeText("にじいろプレゼント！",0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";if(rbMsgT<0)rbMsgT=0;}
       // ② きょうのラッキー色 中央の小ヒント(初回だけ大きめに一度教える)
-      if(luckyMsgT>0&&clearT<=0&&feverBannT<=0&&rbMsgT<=0){luckyMsgT-=0.016*dt;
-        g.save();g.translate(api.W/2,api.H*0.5);g.textAlign="center";
-        g.globalAlpha=clamp(luckyMsgT*1.4,0,1);g.font="800 24px 'Hiragino Maru Gothic ProN',system-ui";
+      if(luckyMsgT>0&&clearT<=0&&feverBannT<=0&&rbMsgT<=0&&nonstopT<=0&&combo<=1){luckyMsgT-=0.016*dt;
+        // 軸6: コンボ表示・ほめ言葉と重ならない(コンボ中は後ろにずらす)。濃い縁＋白い文字＋色玉で背景の赤い屋根にも埋もれない
+        g.save();g.translate(api.W/2,api.H*0.56);g.textAlign="center";
+        g.globalAlpha=clamp(luckyMsgT*2.5,0,1);g.font="800 32px 'Hiragino Maru Gothic ProN',system-ui";
         const t2="きょうのラッキー色は "+(BLOCKNAME[luckyColor]||"")+"！";
-        g.shadowColor=luckyColor;g.shadowBlur=12;
-        g.lineWidth=4;g.lineJoin="round";g.strokeStyle="rgba(255,255,255,.85)";g.strokeText(t2,0,0);
-        g.shadowBlur=0;g.fillStyle=luckyColor;g.fillText(t2,0,0);
+        const tw2=g.measureText(t2).width,orbR=16,orbX=-tw2/2-orbR-8;
+        g.shadowBlur=0;g.lineWidth=6;g.lineJoin="round";g.strokeStyle="rgba(10,42,58,.85)";g.strokeText(t2,12,0);
+        g.fillStyle="#ffffff";g.fillText(t2,12,0);
+        g.beginPath();g.arc(orbX+12,-10,Math.max(0,orbR),0,TAU);g.fillStyle=luckyColor;g.fill();
+        g.lineWidth=3;g.strokeStyle="rgba(10,42,58,.85)";g.stroke();
         g.restore();g.globalAlpha=1;g.textAlign="left";g.lineJoin="miter";if(luckyMsgT<0)luckyMsgT=0;}
       // ③ ノンストップ ボーナス！ バナー(クリア文字の下=重ねない)
       if(nonstopT>0){nonstopT-=0.014*dt;
@@ -593,12 +596,12 @@ function buildSnowplow(api){
 
   function drawHUD(){
     const left=clamp(stageGoal-stageKill,0,stageGoal);
-    const bw=Math.min(api.W*0.6,360),bh=16,bx=(api.W-bw)/2,by=api.H*0.05;
+    const bw=Math.min(api.W*0.6,360),bh=20,bx=(api.W-bw)/2,by=api.H*0.06;
     g.save();g.textAlign="center";
-    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
-    g.fillStyle="#1b3a4a";g.shadowColor="rgba(255,255,255,.6)";g.shadowBlur=6;
-    g.fillText("ステージ "+stage+" / "+STAGES+"     あと "+left+" こ",api.W/2,by-8);
-    g.shadowBlur=0;
+    g.font="800 24px 'Hiragino Maru Gothic ProN',system-ui";
+    const hudT="ステージ "+stage+" / "+STAGES+"     あと "+left+" こ";
+    g.lineJoin="round";g.lineWidth=4;g.strokeStyle="rgba(255,255,255,.9)";g.strokeText(hudT,api.W/2,by-10);
+    g.fillStyle="#1b3a4a";g.fillText(hudT,api.W/2,by-10);g.lineJoin="miter";
     g.fillStyle="rgba(0,0,0,.18)";rrect(bx,by,bw,bh,bh/2);g.fill();
     const fr=clamp(stageKill/stageGoal,0,1);
     if(fr>0){const lg=g.createLinearGradient(bx,0,bx+bw,0);
@@ -732,7 +735,7 @@ function buildSnowplow(api){
       const grd=g.createLinearGradient(0,-h*0.5,0,h*0.5);
       grd.addColorStop(0,"#eafaff");grd.addColorStop(1,"#9fd6ea");
       g.fillStyle=grd;g.beginPath();g.moveTo(-w*0.45,-h*0.5);g.lineTo(w*0.45,-h*0.5);g.lineTo(0,h*0.5);g.closePath();g.fill();
-      g.strokeStyle="rgba(255,255,255,.7)";g.lineWidth=1.5;g.stroke();
+      g.strokeStyle="rgba(60,110,140,.8)";g.lineWidth=2.5;g.lineJoin="round";g.stroke();g.lineJoin="miter";
       g.fillStyle="rgba(255,255,255,.6)";g.fillRect(-w*0.12,-h*0.42,w*0.1,h*0.7);
     }else if(o.type==="ice"){
       // ice block: translucent cyan with shine, crack when chipped

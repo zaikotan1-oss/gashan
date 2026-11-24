@@ -109,7 +109,7 @@ function build_gumball(api){
       sparks.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:1,decay:rnd(0.03,0.06),s:rnd(1.5,3.5),col});}
   }
   function addFloat(f){ if(floats.length>=6) floats.shift(); floats.push(f); }  // 同時表示数に上限
-  function bigY(hy){ return Math.max(H*0.18,Math.min(hy-unit*1.3,ball.y-ball.r-unit*0.8)); }   // 軸6: 大きいボールの上端より上に出す
+  function bigY(hy){ return Math.max(H*0.22,Math.min(hy-unit*1.3,ball.y-ball.r-unit*0.8)); }   // 軸6: 大きいボールの上端より上に出す
   function ringAt(x,y,col){ rings.push({x,y,r:unit*0.5,vr:unit*0.6,life:1,decay:0.05,col}); }
 
   function eatSweet(s){
@@ -172,7 +172,7 @@ function build_gumball(api){
     if(combo>1&&(combo<=3||combo%5===0)) addFloat({x:hx,y:hy-unit*0.6,txt:"x"+combo,life:1,vy:-1,
       col:combo>=8?"#ff2bff":combo>=5?"#ff5b8a":"#ffd23f",size:combo>=4?38:28});
     if(ball.eaten===4) addFloat({x:hx,y:bigY(hy),txt:"おおきく なった！",life:1,vy:-0.7,col:"#ffe14a",size:22});
-    if(ball.eaten===8) addFloat({x:hx,y:bigY(hy),txt:"きょだいガムボール！",life:1,vy:-0.7,col:"#ff2bff",size:22});
+    if(ball.eaten===8) addFloat({x:hx,y:bigY(hy),txt:"きょだいガムボール！",life:1.4,vy:-0.7,col:"#ffd0ff",size:24,stroke:"rgba(60,0,60,.85)"});
     checkStage();
   }
 
@@ -432,11 +432,24 @@ function build_gumball(api){
           g.save();g.translate(s.x,s.y+wob);g.rotate(s.rot*0.6+tsec*0.8);g.scale(pu,pu);
           // star.png は正方形キャンバス内の余白が大きい(実体は幅高さとも約57%)ので、
           // 手描き版(半径0.95*s.r=直径1.9*s.rの星)と見た目の大きさが揃うよう箱を大きめに取る
-          if(!api.drawAsset("star.png",0,0,s.r*3.3,s.r*3.3,{center:true})) drawStar(s.r*0.95);
+          g.globalCompositeOperation="source-over";g.globalAlpha=1;g.shadowBlur=0;
+          // star.png は足元に灰色の影の帯が絵として焼き込まれている(星と一緒に回ると汚れて見える)ので、星形でクリップして帯を切り落とす
+          g.save();
+          const kk=s.r*3.3/512;
+          g.beginPath();
+          for(let i=0;i<10;i++){const aa=-Math.PI/2+i*Math.PI/5,rq=(i%2===0?164:102)*kk;
+            const px=-4*kk+Math.cos(aa)*rq,py=6*kk+Math.sin(aa)*rq;
+            if(i===0)g.moveTo(px,py);else g.lineTo(px,py);}
+          g.closePath();g.clip();
+          const gotStar=api.drawAsset("star.png",0,0,s.r*3.3,s.r*3.3,{center:true});
+          g.restore();
+          if(!gotStar) drawStar(s.r*0.95);
           g.restore();
           if(sparks.length<60&&Math.random()<0.12) spawnSparks(s.x,s.y+wob-s.r,"#ffe27a",1);
         }else{
-          g.save();g.translate(s.x,s.y+wob);g.rotate(s.rot*0.2);
+          g.save();g.translate(s.x,s.y+wob);
+          g.fillStyle="rgba(0,0,0,.15)";g.beginPath();g.ellipse(0,s.r*0.85,s.r*0.8,s.r*0.22,0,0,TAU);g.fill();
+          g.rotate(s.rot*0.2);
           drawSweet(s.kind,s.col,s.r,tsec);
           g.restore();
         }
@@ -533,9 +546,9 @@ function build_gumball(api){
       // ---- フローティング文字 ----
       if(combo>0){comboT-=0.016*dt;if(comboT<=0)combo=0;}
       for(const f of floats){f.y+=f.vy*dt;f.life-=0.016*dt;
-        g.save();g.globalAlpha=Math.max(0,f.life);
+        g.save();g.globalAlpha=Math.max(0,Math.min(1,f.life*2));
         g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-        g.lineWidth=8;g.lineJoin="round";g.strokeStyle="rgba(0,0,0,.75)";g.strokeText(f.txt,f.x,f.y);
+        g.lineWidth=8;g.lineJoin="round";g.strokeStyle=f.stroke||"rgba(0,0,0,.75)";g.strokeText(f.txt,f.x,f.y);
         g.fillStyle=f.col;g.fillText(f.txt,f.x,f.y);g.restore();}
       g.globalAlpha=1;g.textAlign="left";
       floats=floats.filter(f=>f.life>0);
@@ -597,7 +610,7 @@ function build_gumball(api){
         const a=clamp(luckyMsgT*1.2,0,1);
         g.save();g.translate(W/2,H*0.27);g.globalAlpha=a;g.textAlign="center";
         g.font="800 24px 'Hiragino Maru Gothic ProN',system-ui";
-        const t2="きょうのラッキー色は "+(COLNAME[luckyColor]||"")+"！";
+        const t2="きょうのラッキーいろは "+(COLNAME[luckyColor]||"")+"！";
         g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.4)";g.strokeText(t2,0,0);
         g.fillStyle=luckyColor;g.fillText(t2,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";if(luckyMsgT<0)luckyMsgT=0;}
@@ -674,9 +687,9 @@ function build_gumball(api){
     const bw=Math.min(W*0.6,360),bh=15,bx=(W-bw)/2,by=H*0.05;
     g.save();g.textAlign="center";
     g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
-    g.fillStyle="#fff";g.shadowColor="rgba(0,0,0,.5)";g.shadowBlur=6;
-    g.fillText("ステージ "+stage+" / "+STAGES+"      あと "+left+" こ",W/2,by-8);
-    g.shadowBlur=0;
+    g.lineJoin="round";g.lineWidth=4;g.strokeStyle="rgba(40,20,50,.7)";
+    g.strokeText("ステージ "+stage+" / "+STAGES+"      あと "+left+" こ",W/2,by-8);
+    g.fillStyle="#fff";g.fillText("ステージ "+stage+" / "+STAGES+"      あと "+left+" こ",W/2,by-8);
     g.fillStyle="rgba(0,0,0,.3)";roundRect(bx,by,bw,bh,bh/2);g.fill();
     const fr=clamp(stageEat/stageGoal,0,1);
     if(fr>0){const gg=g.createLinearGradient(bx,0,bx+bw,0);
@@ -692,18 +705,18 @@ function build_gumball(api){
       g.save();g.shadowBlur=8+4*Math.sin(tsec*8);g.shadowColor="#ff2bff";
       g.fillStyle="hsl("+(((tsec*200)|0)%360)+",95%,62%)";
       roundRect(fx2,fy2,Math.max(fh2,fw2*fr2),fh2,fh2/2);g.fill();g.restore();
-      g.font="800 14px 'Hiragino Maru Gothic ProN',system-ui";
-      g.fillStyle="#fff";g.shadowColor="rgba(255,43,255,.8)";g.shadowBlur=6;
-      g.fillText("フィーバー！ 2ばい！",W/2,fy2+fh2+15);g.shadowBlur=0;
+      g.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";
+      g.lineWidth=4;g.strokeStyle="rgba(40,20,50,.7)";g.strokeText("フィーバー！ 2ばい！",W/2,fy2+fh2+17);
+      g.fillStyle="#fff";g.fillText("フィーバー！ 2ばい！",W/2,fy2+fh2+17);
     }else if(feverGauge>0.02){
       g.save();if(feverGauge>0.85){g.shadowBlur=8+4*Math.sin(tsec*7);g.shadowColor="#ffd23f";}
       const gg2=g.createLinearGradient(fx2,0,fx2+fw2,0);
       gg2.addColorStop(0,"#ffb84a");gg2.addColorStop(1,"#ff2bff");
       g.fillStyle=gg2;roundRect(fx2,fy2,Math.max(fh2,fw2*clamp(feverGauge,0,1)),fh2,fh2/2);g.fill();
       g.restore();
-      g.font="800 14px 'Hiragino Maru Gothic ProN',system-ui";
-      g.fillStyle="rgba(255,255,255,.85)";
-      g.fillText("フィーバーゲージ",W/2,fy2+fh2+13);
+      g.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";
+      g.lineWidth=4;g.strokeStyle="rgba(40,20,50,.7)";g.strokeText("フィーバーゲージ",W/2,fy2+fh2+17);
+      g.fillStyle="#fff";g.fillText("フィーバーゲージ",W/2,fy2+fh2+17);
     }
     g.strokeStyle="rgba(255,255,255,.4)";g.lineWidth=1.5;roundRect(fx2,fy2,fw2,fh2,fh2/2);g.stroke();
     g.restore();g.textAlign="left";
@@ -714,9 +727,9 @@ function build_gumball(api){
       g.font="800 30px 'Hiragino Maru Gothic ProN',system-ui";
       g.globalAlpha=clamp(comboT,0,1);
       g.shadowColor="rgba(255,90,150,.8)";g.shadowBlur=14;
-      g.fillStyle="#ffd23f";g.fillText("コンボ x"+combo,0,0);
-      g.shadowBlur=0;g.lineWidth=1.5;g.strokeStyle="rgba(255,255,255,.6)";
+      g.shadowBlur=0;g.lineWidth=6;g.lineJoin="round";g.strokeStyle="rgba(60,10,50,.85)";
       g.strokeText("コンボ x"+combo,0,0);
+      g.fillStyle="#ffd23f";g.fillText("コンボ x"+combo,0,0);
       g.restore();g.globalAlpha=1;g.textAlign="left";
     }
   }
@@ -762,7 +775,6 @@ function build_gumball(api){
   // お菓子の見た目(種類ごと)。中心(0,0)基準でサイズ s。
   function drawSweet(kind,col,s,t){
     g.save();
-    g.fillStyle="rgba(0,0,0,.15)";g.beginPath();g.ellipse(0,s*0.85,s*0.8,s*0.22,0,0,TAU);g.fill();
     if(kind==="candy"){
       // ぐるぐるキャンディ
       const grd=g.createRadialGradient(-s*0.25,-s*0.3,s*0.1,0,0,s);
@@ -848,7 +860,6 @@ function build_gumball(api){
 
   // 金の星(ゴールドキャンディ本体)
   function drawStar(s){
-    g.fillStyle="rgba(0,0,0,.15)";g.beginPath();g.ellipse(0,s*0.9,s*0.8,s*0.22,0,0,TAU);g.fill();
     const grd=g.createRadialGradient(-s*0.25,-s*0.3,s*0.1,0,0,s);
     grd.addColorStop(0,"#fff6c8");grd.addColorStop(0.5,"#ffd23f");grd.addColorStop(1,"#ff9a1f");
     g.fillStyle=grd;

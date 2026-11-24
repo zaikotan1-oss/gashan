@@ -212,7 +212,7 @@ function build_jellypop(api){
   }
   // ---- FEVER TIME: gauge full -> 10s of x2 points, rain of jellies, rainbow sky ----
   function startFever(){
-    feverT=10;feverG=0;feverBanner=1.8;flash=1;
+    feverT=10;feverG=0;feverBanner=1.8;flash=1;luckyMsgT=Math.min(luckyMsgT,0.3);
     api.boom(0.7);api.shake(15);
     if(hsCool<=0){api.hitStop(5);hsCool=30;}
     api.slide(300,1400,0.5,0.3,"triangle");
@@ -371,7 +371,7 @@ function build_jellypop(api){
       // ---- floating score / combo text ----
       if(combo>0){comboT-=0.016*dt;if(comboT<=0)combo=0;}
       for(const f of floats){f.y+=f.vy*dt;f.life-=0.02*dt;
-        g.save();g.globalAlpha=Math.max(0,f.life);g.textAlign="center";
+        g.save();g.globalAlpha=Math.max(0,f.life)*((luckyMsgT>0||feverBanner>0||clearT>0)&&f.y>api.H*0.12&&f.y<api.H*0.6?0.5:1);g.textAlign="center";
         g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";
         g.lineWidth=5;g.lineJoin="round";g.strokeStyle="rgba(120,40,90,.5)";g.strokeText(f.txt,f.x,f.y);
         g.fillStyle=f.col;g.fillText(f.txt,f.x,f.y);g.restore();}
@@ -405,7 +405,7 @@ function build_jellypop(api){
         g.shadowBlur=0;g.lineWidth=2;g.strokeStyle=col;g.strokeText("にじいろ ゼリー!",0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";if(rbMsgT<0)rbMsgT=0;}
       // ---- ② きょうのラッキー色は◯! 中央上に一度だけ教える ----
-      if(luckyMsgT>0){luckyMsgT-=0.016*dt;
+      if(luckyMsgT>0){luckyMsgT-=0.016*dt;if(feverBanner<=0){
         const pop=1+Math.max(0,luckyMsgT-0.9)*1.2, t2="きょうのラッキーいろは "+(COLNAME[luckyColor]||"")+"!";
         g.save();g.translate(api.W/2,api.H*0.29);g.scale(pop,pop);g.textAlign="center";
         g.font="800 28px 'Hiragino Maru Gothic ProN',system-ui";
@@ -413,7 +413,7 @@ function build_jellypop(api){
         bannerText(t2,0,44,0);
         g.shadowColor=luckyColor;g.shadowBlur=12;g.fillStyle="#ffffff";g.fillText(t2,0,0);
         g.shadowBlur=0;g.lineWidth=2;g.strokeStyle=luckyColor;g.strokeText(t2,0,0);
-        g.restore();g.globalAlpha=1;g.textAlign="left";if(luckyMsgT<0)luckyMsgT=0;}
+        g.restore();g.globalAlpha=1;g.textAlign="left";}if(luckyMsgT<0)luckyMsgT=0;}
       // ---- FEVER TIME! バナー(コンボ0.14/にじいろ0.22/ラッキー0.29と重ならない0.38に配置) ----
       if(feverBanner>0&&clearT<=0){
         const pop=1+Math.max(0,feverBanner-1.2)*1.3, col=COLORS[Math.floor(tsec*8)%COLORS.length];
@@ -485,8 +485,8 @@ function build_jellypop(api){
     let r=b.r;
     if(b.state==="pop"){
       // burst flare: ring of splashing
-      g.save();g.globalCompositeOperation="lighter";g.globalAlpha=b.pop*0.6;
-      g.fillStyle=b.col;g.beginPath();g.arc(sx,sy,r*(1.4+(1-b.pop)*0.8),0,TAU);g.fill();
+      g.save();g.globalCompositeOperation="lighter";g.globalAlpha=b.pop*0.35;
+      g.fillStyle=b.col;g.beginPath();g.arc(sx,sy,Math.max(0,r*(1.3+(1-b.pop)*0.4)),0,TAU);g.fill();
       g.restore();return;
     }
     const sq=b.squash, wob=Math.sin(b.wob)*0.04;
@@ -520,14 +520,18 @@ function build_jellypop(api){
     g.fillStyle=bg;bodyPath(shape,r);g.fill();
     // inner jelly glow ring(強化: 背景のキャンディ群と輪郭が同化しないよう太く・濃く)
     g.save();g.globalCompositeOperation="lighter";g.globalAlpha=0.55;
-    g.strokeStyle=lighten(b.col,70);g.lineWidth=Math.max(0,r*0.16);
-    g.beginPath();g.arc(0,fy,Math.max(0,r*0.7),0,TAU);g.stroke();g.restore();
+    g.strokeStyle=lighten(b.col,70);g.lineWidth=Math.max(0,r*(shape===3?0.1:0.16));
+    g.beginPath();
+    if(shape===3)g.ellipse(0,fy,Math.max(0,r*0.95),Math.max(0,r*0.5),0,0,TAU);
+    else g.arc(0,fy,Math.max(0,r*0.7),0,TAU);
+    g.stroke();g.restore();
     // big glossy highlight
     g.fillStyle="rgba(255,255,255,.7)";g.beginPath();
     g.ellipse(-r*0.32,-r*0.38+fy,Math.max(0,r*0.26),Math.max(0,r*0.16),-0.5,0,TAU);g.fill();
     g.fillStyle="rgba(255,255,255,.45)";g.beginPath();g.arc(r*0.3,r*0.28+fy,Math.max(0,r*0.1),0,TAU);g.fill();
     // rim light(本体と同じ輪郭でふちどる)
-    g.strokeStyle="rgba(255,255,255,.45)";g.lineWidth=2;bodyPath(shape,r);g.stroke();
+    g.strokeStyle="rgba(120,40,90,.55)";g.lineWidth=3.5;g.lineJoin="round";bodyPath(shape,r);g.stroke();
+    g.strokeStyle="rgba(255,255,255,.5)";g.lineWidth=2;bodyPath(shape,r);g.stroke();
     // near-bursting warning: a quick wiggle outline when about to pop
     if(b.life-b.age<0.5&&Math.floor(b.age*16)%2===0){
       g.strokeStyle="rgba(255,90,150,.7)";g.lineWidth=3;

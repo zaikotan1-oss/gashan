@@ -123,13 +123,14 @@ function build_snowball(api){
   }
   // auto-aim + gravity-compensated shot: snap to the fort nearest to the tap
   // and solve the launch velocity so the ball passes exactly through it.
+  const MAGK=0.5;   // 吸着の縁からの距離(U倍)。下限0.5
   function calcShot(tx,ty,p){
     let ax=tx, ay=ty, bd=1e9;
-    for(const f of forts){const d=Math.hypot(f.x-tx,f.y-ty);
+    // 軸3: 砦の「縁」からの距離で最寄りを選ぶ(小さい砦は狭く・大きい砦は広く吸着する)
+    for(const f of forts){const d=Math.hypot(f.x-tx,f.y-ty)-f.r;
       if(d<bd){bd=d; ax=f.x; ay=f.y;}}
-    // 軸3(歯ごたえ): 吸着には距離上限を設ける。タップが砦から離れすぎていたら
-    // 生のタップ座標へ撃つ(=狙わない連打は外れる)。狙って撃てば従来通り確実に当たる。
-    const MAG=U*1.6;
+    // 吸着には縁からの距離上限を設ける。離れすぎたタップは生のタップ座標へ撃つ(=狙わない連打は外れる)。
+    const MAG=U*MAGK;
     if(bd>MAG){ax=tx; ay=ty;}
     const sx=launchX, sy=launchY-U*0.6;
     const dx=ax-sx, dy=ay-sy;
@@ -141,7 +142,7 @@ function build_snowball(api){
   }
   function launch(tx,ty,p){
     const v=calcShot(tx,ty,p);
-    const r=U*(0.5+p*1.0);            // charge -> bigger (base is kid-friendly big)。軸3: 無チャージの即撃ちは判定を絞り、狙わない連打が伸びすぎないようにする
+    const r=U*(0.45+p*1.0);           // charge -> bigger (base is kid-friendly big)。軸3: 無チャージの即撃ちは判定を絞り、狙わない連打が伸びすぎないようにする
     balls.push({x:launchX,y:launchY-U*0.6,vx:v.vx,vy:v.vy,r,big:p>0.55,life:1});
     cannonA=Math.atan2(v.vy,v.vx); cannonRecoil=1;
     api.slide(p>0.55?260:360,120,0.14,0.22,"sine");
@@ -184,7 +185,7 @@ function build_snowball(api){
     if(f.rainbow){
       rainbowBurst(f);
       // 軸6: 「にじいろ とりで！」バナー(H*0.22)と重ならないよう、+N は H*0.30 より下に出す
-      floats.push({x:f.x,y:Math.max(f.y-f.r,api.H*0.30),txt:"+"+pts,life:1,vy:-1.1,col:"#ff7bd0",size:36});
+      floats.push({x:f.x,y:Math.max(f.y-f.r,api.H*0.36),txt:"+"+pts,life:1,vy:-1.1,col:"#ff7bd0",size:36});
     }else if(f.gold){
       // rainbow shower + fanfare (special reward moment)
       [0,4,7,12].forEach((semi,i)=>setTimeout(()=>api.tone(659*Math.pow(2,semi/12),0.16,"triangle",0.12),i*70));
@@ -235,6 +236,8 @@ function build_snowball(api){
     checkStage();
     return true;
   }
+  // 当たり判定の半径: 見た目の幅に合わせる(つららは細いので小さめ)。見えている所に当てれば当たる・離れていれば外れる
+  function hitR(f){return f.r*(f.shape==="tall"?0.7:(f.shape==="stack"?0.85:(f.shape==="round"?0.88:0.82)));}
   function ring(x,y,r,col){rings.push({x,y,r:r*0.4,vr:r*0.9,life:1,col});}
   function burst(x,y,col,n,spd){
     for(let i=0;i<n;i++){const a=rnd(0,TAU),s=rnd(spd*0.4,spd);
@@ -396,7 +399,7 @@ function build_snowball(api){
         b.vy+=0.28*dt; b.x+=b.vx*dt; b.y+=b.vy*dt;
         // collide with forts
         for(let i=forts.length-1;i>=0;i--){const f=forts[i];
-          if(Math.hypot(b.x-f.x,b.y-f.y)<b.r+f.r){
+          if(Math.hypot(b.x-f.x,b.y-f.y)<b.r+hitR(f)){
             smashFort(f,b.x,b.y,b.big);
             b.life=0; break;
           }
@@ -472,16 +475,17 @@ function build_snowball(api){
         g.save(); g.globalCompositeOperation="lighter"; g.globalAlpha=Math.max(0,flash)*0.3;
         g.fillStyle=flashCol;
         // 軸6(見やすさ): 上部HUD帯(ステージ文字/フィーバーゲージ)はフラッシュの白飛びから外し、常に読めるようにする
-        const hudBand=api.H*0.13;
+        const hudBand=api.H*0.22;
         g.fillRect(0,hudBand,api.W,api.H-hudBand);
         g.restore(); g.globalAlpha=1; g.globalCompositeOperation="source-over";}
 
       // ---- combo text (top center safe zone) ----
       if(combo>1){
         const pop=1+Math.max(0,comboT-0.7)*1.2;
-        g.save(); g.translate(api.W/2,api.H*0.14); g.scale(pop,pop);
+        g.save(); g.translate(api.W/2,api.H*0.20); g.scale(pop,pop);
         g.font="800 32px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
         g.globalAlpha=clamp(comboT,0,1);
+        g.lineJoin="round"; g.lineWidth=5; g.strokeStyle="rgba(0,0,0,.45)"; g.strokeText("コンボ x"+combo,0,0);
         g.shadowColor="rgba(80,160,255,.8)"; g.shadowBlur=14;
         g.fillStyle="#ffffff"; g.fillText("コンボ x"+combo,0,0);
         g.shadowBlur=0; g.lineWidth=1.5; g.strokeStyle="rgba(120,180,255,.7)";
@@ -514,14 +518,14 @@ function build_snowball(api){
       // ① にじいろ とりで！ 中央バナー(虹色に色替わり=レアの大きな祝福)
       if(rbMsgT>0){rbMsgT-=0.016*dt;
         const pop=1+Math.max(0,rbMsgT-1)*1.3, col=RAINBOW[Math.floor(tsec*6)%RAINBOW.length];
-        g.save(); g.translate(api.W/2,api.H*0.22); g.scale(pop,pop); g.textAlign="center";
+        g.save(); g.translate(api.W/2,api.H*0.27); g.scale(pop,pop); g.textAlign="center";
         g.globalAlpha=clamp(rbMsgT*1.4,0,1); g.font="900 40px 'Hiragino Maru Gothic ProN',system-ui";
         g.lineWidth=7; g.strokeStyle="rgba(0,0,0,.45)"; g.strokeText("にじいろ とりで！",0,0);
         g.fillStyle=col; g.fillText("にじいろ とりで！",0,0);
         g.restore(); g.globalAlpha=1; g.textAlign="left"; if(rbMsgT<0)rbMsgT=0;}
       // ② きょうのラッキー色 はっけん！ 中央の小ヒント(初回だけ)
       if(luckyTeachT>0){luckyTeachT-=0.016*dt;
-        g.save(); g.translate(api.W/2,api.H*0.3); g.textAlign="center";
+        g.save(); g.translate(api.W/2,api.H*0.33); g.textAlign="center";
         g.globalAlpha=clamp(luckyTeachT*1.2,0,1); g.font="800 23px 'Hiragino Maru Gothic ProN',system-ui";
         const t2="きょうのラッキーは "+(FLAGNAME[luckyFlag]||"")+"の はた！";
         g.lineWidth=5; g.strokeStyle="rgba(0,0,0,.45)"; g.strokeText(t2,0,0);
@@ -543,7 +547,7 @@ function build_snowball(api){
       // ---- stage clear banner ----
       if(clearT>0){clearT-=0.016*dt;
         const a=clamp(clearT*1.4,0,1);
-        g.save(); g.globalAlpha=a*0.45; g.fillStyle="#1a2a4a"; g.fillRect(0,api.H*0.34,api.W,api.H*0.22); g.restore();
+        g.save(); g.globalAlpha=a*0.3; g.fillStyle="#1a2a4a"; g.fillRect(0,api.H*0.37,api.W,api.H*0.16); g.restore();
         const pop=1+Math.max(0,clearT-1.3)*1.8;
         g.save(); g.translate(api.W/2,api.H*0.45); g.scale(pop,pop); g.globalAlpha=a;
         g.textAlign="center"; g.font="900 46px 'Hiragino Maru Gothic ProN',system-ui";

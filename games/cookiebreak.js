@@ -101,7 +101,7 @@ function build_cookiebreak(api){
   function maybeAddBig(){
     let made=0;
     for(let c=0;c<cols;c++){
-      if(Math.random()>=0.2) continue;
+      if(Math.random()>=(stage>1?0.3:0.2)) continue;
       if(mergeBigIn(c)) made++;
     }
     // 軸7: 塔に大玉が1個も無い時は、どれかの列で必ず合体させて「大きい物」が画面に出るようにする(ステージ1は塔が低くても)
@@ -195,8 +195,8 @@ function build_cookiebreak(api){
       for(const o of blocks){const dx=o.x+S/2-px,dy=o.y+S*(o.h||1)/2-py,d=dx*dx+dy*dy;
         if(d<bd){bd=d;b=o;}}
       if(!b){ api.tone(220,0.05,"triangle",0.05); return; }
-      // 軸3: 最初の1回が割れたあとは、おかしの近く(S*1.3以内)を狙った時だけ割れる。遠いタップは「ぽよん」だけ(減点・ゲームオーバー無し)
-      if(firstBreak && fcount-lastBreakF<150 && Math.sqrt(bd)>S*1.3){  // 2.5秒以上何も割れていない時は距離無制限に戻す(遠くの最後の1個で詰まらない安全網)
+      // 軸3: 最初の1回が割れたあとは、おかしの近く(S以内)を狙った時だけ割れる。遠いタップは「ぽよん」だけ(減点・ゲームオーバー無し)
+      if(firstBreak && fcount-lastBreakF<150 && Math.sqrt(bd)>S*1.0){  // 2.5秒以上何も割れていない時は距離無制限に戻す(遠くの最後の1個で詰まらない安全網)
         api.tone(260,0.06,"triangle",0.06);
         rings.push({x:px,y:py,r:S*0.18,life:0.7,col:"#fff"});
         return;
@@ -273,7 +273,7 @@ function build_cookiebreak(api){
     }
     // ② きょうのラッキーおかし命中: 小さな祝福(白飛びしないよう控えめ)＋初回だけ中央に教示
     if(isLucky){
-      luckyMsgT=luckySeen?Math.max(luckyMsgT,0.7):1.6; luckySeen=true;
+      if(blocks.length>0) luckyMsgT=luckySeen?Math.max(luckyMsgT,0.7):1.6; luckySeen=true;
       api.tone(1046,0.14,"triangle",0.1); api.tone(1568,0.16,"triangle",0.08);
       floats.push({x:offsetFloatX(cx),y:cy-84,txt:"ラッキー！",life:1,vy:-0.9,col:b.type.chip,size:26});
       for(let i=0;i<7;i++){const a=rnd(-TAU*0.5,0),v=rnd(2,5);
@@ -313,7 +313,7 @@ function build_cookiebreak(api){
     clearNext=stage+1;
     // ③ ノンストップ クリア: コンボを一度も切らさず塔を割り切ったら +5 & 祝福(考えどころ=手を止めず一気に)
     if(comboKept){ count+=5; api.setScore(count); nonstopT=1.9;
-      floats.push({x:api.W/2,y:api.H*0.3,txt:"ノンストップ！ ＋5",life:1,vy:-0.6,col:"#7be08a",size:34});
+      floats.push({x:api.W/2,y:api.H*0.5,txt:"ノンストップ！ ＋5",life:1,vy:-0.6,col:"#7be08a",size:34});
       for(let i=0;i<16&&sparks.length<180;i++){const a=rnd(0,TAU),v=rnd(3,8);
         sparks.push({x:api.W/2,y:api.H*0.42,vx:Math.cos(a)*v,vy:Math.sin(a)*v-2,life:1,decay:rnd(0.012,0.02),s:rnd(2,5),col:"#7be08a"});}
       api.tone(1318,0.14,"triangle",0.1); setTimeout(()=>{try{api.tone(1976,0.16,"triangle",0.08);}catch(e){}},120);
@@ -352,7 +352,7 @@ function build_cookiebreak(api){
         if(fever<=0){ fever=0;
           api.tone(660,0.15,"triangle",0.1);
           setTimeout(()=>{try{api.tone(440,0.2,"triangle",0.09);}catch(e){}},130);
-          floats.push({x:api.W/2,y:api.H*0.3,txt:"フィーバー おわり",life:1,vy:-0.5,col:"#fff",size:24});
+          floats.push({x:api.W/2,y:api.H*0.5,txt:"フィーバー おわり",life:1,vy:-0.5,col:"#fff",size:24});
         }
       }
       // ---- background: image cover(candy-land) + fallback candy sky gradient (fever = rainbow disco sky!) ----
@@ -527,7 +527,7 @@ function build_cookiebreak(api){
       // ---- FEVER start banner ----
       if(feverBanner>0){ feverBanner=Math.max(0,feverBanner-0.016*dt);
         const a=clamp(feverBanner,0,1),pop=1+0.12*Math.sin(tsec*11);
-        g.save(); g.translate(api.W/2,api.H*0.36); g.scale(pop,pop); g.globalAlpha=a;
+        g.save(); g.translate(api.W/2,api.H*0.46); g.scale(pop,pop); g.globalAlpha=a;
         g.textAlign="center"; g.font="900 52px 'Hiragino Maru Gothic ProN',system-ui";
         g.lineWidth=11; g.lineJoin="round"; g.strokeStyle="rgba(120,20,80,.75)";
         g.strokeText("フィーバー！！",0,0);
@@ -544,7 +544,7 @@ function build_cookiebreak(api){
       if(clearBanner>0){ clearBanner=Math.max(0,clearBanner-0.016*dt);
         clearScale=Math.min(1,clearScale+0.12*dt);
         const a=clamp(clearBanner*1.5,0,1), pop=ease(clearScale)*(1+0.06*Math.sin(tsec*9));
-        g.save(); g.globalAlpha=a*0.4; g.fillStyle="#5a2a44"; g.fillRect(0,api.H*0.34,api.W,api.H*0.2); g.restore();
+        g.save(); g.globalAlpha=a*0.4; g.fillStyle="#5a2a44"; g.fillRect(0,api.H*0.34,api.W,api.H*0.22); g.restore();
         g.save(); g.translate(api.W/2,api.H*0.44); g.scale(pop,pop); g.globalAlpha=a;
         g.textAlign="center"; g.font="900 46px 'Hiragino Maru Gothic ProN',system-ui";
         g.lineWidth=10; g.lineJoin="round"; g.strokeStyle="rgba(120,50,80,.7)";
@@ -555,10 +555,10 @@ function build_cookiebreak(api){
         g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui"; g.fillStyle="#fff";
         g.fillText("つぎは ステージ "+clearNext,0,40);
         if(clearTease){
-          g.font="800 17px 'Hiragino Maru Gothic ProN',system-ui";
+          g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
           g.lineWidth=5; g.strokeStyle="rgba(120,50,80,.6)";
-          g.strokeText(clearTease,0,70);
-          g.fillStyle="#fff2a0"; g.fillText(clearTease,0,70);
+          g.strokeText(clearTease,0,74);
+          g.fillStyle="#fff2a0"; g.fillText(clearTease,0,74);
         }
         g.restore(); g.globalAlpha=1; g.textAlign="left"; g.lineJoin="miter";
       }
@@ -576,8 +576,8 @@ function build_cookiebreak(api){
       // ② きょうのラッキーおかし はっけん！ 中央の小ヒント(初回だけ大きく)
       if(luckyMsgT>0){ luckyMsgT-=0.016*dt;
         // 軸6対策①: 半透明バンドで背後の浮遊テキストと重なっても文字がにじまないようにする
-        g.save(); g.globalAlpha=clamp(luckyMsgT*1.3,0,1)*0.4; g.fillStyle="#5a2a44"; g.fillRect(0,api.H*0.28-28,api.W,56); g.restore();
-        g.save(); g.translate(api.W/2,api.H*0.28); g.textAlign="center"; g.textBaseline="middle";
+        g.save(); g.globalAlpha=clamp(luckyMsgT*1.3,0,1)*0.4; g.fillStyle="#5a2a44"; g.fillRect(0,api.H*0.43-28,api.W,56); g.restore();
+        g.save(); g.translate(api.W/2,api.H*0.43); g.textAlign="center"; g.textBaseline="middle";
         g.globalAlpha=clamp(luckyMsgT*1.3,0,1); g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
         const t2="きょうのラッキーは "+(FLAVNAME[luckyKey]||"")+"！";
         g.lineWidth=5; g.lineJoin="round"; g.strokeStyle="rgba(90,40,60,.45)"; g.strokeText(t2,0,0);
@@ -611,7 +611,7 @@ function build_cookiebreak(api){
     function bodyPath(px,py,pw,ph,inset){
       if(isJelly) g.ellipse(px+pw/2,py+ph/2,Math.max(0,pw*0.46),Math.max(0,ph*0.42),0,0,TAU);
       else if(isRoundCandy) g.arc(px+pw/2,py+ph/2,Math.max(0,pw*0.44),0,TAU);
-      else if(isBig) g.arc(px+pw/2,py+ph/2,Math.max(0,Math.min(pw,ph)*0.46),0,TAU);
+      else if(isBig) roundRect(px+inset,py+inset,Math.max(0,pw-2*inset),Math.max(0,ph-2*inset),Math.max(0,pw-2*inset)*0.5);   // 2マス分の高さいっぱいの縦長カプセル(大小の対比)
       else if(isStick) roundRect(px+pw*0.3,py+inset*0.5,pw*0.4,ph-inset,pw*0.2);
       else roundRect(px+inset,py+inset,pw-2*inset,ph-2*inset,pw*0.28);
     }
@@ -709,7 +709,7 @@ function build_cookiebreak(api){
       // 軸7対策: おおきいアメ = うずまき模様のジャイアントキャンディ玉(大小の対比)
       g.save(); g.beginPath(); bodyPath(x,y,s,heff,1); g.clip();
       g.strokeStyle="rgba(255,255,255,.55)"; g.lineWidth=Math.max(2,s*0.07);
-      for(let i=0;i<3;i++){ g.beginPath(); g.arc(x+s/2,y+heff/2,Math.max(0,s*(0.14+i*0.13)),0,TAU); g.stroke(); }
+      for(let i=0;i<3;i++){ g.beginPath(); g.ellipse(x+s/2,y+heff/2,Math.max(0,s*(0.12+i*0.11)),Math.max(0,heff*(0.12+i*0.14)),0,0,TAU); g.stroke(); }
       g.restore();
       // 頭に小さなキャンディの結び目(ラッピングの端)を付けて「アメ玉」感を出す
       g.fillStyle=lighten(t.col,20);

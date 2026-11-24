@@ -140,7 +140,8 @@ function buildMeteor(api){
         count+=3;hitCount++;colorWash=1;washHue=18;api.shake(34);api.boom(0.5);api.slide(900,120,0.35,0.4,"sawtooth");
         for(let i=0;i<22;i++){const a=rnd(0,TAU),s=rnd(4,12);
           sparks.push({x:u.x,y:u.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,len:rnd(8,18),life:1,decay:rnd(0.03,0.05),col:pick(["#7affd2","#fff2a0","#fff"])});}
-        floats.push({x:u.x,y:u.y-30,txt:"ボーナス！",life:1,vy:-1.2,col:"#7affd2",size:38});}
+        // 軸6対策: UFOの真上に出すと「にじいろビル！(0.2H)」「てんさい！(0.3H)」の帯と重なって欠けるため、低い固定帯へ。見出し表示中はさらに下げる
+        floats.push({x:clamp(u.x,90,api.W-90),y:rbMsgT>0?groundY-60:groundY-140,txt:"ボーナス！",life:1,vy:-0.9,col:"#7affd2",size:38});}
     }
     // コンボは命中した時だけ伸ばす(空振りでx2等が出ていた実装ミスの修正・軸2/軸3対策)
     if(hitCount>0){combo++;comboT=1;lastScoreT=tnow;}
@@ -428,7 +429,7 @@ function buildMeteor(api){
       g.textAlign="center";g.fillStyle="#ffd27a";g.lineWidth=4;g.strokeStyle="rgba(0,0,0,.4)";
       g.strokeText(ct,api.W/2,cy);g.fillText(ct,api.W/2,cy);g.textAlign="left";}
     // --- stage-start / final banner ---
-    if(banT>0&&banner){const a=Math.min(1,banT*1.6);const bfs=clamp(api.W*0.06,26,46);
+    if(banT>0&&banner&&rbMsgT<=0){const a=Math.min(1,banT*1.6);const bfs=clamp(api.W*0.06,26,46);
       g.globalAlpha=a;g.font="900 "+bfs+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
       // 軸6対策: engine.js の祝福バナー(_fx.bann, 固定で api.H*0.3 に描画)と帯が重なって
       // 文字が判読不能に混ざる不具合が実機で確認された。ステージ開始バナーは
@@ -451,7 +452,7 @@ function buildMeteor(api){
       g.globalAlpha=1;g.textAlign="left";}
     // ① にじいろビル！ 発見バナー(虹色に色替わり=激レアの大きな祝福・中央上=HUD安全帯)
     if(rbMsgT>0){const pop=1+Math.max(0,rbMsgT-1)*1.3,col=["#ff5da2","#ffd23f","#5ad1ff","#7be08a","#9b6bff"][Math.floor(tnow*0.15)%5];
-      g.save();g.translate(api.W/2,api.H*(clearT>0?0.44:0.2));g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
+      g.save();g.translate(api.W/2,api.H*(clearT>0?0.44:0.22));g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
       g.globalAlpha=clamp(rbMsgT*1.4,0,1);g.font="900 "+clamp(api.W*0.07,30,48)+"px 'Hiragino Maru Gothic ProN',system-ui";
       g.lineWidth=8;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText("にじいろビル！",0,0);
       g.fillStyle=col;g.fillText("にじいろビル！",0,0);
@@ -565,8 +566,8 @@ function buildMeteor(api){
   function drawUfo(u){
     const yy=u.y+Math.sin(u.bob)*6;
     if(u.hp<=0){ // pop flash
-      g.globalCompositeOperation="lighter";g.globalAlpha=Math.max(0,u.boom||0);
-      g.fillStyle="#7affd2";g.beginPath();g.arc(u.x,yy,u.r*1.8,0,TAU);g.fill();
+      g.globalCompositeOperation="lighter";g.globalAlpha=Math.max(0,u.boom||0)*0.45;
+      g.fillStyle="#7affd2";g.beginPath();g.arc(u.x,yy,Math.max(0,u.r*1.3),0,TAU);g.fill();
       g.globalCompositeOperation="source-over";g.globalAlpha=1;return;
     }
     g.save();

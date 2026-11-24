@@ -19,7 +19,7 @@ function build_snowman(api){
   let stageMelt=0,perfectT=0;                                          // ③ パーフェクト(だれも とけずに クリア)
   let bunny=null,bunnyT=240;                                           // ④ ひみつの ゆきうさぎ(みっけ でごほうび)
   // ---- 無反応アシスト(理不尽な"詰み時間"を防ぐ保険。ふだんの当たり判定は変えない) ----
-  let idleF=0,assistMR=1,firstScored=false,started2=false;
+  let idleF=0,assistMR=1.5,firstScored=false,started2=false;
   let spawnN=0,kamaPity=0,penPity=0;                                   // 出現の数え(最初の2体の大小・かまくら/ペンギンの保険)
   function stageGoalFor(s){return 10+(s-1)*3;}     // 10,13,16...（7〜8歳向けに手応えを増やした）
   function spawnInt(){return clamp(54-(stage-1)*5,30,54);}
@@ -44,8 +44,8 @@ function build_snowman(api){
   layout();
   function spawn(){
     if(mans.length>=(fever>0?10:9))return;
-    const x=rnd(R*1.4,api.W-R*1.4);
-    const y=rnd(api.H*0.34,api.H*0.86);
+    const x=spawnN<2?rnd(api.W*0.3,api.W*0.7):rnd(R*1.4,api.W-R*1.4);
+    const y=spawnN<2?rnd(api.H*0.45,api.H*0.7):rnd(api.H*0.34,api.H*0.86);
     // ① にじいろ ゆきだるま: ステージ2以降、ごくまれ(約5%)。予告のきらめきが集まってから出る激レア。
     // count>0(既に1回は得点済み)を条件に足し、開始直後の最初のスポーン機会が予告で潰れないようにする
     if(stage>=2&&count>0&&!pendingRare&&!mans.some(m=>m.type==="rainbow")&&Math.random()<0.05){
@@ -301,7 +301,7 @@ function build_snowman(api){
       // (ふだんの手応え・歯ごたえは変えず、理不尽に何も起きない時間だけを保険で断ち切る)
       if(clearT<=0){
         idleF+=dt;
-        const forceAt=firstScored?360:90,assistAt=firstScored?600:180;
+        const forceAt=firstScored?240:90,assistAt=firstScored?480:180;
         if(idleF>forceAt&&mans.length<(fever>0?10:9)&&spawnT>12)spawnT=12;
         if(idleF>assistAt)assistMR=1.6;
       }
@@ -438,7 +438,7 @@ function build_snowman(api){
         g.restore();g.globalAlpha=1;g.textAlign="left";if(rbMsgT<0)rbMsgT=0;}
       // ② きょうの ラッキー色 はっけん(初回だけ 大きく色名を教える)
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
-        g.save();g.translate(api.W/2,api.H*0.37);g.textAlign="center";
+        g.save();g.translate(api.W/2,clearT>0?api.H*0.28:api.H*0.37);g.textAlign="center";
         g.globalAlpha=clamp(luckyMsgT*1.4,0,1);g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
         const t2="きょうの ラッキー色は "+(SCARFNAME[SCARF.indexOf(luckyColor)]||"")+"！";
         g.lineWidth=5;g.strokeStyle="rgba(10,40,70,.45)";g.strokeText(t2,0,0);

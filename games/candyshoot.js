@@ -165,6 +165,7 @@ function buildCandyshoot(api){
     if(t.hp>0){t.flash=1;hitFx(bx,by,"#fff",false);
       api.slide(420,300,0.08,0.16,"square");api.noise(0.05,0.1,1400);api.shake(3);return false;}
     t._dead=true;
+    let fy=Math.max(t.y+t.dy-t.r-8,api.H*0.28);           // 同じ1回の pop で出る文字は縦に積んで重ねない
     let gain=t.kind==="cake"?3:(t.kind==="lolli"||t.kind==="donut"?2:(t.kind==="gold"?5:(t.kind==="rainbow"?8:1)));
     // ② ラッキー色: 今日の秘密の色を割ると +1 の隠しボーナス。気づくと得する。
     if(t.lucky){gain+=1;luckyMsgT=luckySeen?Math.max(luckyMsgT,0.7):1.6;luckySeen=true;}
@@ -178,21 +179,21 @@ function buildCandyshoot(api){
     hitFx(t.x,t.y+t.dy,t.col,big||combo>=5,t.kind);
     if(t.kind==="gold"){
       goldBurst(t.x,t.y+t.dy);
-      floats.push({x:t.x,y:t.y-t.r-8,txt:"ゴールド！＋"+gain,life:1,vy:-0.9,col:"#ffd23f",size:34});
+      floats.push({x:t.x,y:fy,txt:"ゴールド！＋"+gain,life:1,vy:-0.9,col:"#ffd23f",size:34});fy-=34;
     }
     if(t.kind==="rainbow"){
       rainbowBurst(t.x,t.y+t.dy);rbMsgT=1.5;
-      floats.push({x:t.x,y:t.y-t.r-8,txt:"にじいろ！＋"+gain,life:1,vy:-0.9,col:"#ff6fae",size:38});
+      floats.push({x:t.x,y:fy,txt:"にじいろ！＋"+gain,life:1,vy:-0.9,col:"#ff6fae",size:38});fy-=34;
     }
     if(t.lucky){
       api.tone(1046,0.12,"triangle",0.11);api.tone(1568,0.14,"triangle",0.08);
       for(let i=0;i<8;i++){const a=rnd(0,TAU),s2=rnd(2,6);
         shards.push({x:t.x,y:t.y+t.dy,vx:Math.cos(a)*s2,vy:Math.sin(a)*s2-2,r:rnd(3,6),
           rot:rnd(0,TAU),vr:rnd(-0.3,0.3),life:1,decay:rnd(0.02,0.03),col:luckyColor,shape:0});}
-      floats.push({x:t.x,y:t.y-t.r-6,txt:"ラッキー！",life:1,vy:-0.9,col:luckyColor,size:26});
+      floats.push({x:t.x,y:fy,txt:"ラッキー！",life:1,vy:-0.9,col:luckyColor,size:26});fy-=34;
     }
-    if(combo>=4)floats.push({x:t.x,y:t.y-t.r-(combo%2)*30,txt:"x"+combo,life:1,vy:-1.1,
-      col:combo>=8?"#ff2bff":combo>=4?"#ff7bb8":"#ffd23f",size:combo>=4?38:28});
+    if(combo>=4){floats.push({x:t.x,y:fy,txt:"x"+combo,life:1,vy:-1.1,
+      col:combo>=8?"#ff2bff":combo>=4?"#ff7bb8":"#ffd23f",size:combo>=4?38:28});fy-=34;}
     if(combo>=3){celebrate=Math.min(1.4,0.6+combo*0.06);}
     // fever gauge fills with every pop; gold gives a big chunk
     if(feverT<=0){fever=Math.min(1,fever+(t.kind==="gold"?0.34:0.07));
@@ -210,6 +211,7 @@ function buildCandyshoot(api){
     if(shards.length>170)shards.splice(0,shards.length-170);
   }
   function startFever(){
+    luckyMsgT=0;                      // フィーバー帯を優先(同じ高さのラッキー帯を消す)
     feverT=10;fever=1;flash=1;flashHue="#ff7bb8";
     api.boom(0.7);api.shake(16);api.slide(220,1760,0.5,0.22,"square");
     [0,4,7,12,16].forEach((s,i)=>setTimeout(()=>api.tone(523*Math.pow(2,s/12),0.14,"triangle",0.12),i*60));

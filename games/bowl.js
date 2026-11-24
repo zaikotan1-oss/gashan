@@ -50,16 +50,16 @@ function buildBowl(api){
   function stageDef(){return STAGES[clamp(stage-1,0,MAXSTAGE-1)];}
   function layout(){
     topY=api.H*0.2;botY=api.H*0.92;
-    laneTopW=clamp(api.W*0.16,80,150);laneBotW=clamp(api.W*0.62,300,640);
+    laneTopW=clamp(api.W*0.2,100,190);laneBotW=clamp(api.W*0.62,300,640);
   }
-  function sc(y){return lerp(1.15,1.9,clamp((y-topY)/(botY-topY),0,1));} // 【軸6】主役のピンを大きく(指で狙える大きさ)
+  function sc(y){return lerp(1.4,2.1,clamp((y-topY)/(botY-topY),0,1));} // 【軸6】主役のピンを大きく(指で狙える大きさ)
   function ballSc(y){return lerp(0.8,1.4,clamp((y-topY)/(botY-topY),0,1));} // ボールは手前のヒント帯と重ならない大きさに据え置き気味
   function laneHalf(y){return lerp(laneTopW,laneBotW,clamp((y-topY)/(botY-topY),0,1))/2;}
   function rack(){
     pins=[];
     const def=stageDef();
     const rows=clamp(3+Math.floor(round/2),3,6);
-    const cy=topY+api.H*0.14, gap=api.W*0.075; // 【軸6】ピンが大きくなった分、間隔を広げて重ならないように
+    const cy=topY+api.H*0.14, gap=api.W*0.085; // 【軸6】ピンが大きくなった分、間隔を広げて重ならないように
     let id=0;
     const cells=[];
     for(let r=0;r<rows;r++){
@@ -151,7 +151,7 @@ function buildBowl(api){
     const sN=gold?rint(10,14):rint(5,8);
     for(let k=sN;k>0;k--){const a2=rnd(0,TAU),sp=rnd(2,gold?9:7);sparks.push({x:p.x,y:p.y,vx:Math.cos(a2)*sp,vy:Math.sin(a2)*sp-rnd(0,3),r:rnd(2,gold?6:5),life:1,decay:rnd(0.025,0.05),col});}
     for(let k=rint(2,gold?6:4);k>0;k--)glints.push({x:p.x+rnd(-10,10),y:p.y+rnd(-12,4),r:rnd(4,gold?12:9),life:1,decay:rnd(0.04,0.07),rot:rnd(0,TAU)});
-    if(gold){api.tone(880,0.16,"triangle",0.13);api.slide(700,1200,0.12,0.22,"square");pushFloat({x:p.x,y:p.y-20,txt:"+3",col:"#ffe14a",life:1,vy:-1.4,size:30});}
+    if(gold){api.tone(880,0.16,"triangle",0.13);api.slide(700,1200,0.12,0.22,"square");pushFloat({x:p.x,y:p.y-20,txt:"+3",col:"#ffe14a",life:1,vy:-0.8,size:30});}
     if(rainbow)rainbowBurst(p);
     if(isLucky)luckySparkle(p);
     if(barrel)barrelBreak(p);
@@ -179,7 +179,9 @@ function buildBowl(api){
   // 表示中の固定バナー(にじいろ/ラッキー色/連続ストライク/パーフェクト)とy帯(±44px)が近ければずらす
   function pushFloat(f){
     let tries=0;
-    while(tries<6 && (floats.some(o=>Math.abs(o.y-f.y)<44) || activeBannerYs().some(y=>Math.abs(y-f.y)<44))){f.y+=44;tries++;}
+    const fw=(o)=>o.size*(o.txt||"").length*0.5; // 文字幅の半分(ひらがな主体なのでおおまかに size*文字数/2)
+    const big=f.size>=28&&Math.abs(f.x-api.W/2)<260; // 大きい文字が中央にある時は、engine の祝福バナー(H*0.3・高さ約80px)の帯も避ける
+    while(tries<6 && (floats.some(o=>Math.abs(o.y-f.y)<60&&Math.abs(o.x-f.x)<fw(o)+fw(f)) || activeBannerYs().some(y=>Math.abs(y-f.y)<60) || (big&&Math.abs(api.H*0.3-f.y)<50))){f.y+=44;tries++;}
     floats.push(f);
   }
   // ① にじいろピン撃破: 虹の輪＋大量得点＋祝福(白飛び防止に加算は局所・短命)
@@ -539,7 +541,7 @@ function buildBowl(api){
       }
       // combo float when big knockdown
       if(combo>=3&&ball.state==="roll"&&!floats.some(f=>f._c)){
-        pushFloat({x:api.W/2,y:api.H*0.3,txt:combo+"ほんたおし！",col:combo>=8?"#ff3b3b":"#ff8c42",life:1,vy:-1,size:36,_c:1});
+        pushFloat({x:api.W/2,y:api.H*0.46,txt:combo+"ほんたおし！",col:combo>=8?"#ff3b3b":"#ff8c42",life:1,vy:-1,size:36,_c:1});
       }
       // 【軸6】祝福テキスト(コンボ/にじいろ/ラッキー/ストライク/パーフェクト)は、この下の
       // climax color-wash と ステージクリア演出(加算合成のフラッシュ)より必ず後で描く。
@@ -582,12 +584,17 @@ function buildBowl(api){
       }
       // 【軸6】ここから祝福テキストを最前面に描く(上の光エフェクトの後に描くことで文字が消えないようにする)
       for(const f of floats){f.y+=f.vy*dt;f.life-=0.014*dt;
-        const a=Math.max(0,f.life);g.globalAlpha=a;
+        const a=Math.max(0,f.life);
+        // 【軸6】薄くなりかけの文字を早めに消す(新しい文字の後ろに薄い文字が残って重なって見えるのを防ぐ)。
+        // 小さい文字が、同じ所にある大きい文字と重なっている間は、大きい方を読ませるため薄くする
+        let da=Math.min(1,a*1.6);
+        for(const o of floats){if(o!==f&&o.size>f.size&&Math.abs(o.y-f.y)<f.size*0.9+o.size*0.5&&Math.abs(o.x-f.x)<(o.size*(o.txt||"").length+f.size*(f.txt||"").length)*0.5){da*=0.3;break;}}
+        g.globalAlpha=da;
         const pop=1+(1-a)*0.12;
         g.save();g.translate(f.x,f.y);g.scale(pop,pop);
         g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.shadowColor=f.col;g.shadowBlur=18;
-        if(f.txt==="ストライク！"){g.lineWidth=10;g.strokeStyle="rgba(90,40,0,.85)";}else{g.lineWidth=7;g.strokeStyle="rgba(0,0,0,.55)";}
+        if(f.txt==="ストライク！"){g.lineWidth=10;g.strokeStyle="rgba(90,40,0,.85)";}else{g.lineWidth=8;g.strokeStyle="rgba(0,0,0,.75)";}
         g.strokeText(f.txt,0,0);
         g.fillStyle=f.col;g.fillText(f.txt,0,0);
         g.restore();}
@@ -612,7 +619,7 @@ function buildBowl(api){
         g.save();g.translate(api.W/2,api.H*0.27);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
         const t2="きょうの ラッキーいろは "+lucky.n+"！";
-        g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.45)";g.strokeText(t2,0,0);
+        g.lineWidth=7;g.strokeStyle="rgba(0,0,0,.75)";g.strokeText(t2,0,0);
         g.fillStyle=lucky.c;g.fillText(t2,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(luckyMsgT<0)luckyMsgT=0;}
       // ③ 連続ストライク(ダブル/ターキー) バナー

@@ -25,6 +25,7 @@ function build_gummy(api){
   const GUM=["#ff5b9e","#5bc8ff","#ffd23f","#7be08a","#c78bff","#ff8c42"];
   const GUMNAME=["ピンク","みずいろ","きいろ","みどり","むらさき","オレンジ"];
   luckyColor=pick(GUM);luckyMsgT=2.6; // 起動時に一度だけ「きょうのラッキーいろは◯！」を中央上に教える
+  function safeY(y){return (y>api.H*0.22&&y<api.H*0.38)?api.H*0.4:y;} // engineの「やったね！」帯(H*0.22〜0.38)を避ける
   function curBg(){return STAGE_BG[(stage-1)%STAGE_BG.length];}
   function stageGoalFor(s){return 10+(s-1)*3;}   // 8,10,12,14→10,13,16,19（7〜8歳向けに手応えを増やした）
   // floating sweet props drifting in the sky (candies/sprinkles)
@@ -112,7 +113,6 @@ function build_gummy(api){
     for(let i=0;i<nb;i++){const a=rnd(0,TAU),s=rnd(3,10);
       bits.push({x:hx,y:hy,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2.5,r:rnd(4,9),
         rot:rnd(0,TAU),vr:rnd(-0.35,0.35),life:1,decay:rnd(0.012,0.02),col:GUM[i%GUM.length],sq:rnd(0.5,1)});}
-    floats.push({x:hx,y:hy-R,txt:"にじいろグミ！",life:1.4,vy:-0.6,col:"#ff5b9e",size:34});
   }
   // ② ラッキー色 命中: 頭上に小さな星のキラッ＋ちいさな祝福(気づけるヒント)
   function luckyStar(hx,hy){
@@ -157,7 +157,7 @@ function build_gummy(api){
     setTimeout(()=>api.tone(784,0.15,"triangle",0.15),100);
     setTimeout(()=>api.tone(988,0.15,"triangle",0.15),200);
     setTimeout(()=>api.tone(1318,0.25,"triangle",0.16),300);
-    floats.push({x:api.W/2,y:api.H*0.3,txt:"フィーバータイム！",life:1.4,vy:-0.4,col:"#ff2b9e",size:44});
+    floats.push({x:api.W/2,y:safeY(api.H*0.3),txt:"フィーバータイム！",life:1.4,vy:-0.4,col:"#ff2b9e",size:44});
     if(bits.length<120)for(let i=0;i<18;i++){const a=rnd(0,TAU),s=rnd(3,9);
       bits.push({x:api.W/2,y:api.H*0.4,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,r:rnd(4,8),
         rot:rnd(0,TAU),vr:rnd(-0.3,0.3),life:1,decay:rnd(0.012,0.02),col:pick(GUM),sq:rnd(0.5,1)});}
@@ -182,7 +182,7 @@ function build_gummy(api){
     api.shake(8);
     const h=holes[4],hx=h?h.x:api.W/2,hy=(h?h.y:api.H/2)-R*2.2;
     smashFx(hx,hy,"#ff4d8d",true);
-    if(combo>1)floats.push({x:hx,y:hy-R,txt:"x"+combo,life:1,vy:-1.1,
+    if(combo>1)floats.push({x:hx+R*3.2*(combo%2?1:-1),y:holes[4].y-R*0.5,txt:"x"+combo,life:1,vy:-1.1,
       col:combo>=8?"#ff2b9e":"#ffd23f",size:combo>=5?40:30});
     if(combo>0&&combo%5===0&&hsCool<=0){api.hitStop(combo>=10?4:3);hsCool=45;}
     addFever(0.05);
@@ -359,7 +359,7 @@ function build_gummy(api){
       // ---- FEVER timer ----
       if(feverT>0){feverT-=0.016*dt;
         if(feverT<=0){feverT=0;feverG=0;api.tone(330,0.2,"sine",0.12);
-          floats.push({x:api.W/2,y:api.H*0.3,txt:"フィーバー おしまい",life:1,vy:-0.5,col:"#fff",size:24});}}
+          floats.push({x:api.W/2,y:safeY(api.H*0.3),txt:"フィーバー おしまい",life:1,vy:-0.5,col:"#fff",size:24});}}
       // ---- BOSS: warn rumble -> rise -> fight -> die ----
       if(bossWarn>0){
         bossWarn-=0.016*dt;
@@ -456,7 +456,7 @@ function build_gummy(api){
         g.fillStyle=flashCol;g.fillRect(0,0,api.W,api.H);
         g.globalAlpha=fa*0.14;g.fillStyle="#fff";g.fillRect(0,0,api.W,api.H);g.restore();g.globalCompositeOperation="source-over";}
       // ---- combo banner (top-center, safe zone) ----
-      if(combo>1){
+      if(combo>1&&rbMsgT<=0&&luckyMsgT<=0&&clearT<=0&&bossWarn<=0){
         const pop=1+Math.max(0,comboT-0.7)*1.2;
         g.save();g.translate(api.W/2,api.H*0.14);g.scale(pop,pop);
         g.font="800 30px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
@@ -470,7 +470,7 @@ function build_gummy(api){
       // ② きょうのラッキー色 教示バナー(起動時に一度だけ・上部中央=安全帯)
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
         const nm=GUMNAME[GUM.indexOf(luckyColor)]||"",pop=1+Math.max(0,luckyMsgT-2.0)*1.2;
-        g.save();g.translate(api.W/2,api.H*0.22);g.scale(pop,pop);g.textAlign="center";
+        g.save();g.translate(api.W/2,api.H*0.19);g.scale(pop,pop);g.textAlign="center";
         g.globalAlpha=clamp(luckyMsgT,0,1);g.font="800 24px 'Hiragino Maru Gothic ProN',system-ui";
         const t="きょうの ラッキーいろは "+nm+"！";
         g.lineWidth=5;g.strokeStyle="rgba(120,40,90,.5)";g.strokeText(t,0,0);
@@ -479,7 +479,7 @@ function build_gummy(api){
       // ① にじいろグミ！ 発見バナー(虹色に色替わり=レアの大きな祝福・上部中央)
       if(rbMsgT>0){rbMsgT-=0.016*dt;
         const col=GUM[Math.floor(tGlobal*0.12)%GUM.length],pop=1+Math.max(0,rbMsgT-1)*1.3;
-        g.save();g.translate(api.W/2,api.H*0.2);g.scale(pop,pop);g.textAlign="center";
+        g.save();g.translate(api.W/2,api.H*0.17);g.scale(pop,pop);g.textAlign="center";
         g.globalAlpha=clamp(rbMsgT*1.4,0,1);g.font="900 34px 'Hiragino Maru Gothic ProN',system-ui";
         g.lineWidth=6;g.strokeStyle="rgba(40,5,35,.6)";g.strokeText("にじいろグミ！",0,0);
         g.fillStyle=col;g.fillText("にじいろグミ！",0,0);
@@ -500,7 +500,7 @@ function build_gummy(api){
       // ---- STAGE CLEAR banner ----
       if(clearT>0){clearT-=0.016*dt;
         const a=clamp(clearT*1.4,0,1);
-        g.save();g.globalAlpha=a*0.4;g.fillStyle="#7a2b55";g.fillRect(0,api.H*0.34,api.W,api.H*0.22);g.restore();
+        g.save();g.globalAlpha=a*0.25;g.fillStyle="#7a2b55";g.fillRect(0,api.H*0.34,api.W,api.H*0.22);g.restore();
         const pop=1+Math.max(0,clearT-1.3)*1.8;
         g.save();g.translate(api.W/2,api.H*0.45);g.scale(pop,pop);g.globalAlpha=a;
         g.textAlign="center";g.font="900 44px 'Hiragino Maru Gothic ProN',system-ui";
@@ -523,9 +523,11 @@ function build_gummy(api){
     if(bossWarn>0||boss){
       const bw=Math.min(api.W*0.6,360),bh=16,bx=(api.W-bw)/2,by=api.H*0.05;
       g.save();g.textAlign="center";
-      g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
+      g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
       g.fillStyle="#fff";g.shadowColor="rgba(120,40,90,.5)";g.shadowBlur=6;
-      g.fillText(boss?"キンググミを たおせ！":"ステージ "+stage+"  ボスステージ！",api.W/2,by-8);
+      g.lineWidth=5;g.strokeStyle="rgba(120,40,90,.75)";g.lineJoin="round";
+      const bt=boss?"キンググミを たおせ！":"ステージ "+stage+"  ボスステージ！";
+      g.strokeText(bt,api.W/2,by-8);g.fillText(bt,api.W/2,by-8);
       g.shadowBlur=0;
       g.fillStyle="rgba(120,40,90,.3)";rr(bx,by,bw,bh,bh/2);g.fill();
       const fr=boss?clamp(boss.hp/boss.maxHp,0,1):1;
@@ -539,9 +541,11 @@ function build_gummy(api){
     const left=clamp(stageGoal-stageKill,0,stageGoal);
     const bw=Math.min(api.W*0.6,360),bh=16,bx=(api.W-bw)/2,by=api.H*0.05;
     g.save();g.textAlign="center";
-    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
+    g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
     g.fillStyle="#fff";g.shadowColor="rgba(120,40,90,.5)";g.shadowBlur=6;
-    g.fillText("ステージ "+stage+"      あと "+left+" こ",api.W/2,by-8);
+    g.lineWidth=5;g.strokeStyle="rgba(120,40,90,.75)";g.lineJoin="round";
+    const ht="ステージ "+stage+"      あと "+left+" こ";
+    g.strokeText(ht,api.W/2,by-8);g.fillText(ht,api.W/2,by-8);
     g.shadowBlur=0;
     g.fillStyle="rgba(120,40,90,.3)";rr(bx,by,bw,bh,bh/2);g.fill();
     const fr=clamp(stageKill/stageGoal,0,1);
@@ -565,10 +569,12 @@ function build_gummy(api){
       g.fillStyle=gg;rr(x,y,Math.max(h,w*fr),h,h/2);g.fill();g.shadowBlur=0;
     }
     g.strokeStyle="rgba(255,255,255,.55)";g.lineWidth=2;rr(x-4,y-3,w+8,h+6,(h+6)/2);g.stroke();
-    g.font="800 14px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
+    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
     g.fillStyle=on?"#ffd23f":"#fff";
     g.shadowColor="rgba(120,40,90,.6)";g.shadowBlur=5;
-    g.fillText(on?"フィーバーちゅう！！":"フィーバー",api.W/2,y-8);
+    const ft=on?"フィーバーちゅう！！":"フィーバー";
+    g.lineWidth=5;g.strokeStyle="rgba(120,40,90,.75)";g.lineJoin="round";
+    g.strokeText(ft,api.W/2,y-8);g.fillText(ft,api.W/2,y-8);
     g.restore();g.textAlign="left";
   }
   function drawBoss(){

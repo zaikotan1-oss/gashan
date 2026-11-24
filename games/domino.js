@@ -11,8 +11,10 @@ function buildDomino(api){
   // stage / progression state
   const MAXSTAGE=5;
   let stage,stageBombs,banner,clearT,clearStars,clearChain,clearCount,allClear,clearPerfect,ambientT;
+  let clearDur=160,clearNeed=0,lapPerfectBefore=true;   // 軸5: クリア画面の長さ・★3まであと何れんさ・やりなおし用に一つ前の lapPerfect
   let lap=0,goldMode=false,lapPerfect=true,nextGold=false,hudStars=0,starPop=[0,0,0];   // 軸5: 2しゅうめ・きんいろ・HUDの★目標
   // per-stage warm/cool accent palette so the board "looks different" over time
+  const FORCE={2:["car","stack","row"],3:["row","car","big"],4:["stack","car","row"],5:["big","car","stack"]};
   const STAGE_TINT=["#ffd9a0","#a7d8ff","#cdb6ff","#9bff9b","#ff9bd0"];
   // ---- 隠し発見レイヤー(クレーン/ハンマー/トラックと同じ思想) ----
   // ② きょうのラッキー色: 色ばくだんが持つ色相の中から毎プレイ1色を秘密に選ぶ
@@ -49,7 +51,8 @@ function buildDomino(api){
     const fits=(x,y,r,k)=>{for(const o of bombs){if(Math.hypot(o.x-x,o.y-y)<(o.r+r)*k)return false;}return true;};
     for(let a=0;a<tries&&placed<stageBombs;a++){
       // 1面は 最初に特大(木箱)・2個目に積み木箱・3個目にドミノの列を保証: 最初の10秒から丸以外が4形見える
-      const type=(n===1&&placed===0)?"big":(n===1&&placed===1)?"stack":(n===1&&placed===2)?"row":rollType(n);
+      // 軸7: 2面以降も 最初の3個は面ごとの固定表から(丸い爆弾ばかりで始まらない・最初の連鎖で必ず違う物が壊れる)
+      const type=(n===1&&placed===0)?"big":(n===1&&placed===1)?"stack":(n===1&&placed===2)?"row":(n>=2&&placed<3&&FORCE[n])?FORCE[n][placed]:rollType(n);
       const nb=mkBomb(0,0,type);
       // 最初の2個は必ず鎖に(連鎖を最初に体験させる)、以降は約1/3をクラスターに
       const cluster=placed>0&&(placed<3||placed%3===1||Math.random()<0.25);
@@ -59,7 +62,7 @@ function buildDomino(api){
         const lo=Math.max(CONNR*0.55,(an.r+nb.r)*1.12),hi=Math.min(reachOf(an),CONNR*nb.sz)*0.95;
         const d=hi>lo?rnd(lo,hi):Math.min(lo,hi*1.0);
         const ang=rnd(0,TAU);x=an.x+Math.cos(ang)*d;y=an.y+Math.sin(ang)*d;
-        ok=x>=XL&&x<=XR&&y>=YT&&y<=YB&&fits(x,y,nb.r,1.1);
+        ok=x>=XL&&x<=XR&&y>=YT&&y<=YB&&fits(x,y,nb.r,(n>=2&&placed<3&&FORCE[n])?0.85:1.1); // 固定の3個は大きい物同士でも必ず隣に置けるよう、すこしだけ詰めてよい
       }else{
         x=rnd(XL,XR);y=rnd(YT,YB);ok=fits(x,y,nb.r,1.25);
       }
@@ -79,13 +82,15 @@ function buildDomino(api){
     // 星の条件は「その面の爆弾の数」に対する割合(1面6個でも・5面16個でも 3つ/2つに届く)
     clearStars=maxChain>=Math.max(4,Math.ceil(stageBombs*0.7))?3:maxChain>=Math.max(3,Math.ceil(stageBombs*0.4))?2:1;
     // さいこうれんさ(きろく): 前より伸びたら「しんきろく！」
+    lapPerfectBefore=lapPerfect;
+    clearNeed=Math.max(0,starTh()[2]-maxChain);
     if(clearStars<3)lapPerfect=false;   // 5面ぜんぶ★3の周だけ 次の周が きんいろ
     clearNewRecord=(bestChain>=2&&maxChain>bestChain);
     if(maxChain>bestChain)bestChain=maxChain;
     clearBest=bestChain;
     allClear=(stage>=MAXSTAGE);
     nextGold=allClear&&lapPerfect;
-    clearT=allClear?260:160;
+    clearDur=(allClear||clearStars<3)?260:160;clearT=clearDur;
     flash=Math.max(flash,0.7);megaFlash=Math.max(megaFlash,allClear?1:0.7);
     api.shake(allClear?40:24);api.boom(allClear?0.7:0.5);
     if(api._celebrate)try{api._celebrate();}catch(e){}
@@ -105,12 +110,12 @@ function buildDomino(api){
     if(r<rainbow)return"rainbow";
     // 軸7: ドミノの列(倒れる)・くるま(タイヤが転がる)は独立のくじで足す(他の種類の確率は動かさない)
     const r2=rnd(0,1);
-    const row=clamp(0.04+n*0.02,0,0.12);
+    const row=n===1?clamp(0.04+n*0.02,0,0.12):clamp(0.08+n*0.02,0,0.16); // 1面は最初の3個を固定で違う形にしており最初の得点の速さを守るため据え置き
     if(r2<row)return"row";
-    const car=n>=2?clamp(0.03*n,0,0.1):0;
+    const car=n>=2?clamp(0.06+0.02*n,0,0.14):0;
     if(r2<row+car)return"car";
     const big=clamp(0.05+n*0.04,0,0.28); // 特大爆弾(大連鎖の起点)
-    const stack=clamp(0.06+n*0.015,0,0.14); // 積み木箱(3段・崩れるように壊れる)
+    const stack=n===1?clamp(0.06+n*0.015,0,0.14):clamp(0.10+n*0.015,0,0.18); // 積み木箱(3段・崩れるように壊れる)
     const timed=clamp(0.18+n*0.04,0,0.4); // 時限自動着火。軸5修正(外れタップでの増殖廃止)で盤面が疎になった分、
     // タップに頼らず自動で連鎖が進む機会を増やし、狙いが下手でも詰まらないようにする(軸3のmaxQuietSec対策)。
     const color=clamp(0.04+n*0.03,0,0.24); // 色違い高得点(1面から低確率で登場)
@@ -124,7 +129,7 @@ function buildDomino(api){
   function mkBomb(x,y,type){type=type||"normal";
     const baseR=clamp(api.W*0.04,20,32);
     // 軸7: 大きさに差をつける(ふつうは0.8〜1.25倍・特大は1.5倍)。reachOf も大きさに比例させる
-    const sz=type==="big"?1.5:type==="normal"?rnd(0.8,1.25):1;
+    const sz=type==="big"?1.5:type==="normal"?rnd(0.7,1.35):1;
     // 軸7: ドミノの列は細長いので r を少し大きく(当たりの円 1.6r を指より大きく保つ)。くるまは横長なので r を更に大きく
     const r=type==="row"?baseR*1.15:type==="car"?baseR*1.25:baseR*sz;
     return{x,y,r,sz,type,state:"idle",t:0,fuse:rnd(0,TAU),sx:1,sy:1,born:1,bob:rnd(0,TAU),
@@ -189,7 +194,7 @@ function buildDomino(api){
     const m1=Math.max(3,Math.ceil(stageBombs*0.4)),m2=Math.max(m1+1,Math.ceil(stageBombs*0.7));
     if(chain===m1)megaChain(b,false);else if(chain===m2)megaChain(b,true);
     // 軸7: 積み木箱は「崩れる」: 段ごとに時間差でバラバラ崩れ落ちる
-    if(b.type==="stack"){crumbles.push({x:b.x,y:b.y-b.r,delay:4},{x:b.x,y:b.y+b.r,delay:8},{x:b.x,y:b.y,delay:12});}
+    if(b.type==="stack"){crumbles.push({x:b.x,y:b.y-b.r,delay:8},{x:b.x,y:b.y+b.r,delay:16},{x:b.x,y:b.y,delay:24});}
   }
   // HUDの★目標: 今の さいだいれんさ が 1/2/3つ目の条件に届いたら★を塗って小さく鳴らす
   function starTh(){return[1,Math.max(3,Math.ceil(stageBombs*0.4)),Math.max(4,Math.ceil(stageBombs*0.7))];}
@@ -205,6 +210,10 @@ function buildDomino(api){
   function carWheels(b){
     for(const sg of[-1,1]){
       shards.push({x:b.x+sg*b.r*0.7,y:b.y+b.r*0.45,vx:sg*rnd(2.2,4.5),vy:-rnd(5,8),s:Math.max(4,b.r*0.34),color:"#2a2a30",rot:rnd(0,TAU),vr:sg*rnd(0.2,0.35),life:1,decay:0.006,shape:"wheel",bn:false});}
+    // 軸7: 車体の板とタイヤが 左右へ走り出す(地面を転がる)
+    for(const sg of[-1,1]){
+      shards.push({x:b.x+sg*b.r*0.5,y:b.y+b.r*0.3,vx:sg*rnd(6,9),vy:-rnd(0.5,2),s:Math.max(5,b.r*0.36),color:"#2a2a30",rot:rnd(0,TAU),vr:0,life:1,decay:0.007,shape:"wheel",bn:true,roll:true});
+      shards.push({x:b.x+sg*b.r*0.2,y:b.y,vx:sg*rnd(4,7),vy:-rnd(1,3),s:Math.max(6,b.r*0.4),color:pick(["#e8503a","#ffd23f"]),rot:rnd(0,TAU),vr:sg*rnd(0.2,0.4),life:1,decay:rnd(0.012,0.02),shape:"plank"});}
   }
   // ① にじいろばくだん 撃破: 虹の輪＋虹色スパーク＋大バナー(激レアの爽快ごほうび)。
   //    白飛び防止のためフラッシュは上限つき・短命。
@@ -270,7 +279,12 @@ function buildDomino(api){
     resize:layout,
     input(px,py,type){
       if(type!=="down")return;
-      if(clearT>0)return; // ignore taps during clear celebration
+      if(clearT>0){
+        // 軸5: ★3に届かなかった面は「もういちど」で同じ面をやりなおせる(押さなければ今まで通り自動で次の面へ)
+        if(!allClear&&clearStars<3&&clearT<clearDur-20){const bt=clearBtn();
+          if(px>=bt.x&&px<=bt.x+bt.w&&py>=bt.y&&py<=bt.y+bt.h){
+            clearT=0;lapPerfect=lapPerfectBefore;floats=[];api.tone(660,0.08,"triangle",0.1);api.tone(990,0.1,"triangle",0.08);startStage(stage);}}
+        return;}
       // ④ ながれ星タップ: ばくだん判定より先に。空を横切る星をタップできたら小さなごほうび(減点なし)。
       if(shootStar&&Math.hypot(px-shootStar.x,py-shootStar.y)<Math.max(36,api.W*0.07)){
         const ss=shootStar;total+=1;count+=1;api.setScore(total);
@@ -405,6 +419,8 @@ function buildDomino(api){
       g.restore();g.globalAlpha=1;rings=rings.filter(r=>r.life>0);
       // shards (軸7: 種類ごとに壊れ方の形も変える)
       for(const p of shards){p.vy+=0.25*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.rot+=p.vr*dt;p.life-=p.decay*dt;
+        // 走り出したタイヤ: 地面をころがって(はねて)止まる
+        if(p.roll){const gy=api.H*0.85;if(p.y>gy){p.y=gy;p.vy=p.vy>1.5?-p.vy*0.3:0;p.vx*=Math.pow(0.985,dt);}p.vr=p.vx/Math.max(4,p.s);}
         // くるまのタイヤ: 地面で一度はねる
         if(p.shape==="wheel"&&!p.bn&&p.vy>0&&p.y>api.H*0.85){p.y=api.H*0.85;p.vy=-Math.abs(p.vy)*0.6;p.bn=true;api.tone(180,0.07,"triangle",0.1);
           for(let k=0;k<3;k++)sparks.push({x:p.x,y:p.y+p.s,vx:rnd(-2,2),vy:-rnd(0.5,2),r:rnd(2,3.5),life:1,decay:rnd(0.04,0.06),col:"#e0c98a"});}
@@ -571,10 +587,15 @@ function buildDomino(api){
       g.font="900 "+clamp(api.W*0.05,24,40)+"px 'Hiragino Maru Gothic ProN',system-ui";
       g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.55)";g.strokeText(lt,0,clamp(api.W*0.07,34,56));
       g.fillStyle=goldMode?"#ffd23f":"#ffffff";g.fillText(lt,0,clamp(api.W*0.07,34,56));}
+    // 軸5: ★3になる目標を数字で見せる
+    {const t3="★3は "+starTh()[2]+"れんさ！",y3=clamp(api.W*0.07,34,56)+(lap>0?44:0)+16;
+      g.font="900 "+clamp(api.W*0.045,22,34)+"px 'Hiragino Maru Gothic ProN',system-ui";
+      g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.55)";g.strokeText(t3,0,y3);
+      g.fillStyle="#ffe27a";g.fillText(t3,0,y3);}
     g.restore();g.globalAlpha=1;g.textAlign="left";
   }
   function drawClear(now){
-    const dur=allClear?260:160,p=1-clearT/dur;
+    const dur=clearDur,p=1-clearT/dur;
     const cx=api.W/2,cy=api.H*0.4;
     // dim backdrop
     g.save();g.globalAlpha=clamp(p*3,0,1)*0.5;g.fillStyle="rgba(10,8,18,1)";g.fillRect(0,0,api.W,api.H);g.restore();
@@ -614,9 +635,33 @@ function buildDomino(api){
     // ③ パーフェクト(ワンチェイン)達成のごほうび表示
     if(clearPerfect){const py2=ry+step*3;
       g.strokeText("パーフェクト！＋5",cx,py2);g.fillStyle="#9bff9b";g.fillText("パーフェクト！＋5",cx,py2);}
+    if(!allClear&&clearStars<3){const ly=ry+step*(clearPerfect?4:3),t4="あと "+clearNeed+"れんさで ★3！";
+      g.strokeText(t4,cx,ly);g.fillStyle="#ffe27a";g.fillText(t4,cx,ly);}
     if(allClear){const ny=ry+step*(clearPerfect?4:3),nt=nextGold?"つぎは きんいろの "+(lap+2)+"しゅうめ！":"つぎは "+(lap+2)+"しゅうめ！";
       g.strokeText(nt,cx,ny);g.fillStyle=nextGold?"#ffd23f":"#ffffff";g.fillText(nt,cx,ny);}
     g.restore();g.textAlign="left";g.globalAlpha=1;
+    // 軸5: 「もういちど」ボタン(★3に届かなかった時だけ・押すと同じ面を最初から)
+    if(!allClear&&clearStars<3){const bt=clearBtn(),pu=0.5+Math.sin(now*0.006)*0.5,al=clamp((p-0.3)*4,0,1);
+      g.save();g.globalAlpha=al;
+      g.shadowColor="rgba(0,0,0,.45)";g.shadowBlur=14;g.shadowOffsetY=4;
+      rrect(bt.x,bt.y,bt.w,bt.h,bt.h*0.5);
+      const bg2=g.createLinearGradient(0,bt.y,0,bt.y+bt.h);bg2.addColorStop(0,"#ffb347");bg2.addColorStop(1,"#ff7a2c");
+      g.fillStyle=bg2;g.fill();g.shadowColor="transparent";g.shadowBlur=0;g.shadowOffsetY=0;
+      g.lineWidth=4;g.strokeStyle="rgba(255,255,255,"+(0.6+0.3*pu)+")";g.stroke();
+      g.font="900 "+Math.round(bt.h*0.42)+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";g.textBaseline="middle";
+      g.lineWidth=5;g.strokeStyle="rgba(120,40,0,.6)";g.strokeText("もういちど",bt.x+bt.w/2,bt.y+bt.h/2+2);
+      g.fillStyle="#ffffff";g.fillText("もういちど",bt.x+bt.w/2,bt.y+bt.h/2+2);
+      g.restore();g.textAlign="left";g.textBaseline="alphabetic";g.globalAlpha=1;}
+  }
+  // 「もういちど」ボタンの矩形(drawClear と input で共通)。ステージ結果の文字の下・画面の中に収める
+  function clearBtn(){
+    const step=clamp(api.W*0.06,30,44),ry=api.H*0.4+api.H*0.14;
+    const w=Math.max(200,Math.min(api.W*0.5,260)),h=64;
+    const lines=clearPerfect?4:3;
+    if(api.H<560&&api.W>=700){   // 背の低い横画面: 文字の右がわへ逃がす
+      return{x:Math.min(api.W-w-12,api.W/2+200),y:clamp(ry+step,12,api.H-h-12),w,h};}
+    const y=Math.min(ry+step*lines+16,api.H-h-12);
+    return{x:api.W/2-w/2,y,w,h};
   }
   // little bomb icon for the hint panel
   function iconBomb(x,y,r,lit,t){

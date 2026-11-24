@@ -289,8 +289,9 @@ function build_cakesmash(api){
     api.boom(0.7);api.shake(18);hstop(6);
     api.slide(392,1568,0.6,0.25,"triangle");
     [0,4,7,12,16].forEach((s,i)=>setTimeout(()=>api.tone(523*Math.pow(2,s/12),0.15,"triangle",0.13),i*60));
-    floats.push({x:W/2,y:H*0.32,txt:"あまあま フィーバー！",life:1,vy:-0.4,col:"#ff2bff",size:40});
-    floats.push({x:W/2,y:H*0.32+34,txt:"ぜんぶ 1ぱつ！ てんすう 2ばい！",life:1,vy:-0.4,col:"#fff",size:20});
+    const fy=rbMsgT>0.2?H*0.33:H*0.22;   // にじいろ中央バナー(H*0.24)と重ねない
+    floats.push({x:W/2,y:fy,txt:"あまあま フィーバー！",life:1,vy:-0.4,col:"#ff2bff",size:40});
+    floats.push({x:W/2,y:fy+34,txt:"ぜんぶ 1ぱつ！ てんすう 2ばい！",life:1,vy:-0.4,col:"#fff",size:20});
   }
   function endFever(){
     fever=0;
@@ -469,7 +470,7 @@ function build_cakesmash(api){
       // ① にじいろ接近の予告: このケーキに にじいろ段 が残っていたら、上に虹の予告マーク(=次くるかもの ドキドキ)
       const rbTier=tiers.find(t=>!t.dead&&t.rb);
       if(rbTier&&clearT<=0&&finaleT<=0){
-        const mx=baseX, my=(tt?tt.y-(tt.shape==="donut"?rOut(tt)-tierH*0.5:0):baseY)-tierH*1.5, pulse=0.5+0.5*Math.sin(tsec*6);
+        const mx=baseX, my=Math.max(H*0.24,(tt?tt.y-(tt.shape==="donut"?rOut(tt)-tierH*0.5:0):baseY)-tierH*1.5), pulse=0.5+0.5*Math.sin(tsec*6);
         const RBC=["#ff5da2","#ff8a3a","#ffd23f","#7be08a","#36c9ff","#b066ff"];
         g.save();g.lineCap="round";g.lineJoin="round";
         g.globalAlpha=0.4+0.35*pulse;g.lineWidth=3;
@@ -479,10 +480,11 @@ function build_cakesmash(api){
           const oy=my+tierH*0.7+k*9+pulse*3;
           g.beginPath();g.moveTo(mx-12,oy-9);g.lineTo(mx,oy);g.lineTo(mx+12,oy-9);g.stroke();}
         g.restore();g.globalAlpha=1;
-        g.save();g.globalAlpha=0.5+0.4*pulse;g.textAlign="center";
-        g.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";
-        g.lineWidth=4;g.strokeStyle="rgba(120,40,80,.4)";g.strokeText("にじいろ入り！",mx,my-tierH*0.7);
-        g.fillStyle="#ff5da2";g.fillText("にじいろ入り！",mx,my-tierH*0.7);
+        g.save();g.globalAlpha=0.85+0.15*pulse;g.textAlign="center";
+        g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
+        const rty=Math.max(H*0.2,my-tierH*0.7);
+        g.lineJoin="round";g.lineWidth=6;g.strokeStyle="rgba(120,40,80,.8)";g.strokeText("にじいろ入り！",mx,rty);
+        g.fillStyle="#fff3a0";g.fillText("にじいろ入り！",mx,rty);
         g.restore();g.globalAlpha=1;g.textAlign="left";
       }
 
@@ -628,9 +630,9 @@ function build_cakesmash(api){
         g.font="800 30px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.globalAlpha=clamp(comboT,0,1);
         g.shadowColor="rgba(255,120,160,.8)";g.shadowBlur=14;
-        g.fillStyle="#ff5b8a";g.fillText("コンボ x"+combo,0,0);
-        g.shadowBlur=0;g.lineWidth=1.5;g.strokeStyle="rgba(255,255,255,.7)";
+        g.shadowBlur=0;g.lineJoin="round";g.lineWidth=6;g.strokeStyle="rgba(120,40,80,.8)";
         g.strokeText("コンボ x"+combo,0,0);
+        g.fillStyle="#fff3a0";g.fillText("コンボ x"+combo,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";
       }
 
@@ -968,11 +970,10 @@ function build_cakesmash(api){
       g.fillStyle=cg;roundRect(gx,gy,Math.max(gh,gw*gf),gh,gh/2);g.fill();g.restore();
     }
     g.strokeStyle="rgba(255,255,255,.6)";g.lineWidth=1.5;roundRect(gx,gy,gw,gh,gh/2);g.stroke();
-    if(fever>0){   // 常時HUDを2段に: 文字はフィーバー中だけ(ふだんは細いゲージのみ)
-      g.font="800 15px 'Hiragino Maru Gothic ProN',system-ui";
-      g.fillStyle="#ff2bff";
-      g.fillText("フィーバーちゅう！",W/2,gy+gh+16);
-    }
+    // 常時HUDは2段(文字+バー / 細いフィーバーゲージ)。フィーバー中も文字行は足さない(虹色ゲージ+開始バナーで伝わる)
+    g.fillStyle=fever>0?"#ff2bff":"rgba(255,43,255,.75)";
+    g.font="800 14px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="right";
+    g.fillText("★",gx-6,gy+gh);g.textAlign="center";
     g.restore();g.textAlign="left";
   }
 

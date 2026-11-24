@@ -15,7 +15,7 @@ function buildJet(api){
   const BCOL=["#ff6b8b","#4cc6e8","#7be08a","#ffd23f","#b58bff","#ff7bd0"];
   const BHI={"#ff6b8b":"#ffd0db","#4cc6e8":"#cdf2ff","#7be08a":"#d6ffdc","#ffd23f":"#fff3c2","#b58bff":"#e7d6ff","#ff7bd0":"#ffd6ef"};
   // ⑦ とり用の色(バルーンのBCOLとは別パレット=同じ色違いの丸に見せないため)
-  const BIRDCOL=["#8a5a3a","#3a3f5c","#c9995a","#4a90d9"];
+  const BIRDCOL=["#8a5a3a","#7a86c8","#c9995a","#4a90d9"];
   // ② きょうのラッキー色: バルーンの色から毎プレイ1色を秘密に選ぶ(色名で一度だけ教える)
   const CNAME={"#ff6b8b":"ピンク","#4cc6e8":"みずいろ","#7be08a":"みどり","#ffd23f":"きいろ","#b58bff":"むらさき","#ff7bd0":"ももいろ"};
   const SLOWV=3,SLOWF=40;   // ふつうの雲に つっこむと SLOWF フレームだけ 上昇が SLOWV まで おそくなる
@@ -294,8 +294,8 @@ function buildJet(api){
       moonOn=false;
       if(hi>0.25){
         const plA=clamp((hi-0.25)/0.5,0,1);
-        const plX=api.W*0.74,plY=api.H*(0.34-hi*0.06),plR=api.W*(0.16+hi*0.12);
-        moonX=plX;moonY=plY;moonR=plR;moonOn=true;   // ④ ひみつタップの当たり判定(描画と一致)
+        const plX=api.W*0.74,plY=api.H*(0.34-hi*0.06),plR=api.W*(0.13+hi*0.08);
+        moonX=plX;moonY=plY;moonR=api.W*(0.16+hi*0.12);moonOn=true;   // ④ ひみつタップの当たり判定(従来サイズを維持。描画だけ小さくした)
         g.save();g.globalAlpha=plA*0.96;
         // 画像の惑星(輪つき)。スプライト内の球は高さの約70%(中心が画像中心より2%上)なので w=plR*3 で球の直径≒2.1plR・少し下げて球中心=タップ判定中心。無ければ従来の手描き惑星
         if(!api.drawAsset("planet.png",plX,plY+plR*0.06,plR*3,plR*3,{center:true,alpha:plA*0.96})){
@@ -565,9 +565,18 @@ function buildJet(api){
       // ⑦ とり: 横長のW字翼シルエット+羽ばたきアニメ。丸い風船・雲、ひし形の凧とはっきり違う形
       const flap=Math.sin(tk*0.25+(o.ph||0))*0.5+0.5,wspan=o.hw||o.r*1.5,bodyR=Math.max(0,o.r*0.35);
       g.save();g.translate(o.x,y);
-      g.strokeStyle=o.color;g.lineWidth=Math.max(2,o.r*0.22);g.lineCap="round";g.lineJoin="round";
+      const bw0=Math.max(2,o.r*0.22),wy=-2-flap*6;
+      g.lineCap="round";g.lineJoin="round";
+      // 白い太め縁を先に描く(暗い宇宙背景でも輪郭が出る)
+      g.strokeStyle="rgba(255,255,255,.9)";g.lineWidth=bw0+4;
+      g.beginPath();
+      g.moveTo(-wspan,wy+8-flap*4);
+      g.quadraticCurveTo(-wspan*0.5,wy-6,0,wy+2);
+      g.quadraticCurveTo(wspan*0.5,wy-6,wspan,wy+8-flap*4);
+      g.stroke();
+      g.fillStyle="rgba(255,255,255,.9)";g.beginPath();g.ellipse(0,4,bodyR*1.3+2.5,bodyR+2.5,0,0,TAU);g.fill();
+      g.strokeStyle=o.color;g.lineWidth=bw0;
       g.shadowColor="#ffffff";g.shadowBlur=10;
-      const wy=-2-flap*6;
       g.beginPath();
       g.moveTo(-wspan,wy+8-flap*4);
       g.quadraticCurveTo(-wspan*0.5,wy-6,0,wy+2);
@@ -618,6 +627,8 @@ function buildJet(api){
     const x=px,y=playerY;
     g.save();g.translate(x,y);g.rotate(jetTilt);
     const fl=12+thrustViz*38+Math.sin(tk*0.5)*5;
+    // 背板: 明るい惑星や輪の上でもロケットが浮くように半透明の濃紺の丸を敷く
+    g.fillStyle="rgba(20,30,70,.3)";g.beginPath();g.arc(0,-2,Math.max(0,30),0,TAU);g.fill();
     // squash & stretch from vertical speed
     const stretch=clamp(1+vy*0.012,0.9,1.18),squash=1/Math.sqrt(stretch);
     // exhaust glow under nozzle

@@ -8,6 +8,8 @@ function buildTruck(api){
   // IMG_OBS/IMG_BOSSと同じ判断で使用を止め、手描きグラデーション背景に統一する(下のframe()内のimgBg分岐参照)。
   // api.drawCover呼び出し自体はコードに残す(画像が直ったら true に戻すだけで復活できるように)。
   const IMG_BG=false;
+  let quietT=0;    // 何も壊れていない時間(フレーム)。長く続いたら「おたすけ」で1回つぶれる(叱らない・止まって見えない)
+  const PITY_F=300;// 5秒壊れなかったら次の1個は確実につぶれる
   let hsCD=0;      // hitStop クールダウン(節目限定・30f以上あける)
   function tryHitStop(f){if(hsCD<=0){api.hitStop(f);hsCD=32;}}
   let obs=[],shards=[],dust=[],smoke=[],floats=[],sparks=[],rings=[],clouds=[],birds=[],poles=[],motes=[],flyers=[];
@@ -21,7 +23,7 @@ function buildTruck(api){
   const HITS_PER=10;     // 区間クリアに必要な撃破数（ボス前）※7〜8歳向けに 8→10
   const BASE_SPD=3.7;    // 基本スピード ※7〜8歳向けに 3.4→3.7
   const BOSS_HP=5;       // 区間ボスのHP ※7〜8歳向けに 4→5
-  const MISS_THRESH=0.45;// タップ直後(boostが高い間)しかつぶせない=タイミングが要る閾値。低いと素通り(ミス扱い)
+  const MISS_THRESH=0.5;// タップ直後(boostが高い間)しかつぶせない=タイミングが要る閾値。低いと素通り(ミス扱い)
   // ※ 2026-09-22 軸3(歯ごたえ)改修: 0.25→0.45に引き上げ。ランダム連打でのscorePerTapをさらに下げ、
   //   タイミングが結果に効く度合いを強める(0.35でmaxQuietSec/firstScoreSecにまだ余裕があったため、
   //   合格線を崩さない範囲でさらに寄せた。playtestでmaxQuietSec<=12秒を確認済み)。
@@ -66,7 +68,7 @@ function buildTruck(api){
   }
   function reset(){
     obs=[];shards=[];dust=[];smoke=[];floats=[];sparks=[];rings=[];clouds=[];birds=[];poles=[];motes=[];flyers=[];
-    baseSpeed=BASE_SPD;speed=baseSpeed;boost=0;bounce=0;bt=0;hsCD=0;
+    baseSpeed=BASE_SPD;speed=baseSpeed;boost=0;bounce=0;bt=0;hsCD=0;quietT=PITY_F*0.5;
     distance=0;combo=0;comboT=0;count=0;wheelRot=0;parallax=0;paraFar=0;paraMid=0;flash=0;sky=0;
     stage=0;stageHits=0;stageGoal=HITS_PER;banner="";bannerT=0;fever=0;feverT=0;boss=null;confetti=[];
     luckyColor=pick(ALLCOLS);luckySeen=false;luckyMsgT=0;rbMsgT=0;comboKept=true;sunWink=0;
@@ -77,8 +79,8 @@ function buildTruck(api){
     // roadside poles (mid-foreground rhythm, recycled by x)
     for(let i=0;i<4;i++)poles.push({x:rnd(0,api.W*1.4),lamp:i%2===0});
     // ※ 2026-09-22 軸3(歯ごたえ)改修: 0.8→0.55に短縮。最初の障害物到達を早め、firstScoreSecを3秒未満に収める。
-    let x=api.W*0.55;
-    for(let i=0;i<6;i++){ x+=rnd(api.W*0.32,api.W*0.5); spawnOb(x); }
+    let x=api.W*0.5;
+    for(let i=0;i<6;i++){ x+=rnd(api.W*0.36,api.W*0.56); spawnOb(x); }
   }
   function spawnOb(x){
     // 後半区間ほど特殊障害物（氷=ice / 金の宝箱=gold）が混ざる。stage 0は普通だけ。
@@ -143,7 +145,7 @@ function buildTruck(api){
     }
   }
   function crush(o){
-    o.crushed=1;
+    o.crushed=1;quietT=0;
     // ① にじいろ=一撃6点 / ② ラッキー色=+2の隠しボーナス
     const isRainbow=o.k==="rainbow";
     const isLucky=!isRainbow && o.k!=="ice" && o.k!=="gold" && o.col===luckyColor;
@@ -238,7 +240,7 @@ function buildTruck(api){
   // ボスに当たり判定。HPを削り、0でステージクリア演出へ。
   function hitBoss(){
     if(!boss) return;
-    boss.hp--; boss.hitT=1;
+    boss.hp--; boss.hitT=1; quietT=0;
     api.shake(16);api.boom(0.5);flash=Math.min(flash+0.32,0.7);
     api.slide(160,70,0.2,0.4,"sine");
     const bx=boss.x,by=groundY-boss.h*0.5;
@@ -305,6 +307,7 @@ function buildTruck(api){
       // ③ 軸3(歯ごたえ)対策: 放っておくと勝手に加速して進む「distance*0.0006」を撤廃。
       // 前進の主因はタップ(boost)だけにする＝連打を止めると本当に失速する。
       speed=baseSpeed+boost*7;
+      quietT+=dt;
       boost*=Math.pow(0.92,dt);
       distance+=speed*dt;
       wheelRot+=speed*dt/wheelR;
@@ -440,7 +443,7 @@ function buildTruck(api){
         if(o.crushed) continue;
         const inZone=o.x-o.w*0.5<frontX && o.x+o.w*0.5>truckX;
         if(inZone){
-          if(SPECIAL_KIND[o.k] || boost>MISS_THRESH) crush(o);
+          if(SPECIAL_KIND[o.k] || boost>MISS_THRESH || quietT>PITY_F) crush(o);
         } else if(!SPECIAL_KIND[o.k] && !o.passed && o.x+o.w*0.5<=truckX){
           o.passed=1; missObstacle(o);
         }
@@ -450,7 +453,7 @@ function buildTruck(api){
       obs=obs.filter(o=>o.x>-o.w*1.5 && !o.crushed);
       // ボス待機中は新しい障害物の追加を控えめにして、ボスが前に出るようにする
       const cap=boss?4:7;
-      while(obs.length<cap){ spawnOb(lastX()+rnd(api.W*0.3,api.W*0.52)); }
+      while(obs.length<cap){ spawnOb(lastX()+rnd(api.W*0.36,api.W*0.58)); }
       // 区間ボス（おおきなビル）の移動・描画・連続クラッシュ
       if(boss){
         if(boss.hitT>0)boss.hitT-=0.06*dt;
@@ -461,7 +464,7 @@ function buildTruck(api){
         drawBoss(boss);
         // ③ 軸3(歯ごたえ)対策: タップしてboostをMISS_THRESHより高く保っていないとボスに一切ダメージが入らない
         // (放置しても自動で削れない)。連打の頻度差(boost高低)で削れる速さの差が体感できるよう係数も強める。
-        if(boss.x<=stopX+2 && boss.cool<=0 && boost>MISS_THRESH){ boss.cool=Math.max(3,18-boost*14); hitBoss(); }
+        if(boss.x<=stopX+2 && boss.cool<=0 && (boost>MISS_THRESH || quietT>PITY_F*0.35)){ boss.cool=Math.max(3,18-boost*14); hitBoss(); }
       }
       // smoke from exhaust
       smoke.push({x:truckX+truckW*0.02,y:groundY-truckH*0.78,r:rnd(6,11),vr:rnd(0.5,1),vx:-rnd(0.6,1.6),life:1,decay:rnd(0.02,0.035)});

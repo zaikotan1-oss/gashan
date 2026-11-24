@@ -451,33 +451,42 @@ function build_icicle(api){
       if(combo>0){comboT-=0.016*dt;if(comboT<=0)combo=0;}
       if(combo>1){
         const pop=1+Math.max(0,comboT-0.7)*1.2;
-        g.save();g.translate(W/2,H*0.17);g.scale(pop,pop);
+        const ctx2="コンボ x"+combo;
+        g.save();g.translate(W/2,H*0.205);g.scale(pop,pop);   // 氷の帯(H*0.16)の下へ出す=帯と同化しない
         g.font="800 32px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.globalAlpha=clamp(comboT,0,1);
-        g.shadowColor="rgba(120,200,255,.9)";g.shadowBlur=14;
-        g.fillStyle="#bfe9ff";g.fillText("コンボ x"+combo,0,0);
-        g.shadowBlur=0;g.lineWidth=1.5;g.strokeStyle="rgba(255,255,255,.7)";
-        g.strokeText("コンボ x"+combo,0,0);
+        g.lineJoin="round";g.lineWidth=6;g.strokeStyle="rgba(8,24,52,.85)";g.strokeText(ctx2,0,0);   // 黒縁を先に描いて背景から浮かせる
+        g.shadowColor="rgba(120,200,255,.9)";g.shadowBlur=10;
+        g.fillStyle="#ffffff";g.fillText(ctx2,0,0);
+        g.shadowBlur=0;
         g.restore();g.globalAlpha=1;g.textAlign="left";
       }
 
       // ① にじいろだま! 発見バナー(虹色に色替わり)
-      if(rbMsgT>0){rbMsgT-=0.016*dt;
+      if(rbMsgT>0&&clearT<=0){rbMsgT-=0.016*dt;   // クリア帯の間は止めて、帯が消えてから見せる
+        {
         const pop=1+Math.max(0,rbMsgT-1)*1.4,rcol=["#ff5b5b","#ffd23f","#7be08a","#5ad1ff","#c78bff"],col=rcol[Math.floor(tsec*6)%rcol.length];
-        g.save();g.translate(W/2,H*0.24);g.scale(pop,pop);
+        g.save();g.translate(W/2,H*0.43);g.scale(pop,pop);   // 10点ごとのお祝い(H*0.30)・コンボ(H*0.205)と重ならない高さ
         g.font="900 34px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-        g.globalAlpha=clamp(rbMsgT*1.4,0,1);g.shadowColor=col;g.shadowBlur=18;
+        g.globalAlpha=clamp(rbMsgT*1.4,0,1);g.lineJoin="round";
+        g.lineWidth=7;g.strokeStyle="rgba(8,24,52,.85)";g.strokeText("にじいろだま!",0,0);
+        g.shadowColor=col;g.shadowBlur=18;
         g.fillStyle="#ffffff";g.fillText("にじいろだま!",0,0);
         g.shadowBlur=0;g.lineWidth=2;g.strokeStyle=col;g.strokeText("にじいろだま!",0,0);
-        g.restore();g.globalAlpha=1;g.textAlign="left";if(rbMsgT<0)rbMsgT=0;}
+        g.restore();g.globalAlpha=1;g.textAlign="left";}
+        if(rbMsgT<0)rbMsgT=0;}
       // ② ラッキー! バナー(初回は「きょうのラッキー色は◯!」と教える)
-      if(luckyMsgT>0){luckyMsgT-=0.016*dt;
+      if(luckyMsgT>0&&clearT<=0){luckyMsgT-=0.016*dt;
+        {
         const pop=1+Math.max(0,luckyMsgT-1)*1.2,txt=luckyMsgT>1.1?("きょうのラッキー色は "+luckyName+"!"):("ラッキー! "+luckyName);
-        g.save();g.translate(W/2,H*0.30);g.scale(pop,pop);
+        g.save();g.translate(W/2,H*0.50);g.scale(pop,pop);   // お祝い(H*0.30)・にじいろ(H*0.43)の下。クリア帯とは同時に出さない
         g.font="900 24px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-        g.globalAlpha=clamp(luckyMsgT*1.4,0,1);g.shadowColor=luckyColor;g.shadowBlur=13;
+        g.globalAlpha=clamp(luckyMsgT*1.4,0,1);g.lineJoin="round";
+        g.lineWidth=6;g.strokeStyle="rgba(8,24,52,.85)";g.strokeText(txt,0,0);
+        g.shadowColor=luckyColor;g.shadowBlur=13;
         g.fillStyle="#fff7d8";g.fillText(txt,0,0);
-        g.restore();g.globalAlpha=1;g.textAlign="left";if(luckyMsgT<0)luckyMsgT=0;}
+        g.restore();g.globalAlpha=1;g.textAlign="left";}
+        if(luckyMsgT<0)luckyMsgT=0;}
       // ③ パーフェクト! バナー(クリア文字の下=重ねない)
       if(perfectT>0){perfectT-=0.014*dt;
         const pop=1+Math.max(0,perfectT-1.3)*1.4;

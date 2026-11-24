@@ -14,6 +14,7 @@ function buildDrill(api){
   // ---- 隠し発見レイヤー(クレーン/パンチ/ハンマー/トラックと同じ思想) ----
   // ① にじいろジェム(激レア) ② きょうのラッキー色 ③ パーフェクトチェイン ④ ひかりむし ひみつ発見
   let luckyColor,luckySeen,luckyMsgT,rbMsgT,gemsInZone,zoneChain,bug,hsCD;
+  let boss,bossHitT,nextBossAt,lastBugZone; // 周回のボス「でっかいドッシー」と、層ごとに必ず来るひかりむし
   function bigHitStop(f){if(hsCD<=0){api.hitStop(f);hsCD=32;}}  // 節目/大ヒット限定(30f以上あける)
   function spawnBug(){const fromL=Math.random()<0.5;
     bug={x:fromL?-24:api.W+24,baseY:rnd(api.H*0.22,api.H*0.7),y:0,ph:rnd(0,TAU),amp:rnd(14,30),
@@ -58,6 +59,12 @@ function buildDrill(api){
     // 軸7: すいしょうのそう(z===3)限定で「クリスタルスパイク」(縦に長い菱形)を約5.5%で抽選。
     // rainbow/gemより先に判定して排他にする=丸い岩・ダイヤ形ジェムしか無かった形状ラインナップに「長い物」を足す。
     else if(z===3 && r<0.09){type="crystal";color=strata(top);}
+    // 周回(2周目〜)のボス「でっかいドッシー」: 周のはじめの少し先に1体だけ。ここだけ「ぽんぽんたたく」遊びに変わる
+    else if(top>=nextBossAt){type="boss";color=strata(top);hp=6;nextBossAt+=ZONE_M*5;}
+    // 生き物・乗り物: つち/こおり=きょうりゅうのほね、マグマ=おもちゃのくるま、すいしょう=ねぼけたもぐら(約8%・大きい物)
+    else if((z===0||z===1) && Math.random()<0.08){type="bone";color=strata(top);}
+    else if(z===2 && Math.random()<0.08){type="car";color=strata(top);}
+    else if(z===3 && Math.random()<0.08){type="mole";color=strata(top);}
     // 軸7: つちのそう専用「つぼ」(粘土色の縦長シルエット・左右2つに割れて中からジェムがコロン)。最初の層で「岩と宝石だけじゃない」を見せる
     else if(z===0 && Math.random()<0.1){type="pot";color=strata(top);}
     // 軸7: おたからのま専用「たからばこ」(ふたが ぱかっと開いて コインが噴き出す)。クリア後の長い層の主役
@@ -101,14 +108,14 @@ function buildDrill(api){
     lastType=type;
     // 軸7: boulder/crystal は縦に長い。genDepthはこの実際の高さぶん進める(ensure側で対応)
     // boulderは通常のrock(chunkH*1)との対比を低学年が一目で分かるレベルまで広げる(1.5-2 → 1.8-2.6)
-    const h=type==="boulder"?chunkH*rnd(1.8,2.6):(type==="crystal"?chunkH*1.8:chunkH);
+    const h=type==="boulder"?chunkH*rnd(1.8,2.6):(type==="crystal"?chunkH*1.8:(type==="boss"?chunkH*3.5:((type==="bone"||type==="car"||type==="mole")?chunkH*rnd(1.8,2.1):chunkH)));
     sinceBoulder=type==="boulder"?0:sinceBoulder+h;
     const seed=rint(0,9999);
     // 横ずれ(幅の割合): 中央固定をやめて見た目だけ左右にずらす(当たり判定・得点は変えない)。にじいろは中央のまま。
-    const fx=type==="rainbow"?0:((seed%5)-2)*0.1;
+    const fx=(type==="rainbow"||type==="boss")?0:((seed%5)-2)*0.1;
     return{top,h,type,color,gem,hp,done:false,seed,fx};
   }
-  function reset(){chunks=[];dust=[];sparks=[];shards=[];floats=[];glints=[];rings=[];depth=0;genDepth=0;lastType="";rockRun=0;sinceBoulder=500;drilling=false;spin=0;boost=0;count=0;wob=0;flash=0;heat=0;stage=0;combo=0;comboTimer=0;fever=false;feverT=0;banner=null;rainbow=0;cleared=false;zoneShown=0;lean=0;leanT=0;midBonusDone=false;
+  function reset(){chunks=[];dust=[];sparks=[];shards=[];floats=[];glints=[];rings=[];depth=0;genDepth=0;lastType="";rockRun=0;sinceBoulder=500;drilling=false;spin=0;boost=0;count=0;wob=0;flash=0;heat=0;stage=0;combo=0;comboTimer=0;fever=false;feverT=0;banner=null;rainbow=0;cleared=false;zoneShown=0;lean=0;leanT=0;midBonusDone=false;boss=null;bossHitT=0;nextBossAt=ZONE_M*5+ZONE_M*0.25;lastBugZone=-1;
     luckyColor=pick(GEM);luckySeen=false;luckyMsgT=0;rbMsgT=0;gemsInZone=0;zoneChain=false;bug=null;hsCD=0;
     layout();ensure();initMotes();}
   // big centered banner for zone arrivals + clear
@@ -256,6 +263,43 @@ function buildDrill(api){
       rings.push({x:ox,y:drillY,r:7,life:1,decay:0.06,col:"#e0a878"});
       floats.push({x:api.W/2,y:drillY-18,txt:"ぱりん！ +3",col:"#ffd9a8",life:1,vy:-1.1,size:26});
       boost=Math.max(boost,0.45);
+    }else if(c.type==="bone"){
+      // 生き物: きょうりゅうのほね。ばらばらの ほねが ガラガラと左右へ倒れて転がる(コンボは切らない=ごほうび寄り)
+      const gain=8*fmul;count+=gain;api.setScore(count);
+      api.tone(300,0.06,"square",0.1);api.tone(240,0.08,"square",0.08);api.noise(0.16,0.2,2200,"highpass",0.7);api.shake(8);
+      flash=Math.max(flash,0.45);
+      for(let k=0;k<6;k++){const sd=k%2===0?-1:1;
+        shards.push({x:ox+rnd(-shaftW*0.12,shaftW*0.12),y:drillY+rnd(-14,14),vx:sd*rnd(1.5,5),vy:-rnd(0.5,3),s:rnd(chunkH*0.55,chunkH*0.8),color:"#f4ecd8",rot:rnd(-0.6,0.6),vr:sd*rnd(0.12,0.3),life:1,decay:rnd(0.012,0.02),half:"bar"});}
+      shards.push({x:ox,y:drillY-6,vx:rnd(-2,2),vy:-rnd(4,6),s:Math.max(14,chunkH*0.3),color:"#f4ecd8",rot:0,vr:rnd(-0.2,0.2),life:1,decay:0.014,half:"skull"});
+      for(let k=0;k<5;k++){const a=rnd(0,TAU),s2=rnd(1,4);
+        glints.push({x:ox,y:drillY,vx:Math.cos(a)*s2,vy:Math.sin(a)*s2-1,life:1,decay:0.03,size:rnd(5,9),col:"#fff6dc"});}
+      rings.push({x:ox,y:drillY,r:8,life:1,decay:0.06,col:"#f4ecd8"});
+      floats.push({x:api.W/2,y:drillY-18,txt:"ガラガラ！ +"+gain,col:"#fff3da",life:1,vy:-1.1,size:28});
+      boost=Math.max(boost,0.5);
+    }else if(c.type==="car"){
+      // 乗り物: うもれた おもちゃのくるま。タイヤが左右へコロコロ、ボディが上へぽーんと跳ねる
+      const gain=10*fmul;count+=gain;api.setScore(count);
+      api.tone(440,0.1,"square",0.1);api.tone(554,0.16,"square",0.09);api.slide(200,700,0.2,0.14,"triangle");api.shake(9);
+      flash=Math.max(flash,0.5);
+      shards.push({x:ox-14,y:drillY+8,vx:-rnd(3,5.5),vy:-rnd(1,3),s:Math.max(10,chunkH*0.2),color:"#2b2b33",rot:0,vr:-rnd(0.25,0.4),life:1,decay:0.013,half:"wheel"});
+      shards.push({x:ox+14,y:drillY+8,vx:rnd(3,5.5),vy:-rnd(1,3),s:Math.max(10,chunkH*0.2),color:"#2b2b33",rot:0,vr:rnd(0.25,0.4),life:1,decay:0.013,half:"wheel"});
+      shards.push({x:ox,y:drillY-4,vx:rnd(-1.5,1.5),vy:-rnd(8,10),s:Math.max(18,chunkH*0.4),color:"#e8443a",rot:0,vr:rnd(-0.12,0.12),life:1.2,decay:0.012,half:"carbody"});
+      for(let k=0;k<12;k++){const a=rnd(-2.6,-0.5),s2=rnd(3,8);
+        sparks.push({x:ox+rnd(-16,16),y:drillY,vx:Math.cos(a)*s2,vy:Math.sin(a)*s2,r:rnd(2,5),life:1,decay:rnd(0.016,0.03),col:pick(["#ffd23f","#ff8c42","#ffffff"])});}
+      rings.push({x:ox,y:drillY,r:8,life:1,decay:0.05,col:"#ff7a6a"});
+      floats.push({x:api.W/2,y:drillY-18,txt:"ぽーん！ +"+gain,col:"#ff9a8a",life:1,vy:-1.2,size:30});
+      boost=Math.max(boost,0.55);
+    }else if(c.type==="mole"){
+      // 生き物: ねぼけた もぐら。「びっくり！」と上へ飛んで、くるくる落ちる
+      const gain=7*fmul;count+=gain;api.setScore(count);
+      api.slide(900,1500,0.14,0.14,"triangle");api.tone(1200,0.08,"sine",0.08);api.noise(0.08,0.14,900,"lowpass");api.shake(7);
+      flash=Math.max(flash,0.45);
+      shards.push({x:ox,y:drillY,vx:rnd(-1.5,1.5),vy:-rnd(9,11),s:Math.max(16,chunkH*0.34),color:"#8a6a5a",rot:0,vr:rnd(-0.2,0.2),life:1.3,decay:0.011,half:"mole"});
+      for(let k=0;k<6;k++)shards.push({x:ox+rnd(-16,16),y:drillY+rnd(-4,8),vx:rnd(-3,3),vy:-rnd(2,5),s:rnd(4,8),color:pick(["#8a6a5a","#6b5040","#5c3a22"]),rot:rnd(0,TAU),vr:rnd(-0.4,0.4),life:1,decay:rnd(0.02,0.035)});
+      for(let k=0;k<5;k++)glints.push({x:ox+rnd(-18,18),y:drillY-14+rnd(-6,6),vx:rnd(-1.5,1.5),vy:-rnd(1,2.6),life:1,decay:0.03,size:rnd(6,10),col:"#ffd0e0"});
+      rings.push({x:ox,y:drillY,r:8,life:1,decay:0.06,col:"#ffb0c8"});
+      floats.push({x:api.W/2,y:drillY-18,txt:"びっくり！ +"+gain,col:"#ffd0e0",life:1,vy:-1.2,size:30});
+      boost=Math.max(boost,0.45);
     }else if(c.type==="fossil"){
       // 軸7: 第3の輪郭「かせき」。丸岩の放射状バーストとも、クリスタルの上下分離とも違う、
       // 数個のかけらがぽろぽろ下に落ちる壊れ方にする。得点(+1)・音の激しさはdirtと同じでバランスは変えない。
@@ -277,6 +321,32 @@ function buildDrill(api){
     for(let k=0;k<26;k++){const a=rnd(0,TAU),s=rnd(4,12);
       sparks.push({x:api.W/2,y:drillY,vx:Math.cos(a)*s,vy:Math.sin(a)*s,r:rnd(3,7),life:1,decay:rnd(0.01,0.02),col:pick(GEM)});}
   }
+  // ---- 周回のボス「でっかいドッシー」: 押しっぱなしでなく ぽんぽんたたく。たたかなくても6秒で じぶんで くずれる(詰まない) ----
+  function bossBreak(win){
+    const c=boss;if(!c)return;
+    boss=null;c.done=true;
+    const ox=api.W/2;
+    const gain=win?60:15;count+=gain;api.setScore(count);
+    api.boom(win?0.65:0.35);api.shake(win?20:10);if(win)bigHitStop(4);
+    api.slide(win?240:300,win?70:120,0.3,0.3,"square");api.noise(0.25,0.3,900,"lowpass");
+    if(win){api.slide(520,1320,0.4,0.22,"triangle");api.tone(1046,0.4,"sine",0.14);}
+    flash=Math.max(flash,0.9);
+    for(let k=0;k<(win?30:16);k++)shards.push({x:ox+rnd(-shaftW*0.3,shaftW*0.3),y:drillY+rnd(-30,30),vx:rnd(-9,9),vy:-rnd(1,8),s:rnd(8,22),color:pick(["#9aa0aa","#7d8390","#8a8a92","#b0b4bc"]),rot:rnd(0,TAU),vr:rnd(-0.4,0.4),life:1,decay:rnd(0.009,0.018)});
+    for(let k=0;k<(win?28:10);k++){const a=rnd(0,TAU),s=rnd(4,12);
+      sparks.push({x:ox,y:drillY,vx:Math.cos(a)*s,vy:Math.sin(a)*s,r:rnd(3,7),life:1,decay:rnd(0.01,0.02),col:pick(GEM)});}
+    rings.push({x:ox,y:drillY,r:10,life:1,decay:0.03,col:"#ffd23f"});
+    floats.push({x:ox,y:drillY+70,txt:(win?"たおした！ +":"くずれた！ +")+gain,col:"#ffd23f",life:1,vy:-1.2,size:34});
+    if(win)showBanner("たおした！","#ffd23f","でっかいドッシー ばいばい！");
+    boost=Math.max(boost,0.9);
+  }
+  function hitBoss(){
+    const c=boss;if(!c)return;
+    c.hp--;bossHitT=1;count+=2;api.setScore(count);
+    api.tone(260+(6-c.hp)*60,0.08,"square",0.12);api.noise(0.1,0.22,700,"lowpass");api.shake(8);
+    for(let k=0;k<5;k++)shards.push({x:api.W/2+rnd(-50,50),y:drillY+rnd(-10,20),vx:rnd(-4,4),vy:-rnd(1,5),s:rnd(5,10),color:pick(["#9aa0aa","#7d8390"]),rot:rnd(0,TAU),vr:rnd(-0.4,0.4),life:1,decay:rnd(0.02,0.035)});
+    floats.push({x:api.W/2+rnd(-40,40),y:drillY+30,txt:"ぽん！ +2",col:"#fff3da",life:1,vy:-1.2,size:24});
+    if(c.hp<=0)bossBreak(true);
+  }
   reset();
   return{
     resize:layout,
@@ -287,6 +357,7 @@ function buildDrill(api){
         if(px>=shaftX && px<=shaftX+shaftW)drilling=true;
         // ④ ひかりむし ひみつ発見: ドリルとは別に、光る虫にタップが届いたら つかまえる(掘りは止めない/減点なし)
         if(bug && Math.hypot(px-bug.x,py-bug.y)<46){catchBug();}
+        else if(boss){hitBoss();}   // ボス中は どこを押しても ぽん！とたたける
         // tap the left/right third to make the driller lean & cheer that way
         else if(px<api.W*0.33){lean=-1;leanT=0.5;api.tone(520,0.05,"sine",0.06);}
         else if(px>api.W*0.67){lean=1;leanT=0.5;api.tone(620,0.05,"sine",0.06);}
@@ -344,6 +415,20 @@ function buildDrill(api){
       flash*=Math.pow(0.82,dt);
       depth+=speed*dt;wob=(drilling||fever)?Math.sin(spin*2)*2:lerp(wob,0,0.2);
       ensure();
+      // 周回のボス: ドリルの先まで来たら そこで止まって「ぽんぽんたたく」遊びに変わる。たたかなくても じぶんで ひびが入り 6秒で崩れる
+      if(!boss){const bc=chunks.find(c=>c.type==="boss"&&!c.done);
+        if(bc&&depth>=bc.top+bc.h*0.3){boss=bc;boss.t=0;boss.tick=0;boss.hp=6;
+          api.boom(0.4);api.shake(14);api.slide(200,90,0.3,0.26,"square");
+          floats.push({x:api.W/2,y:api.H*0.6,txt:"でっかいドッシーが でた！",col:"#ffd27a",life:1.2,vy:-0.7,size:30});}}
+      if(boss){depth=Math.min(depth,boss.top+boss.h*0.3);boss.t+=ds;boss.tick+=ds;
+        if(boss.tick>=2){boss.tick=0;boss.hp--;bossHitT=1;count+=1;api.setScore(count);
+          api.tone(200,0.1,"square",0.1);api.shake(6);floats.push({x:api.W/2,y:drillY+30,txt:"ぴし…",col:"#fff3da",life:1,vy:-1,size:22});
+          if(boss.hp<=0)bossBreak(false);}
+        if(boss&&boss.t>=6)bossBreak(false);}
+      if(bossHitT>0)bossHitT=Math.max(0,bossHitT-0.08*dt);
+      // 層のまんなかに来たら、まだ見ていない層なら ひかりむしを 必ず1ぴき(つかまえるタップが定期的に入る)
+      {const zb=zoneAbs(depth);
+        if(zb>lastBugZone&&depth>=zb*ZONE_M+ZONE_M*0.5){lastBugZone=zb;if(!bug)spawnBug();}}
       // zone arrival -> celebrate + banner (the "区切り"); final zone = clear
       const zi=zoneIdx(depth),za=zoneAbs(depth);
       if(za>zoneShown){
@@ -392,7 +477,7 @@ function buildDrill(api){
       // chunks
       for(const c of chunks){
         const topY=drillY+(c.top-depth);
-        if(!c.done&&depth>=c.top+c.h*0.55)dig(c);
+        if(!c.done&&c.type!=="boss"&&depth>=c.top+c.h*0.55)dig(c);
         if(topY>api.H||topY+c.h<0)continue;
         drawChunk(c,topY);
       }
@@ -419,6 +504,35 @@ function buildDrill(api){
           g.fillStyle="#ffce4d";g.fillRect(-lw/2,-lh/2,lw,lh);
           g.fillStyle="#7a4a1c";g.fillRect(-lw/2,lh*0.1,lw,lh*0.4);
           g.lineWidth=2;g.strokeStyle="#3a1c08";g.strokeRect(-lw/2,-lh/2,lw,lh);
+        }else if(p.half==="bar"){
+          // ほねの かけら: 白い角丸の棒+両はしの丸いこぶ(濃い茶の縁取り)
+          const bl=Math.max(2,p.s),bt=Math.max(2,bl*0.22);
+          g.fillStyle=p.color;g.lineWidth=3;g.strokeStyle="#4a3420";
+          roundRect(-bl/2,-bt/2,bl,bt,Math.max(1,bt/2));g.fill();g.stroke();
+          g.beginPath();g.arc(-bl/2,0,bt*0.7,0,TAU);g.arc(bl/2,0,bt*0.7,0,TAU);g.fill();g.stroke();
+        }else if(p.half==="skull"){
+          const hs=Math.max(2,p.s);
+          g.fillStyle=p.color;g.lineWidth=3;g.strokeStyle="#4a3420";
+          g.beginPath();g.arc(0,0,hs*0.8,0,TAU);g.fill();g.stroke();
+          g.fillStyle="#4a3420";g.beginPath();g.arc(-hs*0.3,-hs*0.1,hs*0.17,0,TAU);g.arc(hs*0.3,-hs*0.1,hs*0.17,0,TAU);g.fill();
+        }else if(p.half==="wheel"){
+          const hs=Math.max(2,p.s);
+          g.fillStyle=p.color;g.beginPath();g.arc(0,0,hs,0,TAU);g.fill();
+          g.lineWidth=2.5;g.strokeStyle="#ffffff";g.stroke();
+          g.fillStyle="#cfd3da";g.beginPath();g.arc(0,0,hs*0.4,0,TAU);g.fill();
+          g.strokeStyle="#6a6f7a";g.lineWidth=2;g.beginPath();g.moveTo(-hs*0.4,0);g.lineTo(hs*0.4,0);g.stroke();
+        }else if(p.half==="carbody"){
+          const hs=Math.max(2,p.s);
+          g.fillStyle=p.color;g.lineWidth=3;g.strokeStyle="#3a0e0a";
+          roundRect(-hs*1.1,-hs*0.35,hs*2.2,hs*0.8,hs*0.25);g.fill();g.stroke();
+          g.fillStyle="#bfe6ff";roundRect(-hs*0.55,-hs*0.85,hs*1.1,hs*0.55,hs*0.2);g.fill();g.stroke();
+        }else if(p.half==="mole"){
+          const hs=Math.max(2,p.s);
+          g.fillStyle=p.color;g.lineWidth=3;g.strokeStyle="#3a2418";
+          g.beginPath();g.arc(0,0,hs,0,TAU);g.fill();g.stroke();
+          g.fillStyle="#ff9ab8";g.beginPath();g.arc(0,hs*0.2,hs*0.3,0,TAU);g.fill();g.stroke();
+          g.fillStyle="#ffffff";g.beginPath();g.arc(-hs*0.4,-hs*0.3,hs*0.2,0,TAU);g.arc(hs*0.4,-hs*0.3,hs*0.2,0,TAU);g.fill();
+          g.fillStyle="#23323f";g.beginPath();g.arc(-hs*0.4,-hs*0.3,hs*0.1,0,TAU);g.arc(hs*0.4,-hs*0.3,hs*0.1,0,TAU);g.fill();
         }else if(p.half==="left"||p.half==="right"){
           const hs=Math.max(0,p.s),sd=p.half==="left"?-1:1;
           g.fillStyle=p.color;g.beginPath();g.moveTo(0,-hs*0.9);g.lineTo(sd*hs*0.35,-hs*0.9);g.lineTo(sd*hs*0.9,-hs*0.1);
@@ -516,7 +630,7 @@ function buildDrill(api){
       if(luckyMsgT>0){luckyMsgT-=ds;
         g.save();g.translate(api.W/2,api.H*0.31);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(luckyMsgT*1.2,0,1);g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
-        const t2="きょうのラッキー色は "+(GEMNAME[luckyColor]||"")+"！";
+        const t2="きょうのラッキーいろは "+(GEMNAME[luckyColor]||"")+"！";
         g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.45)";g.strokeText(t2,0,0);
         g.fillStyle=luckyColor;g.fillText(t2,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(luckyMsgT<0)luckyMsgT=0;}
@@ -727,6 +841,100 @@ function buildDrill(api){
       drawStar(cx0+chunkH*0.34,cy0-chunkH*0.3,3+3*tw,"#ffffff");
       g.restore();
     }
+    if(c.type==="bone"){
+      // 生き物: きょうりゅうの ほねの ほねぐみ。白い角丸の横長ほね3本(あばら)+あたまの丸+しっぽ。暗い影皿と濃い茶の縁取りで土の上でも浮く
+      g.save();g.beginPath();g.rect(x,topY,w,c.h+1);g.clip();
+      const cx0=x+w/2+ox,cy0=topY+c.h/2;
+      const bw=Math.max(40,Math.min(w*0.62,chunkH*2.8)),bt=Math.max(8,chunkH*0.17),gap=Math.max(14,c.h*0.2);
+      g.fillStyle="rgba(40,22,8,.45)";g.beginPath();g.ellipse(cx0,cy0+c.h*0.05,Math.max(0,bw*0.62),Math.max(0,c.h*0.42),0,0,TAU);g.fill();
+      g.lineWidth=3;g.strokeStyle="#4a3420";g.fillStyle="#f6efdc";
+      for(let k=-1;k<=1;k++){
+        const bl=bw*(k===0?0.78:0.62),by=cy0+k*gap,bx=cx0-bw*0.14-bl/2;
+        roundRect(bx,by-bt/2,bl,bt,bt/2);g.fill();g.stroke();
+        g.beginPath();g.arc(bx,by-bt*0.5,bt*0.6,0,TAU);g.arc(bx,by+bt*0.5,bt*0.6,0,TAU);g.arc(bx+bl,by-bt*0.5,bt*0.6,0,TAU);g.arc(bx+bl,by+bt*0.5,bt*0.6,0,TAU);g.fill();g.stroke();
+      }
+      // せぼね(たて)としっぽ
+      roundRect(cx0-bw*0.14-bt*0.5,cy0-gap-bt*0.5,bt,gap*2+bt,bt/2);g.fill();g.stroke();
+      // あたま
+      const hr=Math.max(8,chunkH*0.3),hx=cx0+bw*0.5,hy=cy0;
+      g.beginPath();g.arc(hx,hy,hr,0,TAU);g.fill();g.stroke();
+      roundRect(hx-hr*0.1,hy+hr*0.35,hr*1.5,hr*0.55,hr*0.2);g.fill();g.stroke();
+      g.fillStyle="#4a3420";g.beginPath();g.arc(hx+hr*0.2,hy-hr*0.2,hr*0.22,0,TAU);g.fill();
+      g.fillStyle="#f6efdc";g.lineWidth=2;
+      for(let k=0;k<3;k++){const tx2=hx+hr*0.2+k*hr*0.4;g.beginPath();g.moveTo(tx2,hy+hr*0.35);g.lineTo(tx2+hr*0.12,hy+hr*0.6);g.lineTo(tx2+hr*0.24,hy+hr*0.35);g.closePath();g.fill();g.stroke();}
+      g.restore();
+    }
+    if(c.type==="car"){
+      // 乗り物: うもれた おもちゃのくるま。赤い角丸ボディ+水色の窓+黒いタイヤ2つ。濃い縁取りと影皿で青/橙の帯の上でも読める
+      g.save();g.beginPath();g.rect(x,topY,w,c.h+1);g.clip();
+      const cx0=x+w/2+ox,cy0=topY+c.h/2;
+      const cw=Math.max(40,Math.min(w*0.6,chunkH*2.2)),ch2=cw*0.34,wr=Math.max(6,cw*0.14);
+      g.fillStyle="rgba(30,10,4,.5)";g.beginPath();g.ellipse(cx0,cy0+ch2*0.9,Math.max(0,cw*0.62),Math.max(0,ch2*0.62),0,0,TAU);g.fill();
+      g.lineWidth=3.5;g.strokeStyle="#3a0e0a";
+      g.fillStyle="#e8443a";roundRect(cx0-cw/2,cy0-ch2*0.1,cw,ch2*0.85,ch2*0.3);g.fill();g.stroke();
+      g.fillStyle="#f26a5c";roundRect(cx0-cw*0.3,cy0-ch2*0.85,cw*0.6,ch2*0.85,ch2*0.3);g.fill();g.stroke();
+      g.fillStyle="#bfe6ff";roundRect(cx0-cw*0.24,cy0-ch2*0.7,cw*0.22,ch2*0.55,ch2*0.12);g.fill();g.stroke();
+      roundRect(cx0+cw*0.02,cy0-ch2*0.7,cw*0.22,ch2*0.55,ch2*0.12);g.fill();g.stroke();
+      g.fillStyle="#ffe27a";g.beginPath();g.arc(cx0+cw*0.45,cy0+ch2*0.2,Math.max(0,wr*0.4),0,TAU);g.fill();
+      g.fillStyle="#2b2b33";g.lineWidth=3;
+      for(const sx2 of [-0.28,0.28]){g.beginPath();g.arc(cx0+cw*sx2,cy0+ch2*0.8,wr,0,TAU);g.fill();g.stroke();
+        g.fillStyle="#cfd3da";g.beginPath();g.arc(cx0+cw*sx2,cy0+ch2*0.8,wr*0.4,0,TAU);g.fill();g.fillStyle="#2b2b33";}
+      g.restore();
+    }
+    if(c.type==="mole"){
+      // 生き物: ねぼけた もぐら。つちの山から ひょっこり。丸い体+ピンクの鼻+ひげ+とじた目。濃い縁取りで紫の帯の上でも浮く
+      g.save();g.beginPath();g.rect(x,topY,w,c.h+1);g.clip();
+      const cx0=x+w/2+ox,cy0=topY+c.h/2;
+      const R=Math.max(10,chunkH*0.52*(0.92+0.16*((c.seed%5)/5)));
+      g.fillStyle="rgba(30,10,40,.45)";g.beginPath();g.ellipse(cx0,cy0+R*0.9,Math.max(0,R*1.5),Math.max(0,R*0.5),0,0,TAU);g.fill();
+      g.lineWidth=3.5;g.strokeStyle="#2e1c12";
+      g.fillStyle="#6b4a34";g.beginPath();g.ellipse(cx0,cy0+R*0.9,Math.max(0,R*1.35),Math.max(0,R*0.42),0,0,TAU);g.fill();g.stroke();
+      g.fillStyle="#8a6a5a";g.beginPath();g.arc(cx0,cy0,R,0,TAU);g.fill();g.stroke();
+      g.fillStyle="#ff9ab8";g.beginPath();g.ellipse(cx0,cy0+R*0.28,Math.max(0,R*0.3),Math.max(0,R*0.22),0,0,TAU);g.fill();g.stroke();
+      g.strokeStyle="#2e1c12";g.lineWidth=3;g.lineCap="round";
+      g.beginPath();g.arc(cx0-R*0.4,cy0-R*0.2,Math.max(0,R*0.16),0.1*Math.PI,0.9*Math.PI);g.stroke();
+      g.beginPath();g.arc(cx0+R*0.4,cy0-R*0.2,Math.max(0,R*0.16),0.1*Math.PI,0.9*Math.PI);g.stroke();
+      g.lineWidth=2;
+      for(const sd of [-1,1]){for(const dy of [-0.05,0.18]){g.beginPath();g.moveTo(cx0+sd*R*0.38,cy0+R*(0.3+dy));g.lineTo(cx0+sd*R*0.95,cy0+R*(0.2+dy*2.2));g.stroke();}}
+      g.fillStyle="#ffc0d4";g.lineWidth=2.5;
+      for(const sd of [-1,1]){g.beginPath();g.ellipse(cx0+sd*R*0.62,cy0+R*0.78,Math.max(0,R*0.2),Math.max(0,R*0.14),0,0,TAU);g.fill();g.stroke();}
+      g.restore();
+    }
+    if(c.type==="boss"&&!c.done){
+      // 周回のボス「でっかいドッシー」: 大きな石の顔の像。灰色の角丸+まゆ+大きな目+歯。濃い縁取りで背景から浮く。たたくとゆれて ひびが増える
+      g.save();g.beginPath();g.rect(x,topY,w,c.h+1);g.clip();
+      const shake=(boss===c&&bossHitT>0)?Math.sin(bossHitT*30)*6*bossHitT:0;
+      const cx0=x+w/2+shake,cy0=topY+c.h*0.5;
+      const bwid=Math.max(80,Math.min(w*0.78,chunkH*3.4)),bhgt=c.h*0.88;
+      const hp=Math.max(0,Math.min(6,c.hp));
+      g.fillStyle="rgba(10,6,4,.5)";g.beginPath();g.ellipse(cx0,cy0+bhgt*0.46,Math.max(0,bwid*0.58),Math.max(0,bhgt*0.1),0,0,TAU);g.fill();
+      const sg=g.createLinearGradient(cx0-bwid/2,cy0-bhgt/2,cx0+bwid/2,cy0+bhgt/2);
+      sg.addColorStop(0,"#b6bcc6");sg.addColorStop(1,"#6a707c");
+      g.fillStyle=sg;g.lineWidth=5;g.strokeStyle="#22242c";
+      roundRect(cx0-bwid/2,cy0-bhgt/2,bwid,bhgt,Math.min(bwid,bhgt)*0.28);g.fill();g.stroke();
+      const hit=boss===c&&bossHitT>0.5;
+      for(const sd of [-1,1]){
+        const ex=cx0+sd*bwid*0.2,ey=cy0-bhgt*0.08,er=Math.max(4,bwid*0.1);
+        g.lineWidth=5;g.strokeStyle="#22242c";g.lineCap="round";
+        g.beginPath();g.moveTo(ex-sd*er*1.4,ey-er*(sd<0?1.9:1.2));g.lineTo(ex+sd*er*1.2,ey-er*(sd<0?1.2:1.9));g.stroke();
+        if(hit){g.lineWidth=4;g.beginPath();g.moveTo(ex-er*0.8,ey-er*0.8);g.lineTo(ex+er*0.8,ey+er*0.8);g.moveTo(ex+er*0.8,ey-er*0.8);g.lineTo(ex-er*0.8,ey+er*0.8);g.stroke();}
+        else{g.fillStyle="#ffffff";g.lineWidth=3;g.beginPath();g.arc(ex,ey,er,0,TAU);g.fill();g.stroke();
+          g.fillStyle="#22242c";g.beginPath();g.arc(ex+sd*er*0.1,ey+er*0.15,er*0.5,0,TAU);g.fill();}
+      }
+      g.fillStyle="#ffffff";g.lineWidth=4;g.strokeStyle="#22242c";
+      roundRect(cx0-bwid*0.24,cy0+bhgt*0.16,bwid*0.48,bhgt*0.2,8);g.fill();g.stroke();
+      g.lineWidth=2.5;for(let k=1;k<5;k++){g.beginPath();g.moveTo(cx0-bwid*0.24+bwid*0.48*k/5,cy0+bhgt*0.16);g.lineTo(cx0-bwid*0.24+bwid*0.48*k/5,cy0+bhgt*0.36);g.stroke();}
+      // ひび: たたくほど ふえる
+      g.strokeStyle="rgba(20,20,28,.75)";g.lineWidth=3;g.beginPath();
+      const cr=[[-0.35,-0.45,-0.2,-0.3,-0.28,-0.12],[0.3,-0.42,0.15,-0.25,0.25,-0.05],[-0.1,0.4,0.05,0.28,-0.05,0.18],[0.4,0.1,0.3,0.25,0.42,0.38],[-0.42,0.15,-0.3,0.3,-0.4,0.4]];
+      for(let k=0;k<Math.min(5,6-hp);k++){const q=cr[k];g.moveTo(cx0+q[0]*bwid,cy0+q[1]*bhgt);g.lineTo(cx0+q[2]*bwid,cy0+q[3]*bhgt);g.lineTo(cx0+q[4]*bwid,cy0+q[5]*bhgt);}
+      g.stroke();
+      // のこりHP(まるが へる)
+      for(let k=0;k<6;k++){const px2=cx0+(k-2.5)*bwid*0.11,py2=cy0-bhgt*0.37;
+        g.fillStyle=k<hp?"#ffd23f":"rgba(0,0,0,.35)";g.lineWidth=2.5;g.strokeStyle="#22242c";
+        g.beginPath();g.arc(px2,py2,Math.max(3,bwid*0.035),0,TAU);g.fill();g.stroke();}
+      g.restore();
+    }
     if(c.type==="rainbow"){g.save();g.translate(x+w/2,topY+c.h/2);
       // ① にじいろジェム: 虹色に流れる大きな宝石。ふつうのジェムより目立つ=見つけると うれしい。
       const pulse=0.6+0.4*Math.sin(spin*3+c.seed);
@@ -883,7 +1091,7 @@ function buildDrill(api){
     }
     // --- bottom: rounded hint pill (gently bobbing) ---
     g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
-    const hint="おしっぱなしで ほる！ ひだり・みぎで おうえん！";
+    const hint=boss?"ぽんぽん たたいて やっつけよう！":"おしっぱなしで ほる！ ひだり・みぎで おうえん！";
     const hw=(g.measureText(hint)||{}).width||hint.length*10;
     const bw=hw+48,bh=40,bx=api.W/2-bw/2,bob=Math.sin(t*2)*2;
     const by=api.H-bh-12+bob;
