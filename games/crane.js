@@ -49,7 +49,7 @@ function buildWrecking(api){
     o.born=0;
     let fresh=0;for(const f of floats)if((f.born||0)<12)fresh++;
     if(fresh>0){                       // すでに出ている“同じ噴出”の下へ小さく積む
-      o.y=Math.max(o.y,api.H*0.30)+fresh*(o.big?34:20);
+      o.y=Math.max(o.y,api.H*0.46)+fresh*(o.big?34:20);
       o.x=lerp(o.x,api.W/2,0.55);
       if(!o.big)o.size=Math.max(16,Math.min(o.size,26)*0.82);
       o.vy=-0.4;
@@ -158,7 +158,7 @@ function buildWrecking(api){
   // 「ぜんぶ ばくだん」ビルの告知（当たりビル＝1発で総ふっとび）
   function announceBombBuilding(){
     flash=Math.min(1,flash+0.4);flashHue="#ff3b6b";
-    pushFloat({x:api.W/2,y:api.H*0.34,txt:"ぜんぶ ばくだん！",life:1.6,vy:-0.3,col:"#ffd23f",size:34});
+    pushFloat({x:api.W/2,y:api.H*0.46,txt:"ぜんぶ ばくだん！",life:1.6,vy:-0.3,col:"#ffd23f",size:34});
     api.tone(660,0.1,"square",0.12);setTimeout(()=>api.tone(990,0.12,"square",0.1),90);
   }
   function spark(x,y,c,n,spd){for(let i=0;i<n;i++){const a=rnd(0,TAU),v=rnd(spd*0.4,spd);
@@ -315,7 +315,7 @@ function buildWrecking(api){
   // 超レア「レインボービル」出現の告知（一撃サプライズ＝「今の見た!?」）: 派手なにじ火花＋ファンファーレ。
   function announceRare(){
     celebrate=Math.max(celebrate,2.2);flash=1;flashHue=pick(COLORS);
-    pushFloat({x:api.W/2,y:api.H*0.33,txt:"レインボービル！",life:1.8,vy:-0.3,col:"#fff",size:38});
+    pushFloat({x:api.W/2,y:api.H*0.46,txt:"レインボービル！",life:1.8,vy:-0.3,col:"#fff",size:38});
     for(let k=0;k<10;k++)setTimeout(()=>{if(sparks.length<200)spark(rnd(0,api.W),api.H*rnd(0.2,0.5),pick(COLORS),4,8);},k*45);
     [0,4,7,12,16,19].forEach((s,i)=>setTimeout(()=>api.tone(523.25*Math.pow(2,s/12),0.14,"triangle",0.14),i*70));
     api.boom(0.5);
@@ -336,9 +336,9 @@ function buildWrecking(api){
     const bonus=info[1];count+=bonus;api.setScore(count);
     celebrate=Math.max(celebrate,2.4);flash=1;flashHue=info[2];
     floats=floats.filter(f=>f.big);   // 先に出ていた小さい文字(きんピカ！+20 等)は捨てて重ならないように
-    pushFloat({x:api.W/2,y:api.H*0.30,txt:"とっておき！",life:1.6,vy:-0.4,col:"#fff",size:40,big:true});
-    pushFloat({x:api.W/2,y:api.H*0.30+46,txt:info[0]+" さいご！ +"+bonus,life:1.4,vy:-0.3,col:info[2],size:24});
-    for(let k=0;k<9;k++)spark(api.W/2,api.H*0.34,COLORS[k%COLORS.length],4,9);
+    pushFloat({x:api.W/2,y:api.H*0.46,txt:"とっておき！",life:1.6,vy:-0.4,col:"#fff",size:40,big:true});
+    pushFloat({x:api.W/2,y:api.H*0.46+46,txt:info[0]+" さいご！ +"+bonus,life:1.4,vy:-0.3,col:info[2],size:24});
+    for(let k=0;k<9;k++)spark(api.W/2,api.H*0.50,COLORS[k%COLORS.length],4,9);
     api.boom(0.6);api.shake(20);tryHitStop(3);
     api.slide(660,1760,0.35,0.16,"triangle");setTimeout(()=>api.tone(2093,0.16,"triangle",0.14),150);
     if(sparks.length>200)sparks.splice(0,sparks.length-200);
@@ -390,7 +390,7 @@ function buildWrecking(api){
       if(sparks.length>200)sparks.splice(0,sparks.length-200);}
     // 最初の1回と ときどきだけ 文字で気づかせる（毎回出すと ごちゃつくので抑制）
     if(luckyN===1||luckyN%12===0)
-      pushFloat({x:b.x+S/2,y:b.y-16,txt:"ラッキー色！ +1",life:1.0,vy:-0.6,col:luckyColor,size:20});
+      pushFloat({x:b.x+S/2,y:b.y-16,txt:"ラッキーいろ！ +1",life:1.0,vy:-0.6,col:luckyColor,size:20});
   }
   // にじいろボーナス（隠し判定＝色の活用）: 1ボールで同じ色を3つ以上壊すと発火。
   //  ボールが虹色に光り(体で感じる)・上昇アルペジオ・にじ色の火花シャワー＋得点。
@@ -439,7 +439,7 @@ function buildWrecking(api){
   // いきもの4種コンプ解禁（会期メタ＝星5とは別の収集の到達点）: 告知＋即パレード。以後は町ごとに走る。
   function unlockParade(){
     celebrate=Math.max(celebrate,2.6);flash=1;flashHue="#ff9ad0";
-    pushFloat({x:api.W/2,y:api.H*0.30,txt:"そらのパレード かいほう！",life:2.0,vy:-0.2,col:"#fff",size:32});
+    pushFloat({x:api.W/2,y:api.H*0.46,txt:"そらのパレード かいほう！",life:2.0,vy:-0.2,col:"#fff",size:32});
     api.boom(0.6);[0,4,7,12,16].forEach((s,i)=>setTimeout(()=>api.tone(659*Math.pow(2,s/12),0.16,"triangle",0.14),i*90));
     spawnParade();
   }
@@ -497,7 +497,7 @@ function buildWrecking(api){
     const was=armed;power=Math.min(1,power+amt);
     if(power>=1&&!was){armed=true;
       if(!hintShown){hintShown=true;
-        pushFloat({x:api.W/2,y:api.H*0.34,txt:"たかい ビルで うつと おおきい！",life:1.5,vy:-0.25,col:"#ffe14a",size:22});}
+        pushFloat({x:api.W/2,y:api.H*0.46,txt:"たかい ビルで うつと おおきい！",life:1.5,vy:-0.25,col:"#ffe14a",size:22});}
       api.tone(1046,0.12,"triangle",0.14);api.tone(1318,0.1,"triangle",0.1);}
   }
   // 一度に壊した数の自己ベスト。更新でご褒美＝「もっと大きく壊す」を狙う再挑戦動機（長く遊べる）。
@@ -1339,7 +1339,7 @@ function buildWrecking(api){
       g.fillRect(x,y+1,fw,h*0.35);g.restore();}
     g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
     g.lineWidth=5;g.lineJoin="round";g.strokeStyle="rgba(20,12,40,.6)";
-    const label=armed?"MAX！ タップで ぜんかい":"パワー";
+    const label=armed?"まんたん！ タップで ぜんかい":"パワー";
     g.save();if(armed){g.shadowBlur=10+5*Math.sin(tsec*8);g.shadowColor="#ffd23f";}
     g.strokeText(label,api.W/2,y-7);g.fillStyle=armed?"#fff":"#fff5d6";g.fillText(label,api.W/2,y-7);g.restore();
     g.textAlign="left";g.lineJoin="miter";}

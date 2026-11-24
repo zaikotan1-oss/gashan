@@ -163,13 +163,13 @@ function buildDrill(api){
         glints.push({x:ox+rnd(-24,24),y:drillY+rnd(-8,8),vx:Math.cos(a)*s,vy:Math.sin(a)*s-1,life:1,decay:rnd(0.02,0.035),size:rnd(6,12),col:"#ffffff"});}
       rings.push({x:ox,y:drillY,r:8,life:1,decay:0.05,col:c.gem});
       const txt=mult>1?("+"+gain+" x"+mult):("+"+gain);
-      floats.push({x:api.W/2,y:drillY-110,txt:txt,col:mult>=4?"#ffd23f":c.gem,life:1,vy:-1.3,size:34+mult*3});
+      floats.push({x:api.W/2,y:drillY-110,txt:txt,col:mult>=4?"#ffd23f":c.gem,life:0.75,vy:-1.3,size:34+mult*3});
       boost=Math.max(boost,0.7);
       // ② きょうのラッキー色: 秘密の1色のジェムを掘ると 小さめボーナス+頭上に星のキラッ(気づけるヒント)
       if(c.gem===luckyColor){
         const bonus=6+mult*2;count+=bonus;api.setScore(count);
         api.tone(1568,0.14,"triangle",0.1);api.tone(2093,0.12,"triangle",0.06);
-        floats.push({x:api.W/2+130,y:drillY-96,txt:"ラッキー！",col:luckyColor,life:1,vy:-1.1,size:24});
+        floats.push({x:api.W/2+130,y:drillY-96,txt:"ラッキー！",col:luckyColor,life:0.8,vy:-1.1,size:24});
         for(let k=0;k<5;k++)glints.push({x:ox+rnd(-18,18),y:drillY-16+rnd(-6,6),vx:rnd(-1.5,1.5),vy:-rnd(1,2.6),life:1,decay:0.03,size:rnd(6,10),col:luckyColor});
         if(!luckySeen){luckySeen=true;luckyMsgT=2.2;}   // 初回だけ中央上に「きょうのラッキー色は◯！」
       }
@@ -394,8 +394,8 @@ function buildDrill(api){
       }
       g.globalCompositeOperation="source-over";g.globalAlpha=1;
       // side walls texture (scrolling) with subtle shading
-      g.fillStyle="rgba(0,0,0,.28)";
-      for(let i=0;i<14;i++){const y=((i*70 - depth*0.5)%(api.H+70)+api.H+70)%(api.H+70);g.fillRect(0,y,shaftX,3);g.fillRect(shaftX+shaftW,y,api.W-shaftX-shaftW,3);}
+      g.fillStyle="rgba(0,0,0,.10)";
+      for(let i=0;i<14;i++){const y=((i*70 - depth*0.5)%(api.H+70)+api.H+70)%(api.H+70);g.fillRect(0,y,shaftX,2);g.fillRect(shaftX+shaftW,y,api.W-shaftX-shaftW,2);}
       // timers (dt is ~1 at 60fps; convert to seconds)
       const ds=dt/60;
       if(hsCD>0)hsCD-=dt;
@@ -468,10 +468,10 @@ function buildDrill(api){
         midBonusDone=true;
         count+=20;api.setScore(count);
         api.tone(988,0.14,"triangle",0.1);api.tone(1318,0.12,"triangle",0.06);
-        floats.push({x:api.W/2,y:api.H*0.46,txt:"よくがんばった！ +20",col:"#8affb0",life:1,vy:-1,size:26});
+        floats.push({x:api.W/2,y:api.H*0.72,txt:"よくがんばった！ +20",col:"#8affb0",life:0.8,vy:-1,size:26});
         for(let k=0;k<10;k++){const a=rnd(0,TAU),s=rnd(2,6);
-          glints.push({x:api.W/2,y:api.H*0.46,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1,life:1,decay:0.03,size:rnd(6,10),col:"#c7ffcf"});}
-        rings.push({x:api.W/2,y:api.H*0.46,r:8,life:1,decay:0.05,col:"#8affb0"});
+          glints.push({x:api.W/2,y:api.H*0.72,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1,life:1,decay:0.03,size:rnd(6,10),col:"#c7ffcf"});}
+        rings.push({x:api.W/2,y:api.H*0.72,r:8,life:1,decay:0.05,col:"#8affb0"});
       }
       // chunks
       for(const c of chunks){
@@ -1093,17 +1093,19 @@ function buildDrill(api){
       g.shadowColor=col;g.shadowBlur=14;g.fillStyle=col;g.fillText(txt,0,0);g.shadowBlur=0;g.restore();
     }
     // --- bottom: rounded hint pill (gently bobbing) ---
-    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
+    g.font="800 21px 'Hiragino Maru Gothic ProN',system-ui";
     const hint=boss?"ぽんぽん たたいて やっつけよう！":"おしっぱなしで ほる！ ひだり・みぎで おうえん！";
     const hw=(g.measureText(hint)||{}).width||hint.length*10;
-    const bw=hw+48,bh=40,bx=api.W/2-bw/2,bob=Math.sin(t*2)*2;
+    const bw=hw+48,bh=46,bx=api.W/2-bw/2,bob=Math.sin(t*2)*2;
     const by=api.H-bh-12+bob;
-    g.save();g.shadowColor="rgba(160,210,255,.45)";g.shadowBlur=14;
+    // 遊び始めを過ぎたら説明の帯はうすくして、下から上がってくる標的を隠さない(ボス中は濃く)
+    g.save();g.globalAlpha=(!boss&&depth>=ZONE_M*0.25)?0.35:1;g.shadowColor="rgba(160,210,255,.45)";g.shadowBlur=14;
     let bg2=g.createLinearGradient(0,by,0,by+bh);bg2.addColorStop(0,"rgba(40,55,72,.78)");bg2.addColorStop(1,"rgba(26,36,48,.78)");
-    g.fillStyle=bg2;roundRect(bx,by,bw,bh,bh/2);g.fill();g.restore();
+    g.fillStyle=bg2;roundRect(bx,by,bw,bh,bh/2);g.fill();g.shadowBlur=0;
     g.lineWidth=2;g.strokeStyle="rgba(180,220,255,.5)";roundRect(bx,by,bw,bh,bh/2);g.stroke();
     g.lineWidth=4;g.strokeStyle="rgba(0,0,0,.4)";g.strokeText(hint,api.W/2,by+bh/2+1);
     g.fillStyle="#eaf2ff";g.fillText(hint,api.W/2,by+bh/2);
+    g.restore();
     g.textAlign="left";g.textBaseline="alphabetic";
   }
   function drawDiamond(r){g.beginPath();g.moveTo(0,-r);g.lineTo(r*0.7,0);g.lineTo(0,r);g.lineTo(-r*0.7,0);g.closePath();g.fill();}

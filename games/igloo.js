@@ -57,6 +57,14 @@ function build_igloo(api){
     // keep clear of the engine HUD corners (top-left/top-right y<56)
     // つららは背景の森の帯(上〜中段)に溶けやすいので、少し下(雪面側)に出す
     let x=rnd(r+20,api.W-r-20), y=rnd(api.H*0.34,api.H*0.84);
+    // 軸6: 既存の的・ボスと重ならない位置を最大6回まで引き直す(決まらなければ最後の位置=出現は止めない)
+    for(let tr=0;tr<6;tr++){
+      let ng=false;
+      for(const o of igls){ if(!o.dead&&Math.hypot(x-o.x,y-o.y)<(r+o.r)*0.9){ng=true;break;} }
+      if(!ng&&boss&&Math.hypot(x-boss.x,y-boss.y)<(r+boss.r)*0.9)ng=true;
+      if(!ng)break;
+      x=rnd(r+20,api.W-r-20); y=rnd(api.H*0.34,api.H*0.84);
+    }
     const gold=Math.random()<0.08;                    // レア: ゴールドイグルー
     const rainbow=!gold&&Math.random()<0.045;         // ① 激レア: にじいろイグルー(数%・短命で逃げる=ドキドキ)
     igls.push({x,y,r,born:0,wob:rnd(0,TAU),kind,
@@ -206,7 +214,7 @@ function build_igloo(api){
     rings.push({x:hx,y:hy,r:r*0.3,vr:r*0.5,life:1,decay:0.035,col:"#ffffff"});
     rings.push({x:hx,y:hy,r:r*0.5,vr:r*0.4,life:1,decay:0.03,col:"#ffd23f"});
     puffs.push({x:hx,y:hy,r:r*0.6,vr:2.2,life:1,decay:0.015});
-    floats.push({x:hx,y:hy-r,txt:"+10！",life:1,vy:-1,col:"#ffd23f",size:36});
+    floats.push({x:api.W/2,y:api.H*0.27,txt:"+10！",life:1,vy:-1,col:"#ffd23f",size:36});
     boss=null;bossCele=1.8;
     flash=1;flashHue="#fff";
     api.boom(0.85);api.shake(26);hs(8);
@@ -220,6 +228,7 @@ function build_igloo(api){
     doClear(false);
   }
   function doClear(fromBoss){
+    if(luckyMsgT>0)luckyMsgT=Math.min(luckyMsgT,0.4);   // 軸6: クリア時は ラッキー文を短くたたむ(バナーと重ねない)
     clearStage=stage;clearT=fromBoss?2.0:1.6;celebrate=clearT;flash=Math.min(1,flash+0.5);
     bossJust=!!fromBoss;
     api.boom(fromBoss?0.7:0.55);api.shake(14);
@@ -230,7 +239,7 @@ function build_igloo(api){
     // ③ ノンストップ ボーナス: このステージを コンボを一度も切らさず走破したら +3 & みどりの祝福
     if(!fromBoss&&comboKept){
       count+=3;api.setScore(count);
-      floats.push({x:api.W/2,y:api.H*0.3,txt:"ノンストップ！＋3",life:1,vy:-0.7,col:"#7be08a",size:30});
+      floats.push({x:api.W/2,y:api.H*0.27,txt:"ノンストップ！＋3",life:1,vy:-0.7,col:"#7be08a",size:30});
       for(let i=0;i<16;i++){const a=rnd(0,TAU),v=rnd(3,8);
         sparks.push({x:api.W/2,y:api.H*0.42,vx:Math.cos(a)*v,vy:Math.sin(a)*v-2.4,life:1,decay:rnd(0.014,0.022),
           s:rnd(2,4),col:"#7be08a"});}
@@ -402,6 +411,7 @@ function build_igloo(api){
           g.beginPath();g.moveTo(0,0);g.lineTo(rl,-12);g.lineTo(rl,12);g.closePath();g.fill(); }
         g.restore();g.globalAlpha=1;g.globalCompositeOperation="source-over";
         // chain banner (top-center safe zone)
+        if(rbMsgT<=0){   // 軸6: にじいろバナーが出ている間は れんさバナーを出さない(光の筋と音は残す)
         const pop=1+0.12*Math.sin(tsec*9)*tc;
         g.save();g.translate(api.W/2,api.H*0.2);g.scale(pop,pop);g.globalAlpha=tc;
         g.textAlign="center";g.font="900 44px 'Hiragino Maru Gothic ProN',system-ui";
@@ -411,6 +421,7 @@ function build_igloo(api){
         let bg=g.createLinearGradient(0,-26,0,26);bg.addColorStop(0,"#ffffff");bg.addColorStop(1,"#7fd0ff");
         g.fillStyle=bg;g.fillText(txt,0,0);
         g.restore();g.globalAlpha=1;g.lineJoin="miter";g.textAlign="left"; }
+      }
       // ---- boss defeat full-screen golden rays ----
       if(bossCele>0){ bossCele=Math.max(0,bossCele-0.016*dt); const tc=Math.min(1,bossCele);
         g.save();g.globalCompositeOperation="lighter";g.translate(api.W/2,api.H*0.5);
@@ -443,7 +454,7 @@ function build_igloo(api){
         g.restore();g.globalAlpha=1;g.textAlign="left";if(rbEscT<0)rbEscT=0; }
       // ② きょうのラッキー色 ヒント(初回だけ大きく中央上に教える)
       if(luckyMsgT>0){ luckyMsgT-=0.016*dt;
-        g.save();g.translate(api.W/2,api.H*0.31);g.globalAlpha=clamp(luckyMsgT*1.3,0,1);
+        g.save();g.translate(api.W/2,api.H*0.33);g.globalAlpha=clamp(luckyMsgT*1.3,0,1);
         g.textAlign="center";g.font="800 23px 'Hiragino Maru Gothic ProN',system-ui";
         const t2="きょうの ラッキーな はたは "+lucky.n+"！";
         g.lineWidth=5;g.lineJoin="round";g.strokeStyle="rgba(20,60,100,.5)";g.strokeText(t2,0,0);
@@ -473,7 +484,7 @@ function build_igloo(api){
   function drawHUD(){
     const bw=Math.min(api.W*0.6,360),bh=16,bx=(api.W-bw)/2,by=api.H*0.045;
     g.save();g.textAlign="center";
-    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
+    g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
     g.fillStyle="#0b3a5a";g.shadowColor="rgba(255,255,255,.6)";g.shadowBlur=6;
     if(boss||bossWarn>0){
       g.fillText(boss?"ボスイグルー を たたけ！":"なにか くるぞ…！",api.W/2,by-8);

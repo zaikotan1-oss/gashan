@@ -101,7 +101,8 @@ function buildVolcano(api){
     const sm=speedMul();
     // 軸3(歯ごたえ): 開始直後の数体だけ火口に近い高さへ寄せ、噴火の弾が届くまでの時間そのものを縮める
     // (firstScoreSecの外れ値=噴火が届く前に的が流れ去ってしまう試行を減らす)
-    const pickY=()=>nearCrater?rnd(Math.max(api.H*0.1,craterY-r*3),craterY-r*1.5):rnd(api.H*0.12,craterY-r*1.5);
+    const topY=r*1.12+64; // 軸6: 的の上端がもどる/得点の帯(上64px)に重ならない下限
+    const pickY=()=>nearCrater?rnd(Math.max(api.H*0.1,topY,craterY-r*3),Math.max(craterY-r*1.5,topY+1)):rnd(Math.max(api.H*0.12,topY),Math.max(craterY-r*1.5,Math.max(api.H*0.12,topY)+1));
     let y=pickY();
     // 軸6(見やすさ): 画面端から入る時は、既存の的と重なって顔が隠れないよう y を最大4回引き直す
     if(x0==null){const px=fromL?-r:api.W+r;
@@ -116,7 +117,7 @@ function buildVolcano(api){
   function spawnMeteor(){
     const r=clamp(api.W*0.075,40,74);
     // 軸6(見やすさ): 火口の真上(弾道)と的の密集帯を避け、火口の左右どちらかの外側へ落とす
-    const side=Math.random()<0.5?-1:1,mx=clamp(craterX+side*rnd(api.W*0.28,api.W*0.4),r,api.W-r);
+    const side=Math.random()<0.5?-1:1,mx=clamp(craterX+side*rnd(api.W*0.28,api.W*0.4),r,api.W-r-70);
     flyers.push({x:mx,y:-r,t:"meteor",r,
       vx:rnd(-0.15,0.15),vy:rnd(0.5,0.8)*speedMul(),color:"#8a7358",bob:0,
       hp:3,hitT:0,zig:0,rare:false,offset:rnd(0,10),big:true});
@@ -360,7 +361,7 @@ function buildVolcano(api){
           if(d<(f.r+o.r)*0.75)f.y+=Math.sign(f.y-o.y||1)*0.6*dt;}
         if(f.t==="ufo"){f.zig+=0.09*dt;f.y+=Math.sin(f.zig)*1.1*dt;}
         else f.y+=Math.sin(f.bob)*0.3*dt;
-        f.y=clamp(f.y,api.H*0.1,craterY-f.r);
+        f.y=clamp(f.y,Math.max(api.H*0.1,f.r*1.12+64),Math.max(craterY-f.r,f.r*1.12+65));
         if(f.hitT>0)f.hitT-=dt;
       }
       // ③ ノーミス判定: たおせず にげた てきを数える(このウェーブで 0 ならボーナス)。隕石は倒せず地面に落ちたら土煙を残して消える(ノーミス判定には数えない)
@@ -378,7 +379,7 @@ function buildVolcano(api){
       // boss move (draw happens later, after the lava fx layers — see below, 軸6)
       if(boss){
         boss.x+=boss.vx*dt;boss.bob+=0.04*dt;boss.zig+=0.05*dt;
-        boss.y+=Math.sin(boss.zig)*0.5*dt;boss.y=clamp(boss.y,api.H*0.12,api.H*0.36);
+        boss.y+=Math.sin(boss.zig)*0.5*dt;{const bLo=Math.max(api.H*0.12,boss.r*1.12+64);boss.y=clamp(boss.y,bLo,Math.max(api.H*0.36,bLo+1));}
         if(boss.x<-boss.r*1.5)boss.x=-boss.r*1.4,boss.vx=Math.abs(boss.vx);
         if(boss.x>api.W+boss.r*1.5)boss.x=api.W+boss.r*1.4,boss.vx=-Math.abs(boss.vx);
         if(boss.hitT>0)boss.hitT-=dt;
@@ -507,12 +508,12 @@ function buildVolcano(api){
       // hint (cute rounded glassy panel, fades while charging so it doesn't fight the meter)
       const hintA=charging?0.35:1;
       g.save();g.globalAlpha=hintA;
-      g.font="800 15px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
+      g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
       const htxt="ながおしで マグマをためて、はなして ふんか！";
-      const hw2=(g.measureText(htxt)||{}).width||htxt.length*13,pw=hw2+34,px2=(api.W-pw)/2,py2=api.H-40,ph=26;
-      g.fillStyle="rgba(40,24,48,0.55)";roundRect(px2,py2,pw,ph,13);g.fill();
-      g.strokeStyle="rgba(255,200,120,0.5)";g.lineWidth=2;roundRect(px2,py2,pw,ph,13);g.stroke();
-      const ty=py2+ph*0.62+5;
+      const hw2=(g.measureText(htxt)||{}).width||htxt.length*13,pw=hw2+40,px2=(api.W-pw)/2,py2=api.H-46,ph=32;
+      g.fillStyle="rgba(40,24,48,0.55)";roundRect(px2,py2,pw,ph,16);g.fill();
+      g.strokeStyle="rgba(255,200,120,0.5)";g.lineWidth=2;roundRect(px2,py2,pw,ph,16);g.stroke();
+      const ty=py2+ph*0.62+6;
       g.lineWidth=4;g.strokeStyle="rgba(0,0,0,.45)";g.strokeText(htxt,api.W/2,ty);
       g.shadowColor="rgba(255,180,80,0.7)";g.shadowBlur=8;g.fillStyle="#fff7e6";g.fillText(htxt,api.W/2,ty);
       g.shadowBlur=0;g.textAlign="left";g.restore();
@@ -557,7 +558,7 @@ function buildVolcano(api){
     // 全HUDを上部中央のスタックに集約（engine HUDのもどる/タイトル/スコアと衝突させない）
     g.save();g.textBaseline="middle";
     // stage label
-    g.textAlign="center";g.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";
+    g.textAlign="center";g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
     const lab="ステージ "+stage;
     g.lineWidth=4;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText(lab,api.W/2,16);
     g.fillStyle="#fff7e6";g.fillText(lab,api.W/2,16);

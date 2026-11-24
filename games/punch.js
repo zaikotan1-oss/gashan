@@ -299,7 +299,7 @@ function buildPunch(api){
     api.slide(160,80,0.1,0.18,"square");
     // 節目ごとにドカッと（多段の“ゴンゴン→ドカン”）
     if(combo>0&&combo%5===0){wash=Math.min(1,0.5);washCol=comboCol();api.boom(0.4);api.shake(14);
-      if(spawnTitle<=0)floats(api.W*0.28,api.H*0.40,combo+" COMBO!",comboCol());tryHitStop(4);}
+      if(spawnTitle<=0)floats(api.W*0.28,api.H*0.40,combo+" コンボ！",comboCol());tryHitStop(4);}
     else if(charge>0.75||dmg>=2)tryHitStop(3);
     if(boss.hp<=0)killBoss();
   }
@@ -507,12 +507,14 @@ function buildPunch(api){
           wash=Math.min(1,0.4+cf*0.6);washCol=comboCol();
           api.boom(clamp(0.35+cf*0.35,0,0.7));api.shake(10+combo);
           api.slide(440+combo*20,880+combo*20,0.14,0.28,"square");
-          if(spawnTitle<=0)floats(api.W*0.28,api.H*0.40,combo+" COMBO!",comboCol());
+          if(spawnTitle<=0)floats(api.W*0.28,api.H*0.40,combo+" コンボ！",comboCol());
           tryHitStop(4);
         }
       }
+      // 空振り(軸2): 何も当たらなかった時は小さな煙と低い音で「外した」を見せる(当たり判定は変えない)
+      if(!broke&&!chipped){dust.push({x:ix,y:iy,r:S*0.3,vr:1.2,life:1,decay:0.04,hue:0.1});api.tone(110,0.06,"sine",0.1);}
       if(goldHit)rewardGold(ix,iy);
-      if(charge>0.92&&broke)floats(ix,iy,"PERFECT!","#ffd23f");
+      if(charge>0.92&&broke)floats(ix,iy,"ばっちり！","#ffd23f");
     }
     if(bricks.length===0&&!boss&&!clearing){
       clearing=true;
@@ -534,17 +536,17 @@ function buildPunch(api){
     if(isFinal){
       // FINAL STAGE conquered -> full-screen celebration, show records, then loop into endless (stages keep counting up)
       finale=1;wash=1;washCol="#ffd23f";
-      floats(api.W/2,api.H*0.30,"ぜんステージ クリア！","#ffd23f");
+      floats(api.W/2,api.H*0.30,"ぜんぶの めん クリア！","#ffd23f");
       floats(api.W/2,api.H*0.46,"こわした かず "+count,"#fff");
       floats(api.W/2,api.H*0.58,"さいこう コンボ "+bestCombo,"#aef0ff");
-      stageBanner=200;stageBannerTxt="ALL CLEAR!";
+      stageBanner=200;stageBannerTxt="ぜんぶ クリア！";
       stage++;wave=1;wavesPerStage=Math.min(wavesPerStage+1,4);
       setTimeout(newWall,1100);
     }else{
       stage++;wave=1;
       // gentle ramp: stage1=1 wall, then +1 wall per stage up to 4 (7〜8歳向けに1壁ぶん手応えを足した)
       wavesPerStage=Math.min(wavesPerStage+1,4);
-      stageBanner=140;stageBannerTxt="ステージ "+(stage-1)+" クリア！";
+      stageBanner=140;stageBannerTxt="めん "+(stage-1)+" クリア！";
       floats(api.W/2,api.H*0.52,"つぎは "+(nextRecipe?nextRecipe.name:"？")+"！","#fff");
       setTimeout(newWall,110);
     }
@@ -808,7 +810,7 @@ function buildPunch(api){
       }
       // stage / wave indicator (top-CENTER = engine HUDのもどる/スコアと衝突しない安全帯)
       g.font="800 20px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-      const stg="ステージ "+stage+(stage>FINAL_STAGE?"":"/"+FINAL_STAGE)+"  かべ "+wave+"/"+wavesPerStage;
+      const stg="めん "+stage+(stage>FINAL_STAGE?"":"/"+FINAL_STAGE)+"  かべ "+wave+"/"+wavesPerStage;
       g.lineWidth=4;g.strokeStyle="rgba(0,0,0,.45)";g.strokeText(stg,api.W/2,28);
       g.fillStyle="#fff7e6";g.fillText(stg,api.W/2,28);
       g.textAlign="left";
@@ -868,16 +870,16 @@ function buildPunch(api){
       else{
         // cute rounded translucent hint panel with glow + outline
         const msg="ながおしで ためて、はなして パンチ！";
-        g.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-        const tm=g.measureText(msg),tw=(tm&&tm.width)||msg.length*9;
-        const pw=Math.min(api.W*0.86,tw+44),ph=34,px=api.W/2-pw/2,py=api.H-44;
+        g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
+        const tm=g.measureText(msg),tw=(tm&&tm.width)||msg.length*13;
+        const pw=Math.min(api.W*0.86,tw+44),ph=44,px=api.W/2-pw/2,py=api.H-56;
         const bob=Math.sin(tnow*0.08)*2;
         g.save();g.translate(0,bob);
         g.shadowColor="rgba(255,200,120,.6)";g.shadowBlur=14;
         roundRect(px,py,pw,ph,ph/2);g.fillStyle="rgba(60,30,70,.55)";g.fill();
         g.shadowBlur=0;g.lineWidth=3;g.strokeStyle="rgba(255,230,180,.85)";g.stroke();
-        g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.4)";g.strokeText(msg,api.W/2,py+ph/2+6);
-        g.fillStyle="#fff7e6";g.fillText(msg,api.W/2,py+ph/2+6);
+        g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.4)";g.strokeText(msg,api.W/2,py+ph/2+8);
+        g.fillStyle="#fff7e6";g.fillText(msg,api.W/2,py+ph/2+8);
         g.restore();g.textAlign="left";
       }
       for(const f of fl){f.y+=f.vy*dt;f.life-=0.02*dt;g.globalAlpha=Math.max(0,f.life);
@@ -891,7 +893,7 @@ function buildPunch(api){
     const react=b.react||0,k=b.kind;
     if(react>0){const sc=1+0.12*react;g.save();g.translate(b.x+S/2,b.y+S/2);g.scale(sc,2-sc);g.translate(-(b.x+S/2),-(b.y+S/2));}
     // 背板(軸6): 夕日など明るい背景でも四角い物が溶けないよう、暗い板を1枚敷く(丸い物・くるまは除く)
-    if(k==="ice"||k==="cake"||k==="toy"||k==="tower"||(k!=="rock"&&k!=="crate"&&k!=="tire"&&k!=="face"&&k!=="car")){
+    if(k==="ice"||k==="cake"||k==="toy"||k==="tower"||(k!=="crate"&&k!=="tire"&&k!=="face"&&k!=="car")){
       const bw=b.pw||S,bh=b.ph||S;g.fillStyle="rgba(20,10,30,.35)";g.fillRect(b.x-2,b.y-2,bw+4,bh+4);
     }
     if(k==="rock")drawRock(b);
@@ -936,6 +938,10 @@ function buildPunch(api){
     g.fillStyle=bg;
     g.beginPath();g.moveTo(x+S*0.5,y+S*0.06);g.lineTo(x+S*0.9,y+S*0.28);g.lineTo(x+S*0.82,y+S*0.86);
     g.lineTo(x+S*0.5,y+S*0.96);g.lineTo(x+S*0.16,y+S*0.82);g.lineTo(x+S*0.08,y+S*0.3);g.closePath();g.fill();
+    // 縁取り(軸6): 遠景の青灰色の瓦礫に灰色のいわが溶けないよう、暗い輪郭をつける
+    g.strokeStyle="rgba(40,20,10,.6)";g.lineWidth=Math.max(2,S*0.05);g.lineJoin="round";
+    g.beginPath();g.moveTo(x+S*0.5,y+S*0.06);g.lineTo(x+S*0.9,y+S*0.28);g.lineTo(x+S*0.82,y+S*0.86);
+    g.lineTo(x+S*0.5,y+S*0.96);g.lineTo(x+S*0.16,y+S*0.82);g.lineTo(x+S*0.08,y+S*0.3);g.closePath();g.stroke();
     // 上部ハイライトの帯だけで陰影(ファセット2枚＋斑点は省いて描画数を揃える)
     g.fillStyle="rgba(255,255,255,.18)";g.fillRect(x+S*0.16,y+S*0.12,S*0.5,Math.max(2,S*0.1));
   }
@@ -1130,12 +1136,12 @@ function buildPunch(api){
     drawBossHP(bo);
   }
   function drawBossHP(bo){
-    const w=bo.w,segs=bo.maxHp,bw=Math.min(w*0.9,segs*14),x=bo.cx-bw/2,
+    const w=bo.w,segs=bo.maxHp,bw=Math.min(w*0.9,segs*18),x=bo.cx-bw/2,
       y=clamp(bo.y-16,api.H*0.09,groundY-bo.h-14),sw=bw/segs;
     g.save();g.globalAlpha=0.95;
     for(let i=0;i<segs;i++){g.fillStyle=i<bo.hp?(bo.hp<=bo.maxHp*0.3?"#ff5a3b":"#ffd23f"):"rgba(0,0,0,.4)";
-      g.fillRect(x+i*sw+1,y,sw-2,7);}
-    g.strokeStyle="rgba(0,0,0,.5)";g.lineWidth=1.5;g.strokeRect(x,y-1,bw,9);
+      g.fillRect(x+i*sw+1,y,sw-2,14);}
+    g.strokeStyle="rgba(0,0,0,.5)";g.lineWidth=1.5;g.strokeRect(x,y-1,bw,16);
     g.restore();g.globalAlpha=1;
   }
   // 大仏: 金色の座像（頭・肉髻・穏やか→ダメージで困り顔）

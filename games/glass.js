@@ -109,7 +109,7 @@ function buildGlass(api){
     burstSparks(shoot.x,shoot.y,12,7,{glow:"#ffe27a"});
     rings.push({x:shoot.x,y:shoot.y,r:6,vr:3,life:1,col:"#ffe27a",lw:3});
     glints.push({x:shoot.x,y:shoot.y,life:1,rot:rnd(0,TAU)});
-    floats.push({x:shoot.x,y:shoot.y-14,txt:"ほし ゲット！",col:"#ffe27a",life:1,vy:-0.7,size:24,pop:0});
+    floats.push({x:Math.max(90,Math.min(api.W-90,shoot.x)),y:placeY(Math.max(api.H*0.16,shoot.y-14)),txt:"ほし ゲット！",col:"#ffe27a",life:1,vy:-0.35,size:30,pop:0});
     count+=1;api.setScore(count);
     shoot=null;
   }
@@ -201,6 +201,22 @@ function buildGlass(api){
     }
     newPane();
   }
+  // 文字がかさならない置き場所: 出ている固定文字(ラッキー・にじいろ・バナー・コンボ)や他の浮き文字から46px以上はなれた高さを探す
+  function placeY(y){
+    const ok=yy=>{
+      if(luckyMsgT>0&&Math.abs(yy-api.H*0.12)<46)return false;
+      if(rbMsgT>0&&Math.abs(yy-api.H*0.19)<50)return false;
+      if(banner>0&&yy>api.H*0.28-44&&yy<api.H*0.28+76)return false;
+      if(combo>=2&&comboTimer>0&&yy<84)return false;
+      for(const f of floats)if(f.life>0.25&&Math.abs(f.y-yy)<46)return false;
+      return true;};
+    if(ok(y))return y;
+    const lo=api.H*0.1,hi=api.H*0.78;
+    for(let k=1;k<=10;k++){const dn=y+k*50,up=y-k*50;
+      if(dn<=hi&&ok(dn))return dn;
+      if(up>=lo&&ok(up))return up;}
+    return y;
+  }
   function showBanner(txt,col,sub){banner=1;bannerTxt=txt;bannerCol=col;bannerSub=sub||"";wash=1;washCol=col;}
   reset();
   return{
@@ -222,7 +238,9 @@ function buildGlass(api){
         if(weak){
           // ご褒美演出(連射ではないのでhitStopは入れない)
           burstSparks(px,py,16,9,pane.tint);rings.push({x:px,y:py,r:8,vr:5,life:1,col:"#ffffff",lw:4});
-          floats.push({x:px,y:py-10,txt:"きゅうしょ！",col:pane.tint.e,life:1,vy:-0.8,size:26,pop:0});
+          // 最後の一撃は「パリーン！」と重なるので文字を省く(火花と音だけ)。それ以外は板の上端より上の帯へ逃がす
+          if(pane.hits<pane.need)
+            floats.push({x:Math.max(90,Math.min(api.W-90,px)),y:placeY(Math.max(api.H*0.14,Math.min(py-10,pane.ty-30))),txt:"きゅうしょ！",col:pane.tint.e,life:1,vy:-0.35,size:26,pop:0});
           api.tone(1500,0.1,"triangle",0.13);api.slide(1200,2000,0.1,0.1,"sine");api.shake(7);
         }
         api.tone(900+pane.hits*180,0.09,"triangle",0.12);api.noise(0.05,0.1,2600,"highpass");api.shake(4);
@@ -354,11 +372,11 @@ function buildGlass(api){
       g.globalCompositeOperation="source-over";g.globalAlpha=1;
       // floats
       for(const f of floats){f.y+=f.vy*dt;f.life-=0.012*dt;f.pop=Math.min(1,f.pop+0.12*dt);
-        const sc=1+(1-f.pop)*0.6;g.save();g.globalAlpha=Math.max(0,f.life);
+        const sc=1+(1-f.pop)*0.6;g.save();g.globalAlpha=Math.max(0,Math.min(1,f.life*2));
         g.translate(f.x,f.y);g.scale(sc,sc);
         g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.shadowColor=f.col;g.shadowBlur=20;
-        g.lineJoin="round";g.lineWidth=8;g.strokeStyle="rgba(0,0,0,.7)";g.strokeText(f.txt,0,0);
+        g.lineJoin="round";g.lineWidth=10;g.strokeStyle="rgba(0,0,0,.85)";g.strokeText(f.txt,0,0);
         g.fillStyle=f.col;g.fillText(f.txt,0,0);g.restore();}
       g.globalAlpha=1;g.textAlign="left";floats=floats.filter(f=>f.life>0);
       // combo counter (上部中央＝engine HUDのスコア/ミュートと衝突しない安全帯)

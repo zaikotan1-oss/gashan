@@ -117,6 +117,7 @@ function build_magmaflow(api){
 
   function eat(it){
     it.eaten=true;it.burn=1;
+    const willClear=(stageEat+1>=stageGoal&&clearT<=0);   // 軸6: クリアになる食べのごほうび文字は黒幕と重ならない高さへ
     const p=lavaPos(it.d,it.t);
     const gold=it.type==="gold",rb=it.type==="rainbow";
     // ② ラッキー色: ふつうの3種(rock/tree/crate)で 今日のラッキー種類なら +1 の隠しボーナス
@@ -140,7 +141,7 @@ function build_magmaflow(api){
       for(let i=0;i<22;i++){const a=rnd(0,TAU),sp=rnd(3,9);
         blobs.push({x:p.x,y:p.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-3,r:rnd(3,8),
           life:1,decay:rnd(0.015,0.03),col:pick(RAINBOW)});}
-      floats.push({x:clamp(p.x,70,api.W-70),y:Math.min(p.y+laneH*0.55,api.H-70),txt:"ゴールド！ +"+pts,life:1,vy:-0.9,col:"#ffe14a",size:30});
+      floats.push({x:clamp(p.x,70,api.W-70),y:willClear?api.H*0.70:Math.min(p.y+laneH*0.55,api.H-70),txt:"ゴールド！ +"+pts,life:1,vy:-0.9,col:"#ffe14a",size:30});
     }else if(rb){ // ① にじいろ ようがん撃破: 虹のしぶき + ファンファーレ + 大量得点(白飛びは控えめ)
       rbMsgT=1.6;rbComingT=0;flash=Math.min(1,flash+0.4);api.shake(14);hs(5);api.boom(0.7);
       [0,4,7,11,14].forEach((s,i)=>setTimeout(()=>api.tone(659.25*Math.pow(2,s/12),0.16,"triangle",0.1),i*70));
@@ -149,15 +150,15 @@ function build_magmaflow(api){
       for(let i=0;i<30;i++){const a=rnd(0,TAU),sp=rnd(3,11);
         blobs.push({x:p.x,y:p.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-3,r:rnd(3,9),
           life:1,decay:rnd(0.015,0.03),col:RAINBOW[i%RAINBOW.length]});}
-      floats.push({x:clamp(p.x,80,api.W-80),y:Math.min(p.y+laneH*0.55,api.H-70),txt:"にじいろ ようがん！ +"+pts,life:1,vy:-0.9,col:"#ff7bd0",size:26});
+      floats.push({x:clamp(p.x,80,api.W-80),y:willClear?api.H*0.70:Math.min(p.y+laneH*0.55,api.H-70),txt:"にじいろ ようがん！ +"+pts,life:1,vy:-0.9,col:"#ff7bd0",size:26});
     }else if(fever>0&&!lucky&&floats.filter(f=>f.plus).length<3){   // 軸6: ラッキーと重ねない・「+N」は同時3個まで・横にずらして上へ早く抜ける
-      floats.push({x:clamp(p.x,50,api.W-50)+rnd(-28,28),y:p.y-laneH*0.5,txt:"+"+pts,life:1,vy:-1.4,col:"#fff",size:24,plus:true});
+      floats.push({x:clamp(p.x,50,api.W-50)+rnd(-28,28),y:willClear?api.H*0.70:p.y-laneH*0.5,txt:"+"+pts,life:1,vy:-1.4,col:"#fff",size:24,plus:true});
     }
     if(lucky){ // ② ラッキー色命中: 頭上に小さな星のキラッ(気づけるヒント)+ 小さめ祝福
       api.tone(1046,0.12,"triangle",0.1);api.tone(1568,0.14,"triangle",0.08);
       for(let i=0;i<6;i++){const a=-TAU/4+rnd(-0.5,0.5),sp=rnd(1.5,3.5);
         embers.push({x:p.x,y:p.y-laneH*0.3,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1.5,r:rnd(1.6,3),life:1,decay:rnd(0.02,0.035)});}
-      floats.push({x:clamp(p.x,70,api.W-70),y:p.y-laneH*0.95,txt:fever>0?"ラッキー！ +"+pts:"ラッキー！",life:1,vy:-0.9,col:luckyCol,size:22});   // 軸6: フィーバー中は点数も1行に(二重文字をなくす)
+      floats.push({x:clamp(p.x,70,api.W-70),y:willClear?api.H*0.70:p.y-laneH*0.95,txt:fever>0?"ラッキー！ +"+pts:"ラッキー！",life:1,vy:-0.9,col:luckyCol,size:22});   // 軸6: フィーバー中は点数も1行に(二重文字をなくす)
     }
     // fever gauge charges from eating; full gauge auto-triggers FEVER TIME
     if(fever<=0){feverGauge=Math.min(1,feverGauge+(gold?0.34:0.1));
@@ -193,7 +194,7 @@ function build_magmaflow(api){
     fever=0;feverGauge=0;flash=Math.min(1,flash+0.5);
     api.boom(0.4);api.slide(880,220,0.4,0.2,"triangle");
     rings.push({x:src.x,y:src.y,r:10,vr:laneH*0.7,life:1,decay:0.035,col:"#ff8a20"});
-    floats.push({x:api.W/2,y:api.H*0.3,txt:"フィーバー おしまい！ また ためよう！",life:1,vy:-0.4,col:"#ffd23f",size:22});
+    if(clearT<=0)floats.push({x:api.W/2,y:api.H*0.3,txt:"フィーバー おしまい！ また ためよう！",life:1,vy:-0.4,col:"#ffd23f",size:22});
   }
 
   function bigErupt(){
@@ -214,6 +215,7 @@ function build_magmaflow(api){
   function checkStage(){
     if(stageEat<stageGoal||clearT>0)return;
     clearStage=stage;clearT=1.7;flash=Math.min(1,flash+0.5);
+    floats=floats.filter(f=>f.y>api.H*0.6||f.y<api.H*0.3);   // 軸6: 黒幕の帯に重なる古い文字は消す
     api.boom(0.6);api.shake(14);
     api.slide(523,880,0.35,0.2,"triangle");api.tone(784,0.25,"triangle",0.12);
     for(let i=0;i<26;i++){const a=rnd(0,TAU),sp=rnd(3,9);
@@ -644,16 +646,6 @@ function build_magmaflow(api){
         g.restore();g.globalAlpha=1;g.textAlign="left";
       }
 
-      // ---- floating point texts (gold / fever) ----
-      for(const f of floats){f.y+=f.vy*dt;f.life-=0.018*dt;
-        g.save();g.globalAlpha=clamp(f.life,0,1);g.textAlign="center";
-        g.font="900 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";
-        g.lineWidth=4;g.lineJoin="round";g.strokeStyle="rgba(30,10,4,.85)";g.strokeText(f.txt,f.x,f.y);
-        g.fillStyle=f.col;g.fillText(f.txt,f.x,f.y);g.restore();}
-      g.globalAlpha=1;g.textAlign="left";
-      floats=floats.filter(f=>f.life>0);
-      if(floats.length>10)floats.splice(0,floats.length-10);
-
       // ---- FEVER banner (entry) + rainbow title ----
       if(feverBanner>0){feverBanner-=0.016*dt;
         const a=clamp(feverBanner*1.4,0,1),pop=1+Math.max(0,feverBanner-1.4)*2+0.06*Math.sin(tGlobal*0.6);
@@ -745,6 +737,16 @@ function build_magmaflow(api){
         g.restore();g.globalAlpha=1;g.textAlign="left";
         if(clearT<=0){clearT=0;spawnT=18;}
       }
+      // ---- floating point texts (gold / fever) ---- 軸6: ステージクリアの黒幕より手前に描く(ごほうび文字が隠れない)
+      for(const f of floats){f.y+=f.vy*dt;f.life-=0.018*dt;
+        g.save();g.globalAlpha=clamp(f.life,0,1);g.textAlign="center";
+        g.font="900 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";
+        g.lineWidth=4;g.lineJoin="round";g.strokeStyle="rgba(30,10,4,.85)";g.strokeText(f.txt,f.x,f.y);
+        g.fillStyle=f.col;g.fillText(f.txt,f.x,f.y);g.restore();}
+      g.globalAlpha=1;g.textAlign="left";
+      floats=floats.filter(f=>f.life>0);
+      if(floats.length>10)floats.splice(0,floats.length-10);
+
       // 加算合成をフレーム末で確実に既定へ戻す(白飛び漏れ防止・実ブラウザでは各blockがsave/restore済み)
       g.globalCompositeOperation="source-over";g.globalAlpha=1;
     },

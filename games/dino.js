@@ -44,12 +44,12 @@ function buildDino(api){
     }
     const tree=stage===0?Math.random()<0.4:Math.random()<(stage<3?0.3:0.22);
     if(tree)return{x:(i+0.5)*slotW,slot:i,type:"tree",
-      w:slotW*0.5,h:rnd(api.H*0.07,api.H*0.12),
+      w:slotW*0.5,h:rnd(api.H*0.09,api.H*0.14),
       color:"#3a8e4a",state:"stand",vx:0,vy:0,rot:0,vr:0,respawnT:0,rise:1,seed:rint(0,999),sway:rnd(0,TAU),hp:1};
     // ③ 街灯(lamp): castleが出ない序盤ステージ(0〜2)でも丸い/縦長のシルエットが混ざるよう追加(軸7=箱型ビルの色違いばかりを解消)
     if(stage<3&&Math.random()<0.2){
       return{x:(i+0.5)*slotW,slot:i,type:"lamp",
-        w:slotW*0.3,h:rnd(api.H*sd.hmax*0.7,api.H*sd.hmax*1.05),
+        w:slotW*0.4,h:rnd(api.H*sd.hmax*0.7,api.H*sd.hmax*1.05),
         color:pick(BCOL),state:"stand",vx:0,vy:0,rot:0,vr:0,respawnT:0,rise:1,seed:rint(0,999),sway:rnd(0,TAU),hp:1,maxhp:1};
     }
     // ① にじいろビル: ステージ2以降、ときどき(約22分の1)だけ建つ激レア。いつ出るか分からない=ドキドキ発見。
@@ -427,9 +427,9 @@ function buildDino(api){
     }else if(o.type==="tree"){
       const swx=Math.sin(o.sway)*o.w*0.04;
       // 画像の木(細長い鉢植え型・不透明部は幅0.6/高さ0.99): 高さ基準の正方形で、鉢の底(0.99)が地面に来るよう配置
-      const ts=Math.max(1,Math.max(o.h*1.15,o.w*1.5));
-      if(o.state!=="fly"){g.save();g.globalAlpha=a*0.25;g.fillStyle="#ffffff"; // 画像の木が緑の背景に沈まないよう足元に薄い光
-        g.beginPath();g.ellipse(o.x,groundY+yo-o.h*0.4,Math.max(0,o.w*0.55),Math.max(0,o.h*0.5),0,0,TAU);g.fill();g.restore();}
+      const ts=Math.max(1,Math.max(o.h*1.3,o.w*1.5));
+      if(o.state!=="fly"){g.save();g.globalAlpha=a*0.12;g.fillStyle="#ffffff"; // 画像の木が緑の背景に沈まないよう足元に薄い光
+        g.beginPath();g.ellipse(o.x,groundY+yo-o.h*0.4,Math.max(0,o.w*0.55),Math.max(0,o.h*0.38),0,0,TAU);g.fill();g.restore();}
       if(api.drawAsset("tree.png",o.x+swx,groundY+yo-ts*0.49,ts,ts,{center:true,rot:Math.sin(o.sway)*0.03})){
         g.globalAlpha=1;g.restore();return;}
       g.fillStyle="#6a4a2a";g.fillRect(o.x-o.w*0.12,groundY-o.h*0.5+yo,o.w*0.24,o.h*0.5);
@@ -539,7 +539,7 @@ function buildDino(api){
   }
   // ③ 街灯(lamp): 箱型ビルばかりにならないよう、丸い頭+細長い柱のシルエットを追加(軸7対策)
   function drawLamp(o,yo){
-    const x=o.x,topY=groundY-o.h+yo,poleW=Math.max(12,o.w*0.45);
+    const x=o.x,topY=groundY-o.h+yo,poleW=Math.max(18,o.w*0.55);
     // pole (縦長)
     g.fillStyle="rgba(0,0,0,.2)";g.fillRect(x-poleW/2+2,topY+o.h*0.16+2,poleW,o.h*0.84);
     let pg=g.createLinearGradient(x-poleW/2,0,x+poleW/2,0);
@@ -586,7 +586,7 @@ function buildDino(api){
       if(full){g.save();g.globalCompositeOperation="lighter";g.globalAlpha=pulse*0.6;g.fillStyle="#fff";roundRect(gx,gy,gw,gh,gh/2);g.fill();g.restore();g.globalCompositeOperation="source-over";}
     }
     g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";g.fillStyle="#fff";g.textAlign="left";
-    g.fillStyle="rgba(0,0,0,.4)";g.fillText("ひっさつ",gx+9,gy+gh/2+1);
+    g.lineJoin="round";g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.55)";g.strokeText("ひっさつ",gx+8,gy+gh/2); // 黄〜オレンジのゲージの上でも読める黒縁
     g.fillStyle="#fffce8";g.fillText("ひっさつ",gx+8,gy+gh/2);
     g.restore();g.textAlign="left";g.textBaseline="alphabetic";
   }

@@ -103,7 +103,7 @@ function buildBalloon(api){
   // 無得点が続いている間だけ判定を広げる(普段のタップ命中率は変えない)
   function at(x,y){const k=quietT>=QUIET_ASSIST+180?2.2:(quietT>=QUIET_ASSIST?1.6:1.05);let best=null,bd=1e9;for(const b of balloons){if(b.popped)continue;const d=Math.hypot(b.x-x,b.y-y);const hr=Math.max(b.r*k,22*(k>1.2?1.2:1));if(d<hr&&d<bd){bd=d;best=b;}}return best;}
   function pop(b,scores){
-    if(b.popped)return;b.popped=true;
+    if(b.popped)return;b.popped=true;b.noScore=(scores===false);
     // 軸3: 色えらびを点数に結びつける。的の色・にじいろ・3こ以上のれんさ・しばらく無得点の時だけ点が入る
     // (単発の外れ色も割れる演出はそのまま・点だけ入らない。叱る文言は出さない)
     if(scores!==false){
@@ -165,7 +165,9 @@ function buildBalloon(api){
   }
   // 割れた時の共通の見せ場: 輪っか・光のにじみ・紙吹雪・キラキラ(x,y,r は割れる場所と大きさ)
   function burst(b,x,y,r,big,nc,ns,long){
-    rings.push({x,y,r:r*0.6,max:r*(big?2.6:1.9),life:1,col:b.color,lw:big?6:4});
+    const miss=!!b.noScore;   // 点が入らない外れ色は輪っかを細く・火花を半分に(的の色との差を付ける。吸着は変えない)
+    if(miss)ns=Math.ceil(ns/2);
+    rings.push({x,y,r:r*0.6,max:r*(big?2.6:1.9),life:1,col:b.color,lw:miss?2:(big?6:4)});
     shines.push({x,y,r:r*1.2,max:r*(big?3.4:2.4),life:1,col:lightenC(b.color)});
     for(let k=nc;k>0;k--){const a=rnd(0,TAU),s=rnd(2,7);
       confetti.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,s:rnd(4,9),color:Math.random()<0.5?b.color:"#fff",rot:rnd(0,TAU),vr:rnd(-0.5,0.5),life:1,decay:rnd(0.012,0.022),long:long});}
@@ -458,13 +460,14 @@ function buildBalloon(api){
         g.fillStyle=flashCol;g.fillRect(0,0,api.W,api.H);g.restore();g.globalAlpha=1;g.globalCompositeOperation="source-over";}
       // top HUD: current goal (上部中央＝engine HUDと衝突しない安全帯)
       if(targetLeft>0){
-        g.save();g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="left";g.textBaseline="middle";
+        g.save();g.font="800 26px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="left";g.textBaseline="middle";
         const label="この いろを あと "+targetLeft+"こ！";
-        const mt=g.measureText(label),tw=(mt&&mt.width)||label.length*10;
-        const bw=tw+58,bh=34,px0=api.W/2-bw/2,py0=10;
-        roundRect(px0,py0,bw,bh,bh/2);g.fillStyle="rgba(40,60,100,.78)";g.fill();
-        g.beginPath();g.arc(px0+24,py0+bh/2,11,0,TAU);g.fillStyle=target;g.shadowColor=target;g.shadowBlur=10;g.fill();g.shadowBlur=0;
-        g.fillStyle="#fff";g.fillText(label,px0+44,py0+bh/2+1);g.restore();g.textAlign="left";g.textBaseline="alphabetic";
+        const mt=g.measureText(label),tw=(mt&&mt.width)||label.length*15;
+        const bw=tw+78,bh=48,px0=api.W/2-bw/2,py0=10;
+        roundRect(px0,py0,bw,bh,bh/2);g.fillStyle="rgba(40,60,100,.82)";g.fill();
+        g.lineWidth=3;g.strokeStyle=target;g.stroke();   // 的の色の縁取り(色を見比べやすく)
+        g.beginPath();g.arc(px0+30,py0+bh/2,17,0,TAU);g.fillStyle=target;g.shadowColor=target;g.shadowBlur=10;g.fill();g.shadowBlur=0;
+        g.fillStyle="#fff";g.fillText(label,px0+54,py0+bh/2+1);g.restore();g.textAlign="left";g.textBaseline="alphabetic";
       }
       // stage banner (big, brief)
       if(banner){banner.t+=dt;banner.life-=0.012*dt;
@@ -517,8 +520,24 @@ function buildBalloon(api){
     // 輪郭(暗い外線＋白い内線の二重): 緑地・青地の背景でも ふうせんが浮いて見える
     const outl=()=>{g.save();g.shadowBlur=0;g.lineJoin='round';g.lineWidth=Math.max(3,b.r*0.08);g.strokeStyle='rgba(20,40,70,.55)';g.stroke();g.lineWidth=Math.max(1.5,b.r*0.04);g.strokeStyle='rgba(255,255,255,.9)';g.stroke();g.restore();};
     // soft drop shadow under body
-    g.save();g.globalAlpha=0.32;g.fillStyle="#1a3a5a";
-    g.beginPath();g.ellipse(b.r*0.12,b.r*0.16,rx,ry,0,0,TAU);g.fill();g.restore();
+    // ハート/しずくは楕円の影がはみ出して灰色の丸に見えるので、本体と同じ形を少しずらして薄く敷く
+    g.save();g.fillStyle="#1a3a5a";
+    if(b.shape==='heart'){
+      g.globalAlpha=0.2;g.translate(b.r*0.1,b.r*0.14);
+      g.beginPath();g.moveTo(0,ry*0.62);
+      g.bezierCurveTo(rx*1.35,ry*0.05,rx*0.85,-ry*1.05,0,-ry*0.28);
+      g.bezierCurveTo(-rx*0.85,-ry*1.05,-rx*1.35,ry*0.05,0,ry*0.62);g.closePath();g.fill();
+    } else if(b.shape==='water'){
+      g.globalAlpha=0.2;g.translate(b.r*0.1,b.r*0.14);
+      g.beginPath();g.moveTo(0,-ry);
+      g.bezierCurveTo(rx*0.75,-ry,rx*1.35,ry*0.15,rx,ry*0.62);
+      g.bezierCurveTo(rx*0.7,ry*1.05,-rx*0.7,ry*1.05,-rx,ry*0.62);
+      g.bezierCurveTo(-rx*1.35,ry*0.15,-rx*0.75,-ry,0,-ry);g.closePath();g.fill();
+    } else {
+      g.globalAlpha=0.32;
+      g.beginPath();g.ellipse(b.r*0.12,b.r*0.16,rx,ry,0,0,TAU);g.fill();
+    }
+    g.restore();
     // string (gentle curve)
     g.strokeStyle="rgba(40,60,90,.35)";g.lineWidth=1.5;g.beginPath();g.moveTo(0,ry*0.95);
     g.quadraticCurveTo(Math.sin(b.phase*2)*6,ry*1.4,Math.sin(b.phase)*4,ry*1.85);g.stroke();

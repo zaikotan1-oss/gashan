@@ -27,7 +27,7 @@ function build_candyswirl(api){
   // ---- 隠し発見レイヤー(ハンマー/トラックと同じ思想) ----
   // ② きょうのラッキー色: セッションで秘密の1色を選ぶ。その色を割ると小ボーナス＋頭上に星のキラッ
   const SWNAME={"#ff8fb3":"ももいろ","#8a5a3a":"チョコいろ","#7be08a":"みどり","#9be8ff":"みずいろ","#ffd23f":"きいろ","#c78bff":"むらさき"};
-  let luckyColor=pick(SWEETS).col, luckySeen=false, luckyMsgT=0, luckyTeachT=0;
+  let luckyColor=pick(SWEETS).col, luckySeen=false, luckyMsgT=0, luckyFirst=false;   // ラッキー文言は1つに統合(初回だけ教える文)
   let rbMsgT=0;                       // ① にじいろキャンディ 発見バナー
   // ③ ノンストップ判定: このステージ中にコンボを一度も切らさなかったらボーナス
   let nonstopBroken=false, nonstopT=0;
@@ -74,7 +74,7 @@ function build_candyswirl(api){
     api.noise(0.14,0.1,2200,"highpass",0.8);
     for(let i=0;i<7;i++){const a=rnd(0,TAU),s=rnd(2,5);
       sparks.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,len:rnd(6,12),life:1,decay:rnd(0.05,0.09),col:pick(SWIRLCOL)});}
-    vortices.push({x,y,t:0,life:1,grow:0,pull:R*2.0,spin:0,col:pick(SWIRLCOL),held:0,kills:0});
+    vortices.push({x,y,t:0,life:1,grow:0,pull:R*2.0,spin:0,col:pick(SWIRLCOL.slice(0,5)),held:0,kills:0});
   }
 
   function fling(s,vx,vy){
@@ -163,7 +163,7 @@ function build_candyswirl(api){
     }
     // ② ラッキー色: 割った瞬間 頭上に小さな星のキラッ(気づけるヒント)＋初回だけ中央で教える
     if(isLucky){
-      if(!luckySeen){ luckyTeachT=2.0; }   // 初回だけ「きょうのラッキーいろは◯!」を中央上に一度
+      if(!luckySeen){ luckyMsgT=2.0; luckyFirst=true; }   // 初回だけ「きょうのラッキーいろは◯!」(同じバナーの文だけ切り替える)
       else { luckyMsgT=Math.max(luckyMsgT,0.9); }
       luckySeen=true;
       api.tone(1046,0.14,"triangle",0.1); api.tone(1568,0.16,"triangle",0.08);
@@ -191,7 +191,7 @@ function build_candyswirl(api){
   function checkStage(){
     if(stageKill<stageGoal||clearT>0)return;
     clearStage=stage; clearT=1.7; flash=Math.min(1,flash+0.5);
-    luckyMsgT=0; catchMsgT=0; rbMsgT=0; luckyTeachT=0; feverBanner=0;   // クリア帯に他のバナーを重ねない
+    luckyMsgT=0; luckyFirst=false; catchMsgT=0; rbMsgT=0; feverBanner=0;   // クリア帯に他のバナーを重ねない
     api.boom(0.6); api.shake(14);
     api.slide(523,784,0.3,0.2,"triangle"); api.tone(660,0.25,"triangle",0.14);
     api.tone(988,0.3,"triangle",0.1);
@@ -446,7 +446,7 @@ function build_candyswirl(api){
       // ③ ノンストップ判定: 積み上げたコンボが切れたら「切らした」と記録(このステージはボーナス対象外に)
       if(combo>0){ comboT-=0.016*dt; if(comboT<=0){ if(combo>1)nonstopBroken=true; combo=0; } }
       for(const f of floats){ f.y+=f.vy*dt; f.life-=0.02*dt;
-        const fy=Math.max(f.y,api.H*0.2);   // 上部HUD/コンボバナーに入り込ませない
+        const fy=Math.max(f.y,api.H*0.24);   // 上部HUD/コンボバナーに入り込ませない
         g.globalAlpha=Math.max(0,Math.min(1,f.life*2.2)); g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";
         g.textAlign="center"; g.lineWidth=7; g.strokeStyle="rgba(120,40,90,.85)";
         g.strokeText(f.txt,f.x,fy); g.fillStyle=f.col; g.fillText(f.txt,f.x,fy); }
@@ -472,8 +472,20 @@ function build_candyswirl(api){
         g.restore(); g.globalAlpha=1; g.textAlign="left";
       }
 
-      // ① にじいろキャンディ! 発見バナー(虹色に色替わり・top-center安全帯)
-      if(rbMsgT>0){ rbMsgT-=0.016*dt; if(clearT<=0){
+      // ---- バナーは同時に1つだけ(優先: ずーっと > にじいろ > フィーバー > ながれぼし > ラッキー)。後のものは先のが消えるまで待つ ----
+      let bannerBusy=false;
+      // ③ ノンストップ ボーナス! バナー(クリア文字の下)
+      if(nonstopT>0){ nonstopT-=0.014*dt; bannerBusy=true;
+        const pop=1+Math.max(0,nonstopT-1.3)*1.4;
+        g.save(); g.translate(api.W/2,api.H*0.60); g.scale(pop,pop);
+        g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
+        g.globalAlpha=clamp(nonstopT*1.3,0,1);
+        g.lineJoin="round"; g.lineWidth=7; g.strokeStyle="rgba(120,40,90,.85)"; g.shadowBlur=0; g.strokeText("ずーっと つづいた! ボーナス!",0,0);
+        g.shadowColor="rgba(255,210,60,.9)"; g.shadowBlur=16;
+        g.fillStyle="#ffe6a0"; g.fillText("ずーっと つづいた! ボーナス!",0,0); g.shadowBlur=0;
+        g.restore(); g.globalAlpha=1; g.textAlign="left"; if(nonstopT<0)nonstopT=0; }
+      // ① にじいろキャンディ! 発見バナー
+      if(rbMsgT>0 && !bannerBusy){ rbMsgT-=0.016*dt; if(clearT<=0){ bannerBusy=true;
         const pop=1+Math.max(0,rbMsgT-1)*1.4, col=SWIRLCOL[Math.floor(tsec*6)%SWIRLCOL.length];
         g.save(); g.translate(api.W/2,api.H*0.52); g.scale(pop,pop);
         g.font="900 34px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
@@ -483,40 +495,8 @@ function build_candyswirl(api){
         g.fillStyle="#ffffff"; g.fillText("にじいろキャンディ!",0,0);
         g.shadowBlur=0;
         g.restore(); g.globalAlpha=1; g.textAlign="left"; } if(rbMsgT<0)rbMsgT=0; }
-      // ② きょうのラッキーいろは◯! (初回だけ中央上に教える)
-      if(luckyTeachT>0){ luckyTeachT-=0.016*dt; if(clearT<=0){
-        const pop=1+Math.max(0,luckyTeachT-1.5)*1.4;
-        g.save(); g.translate(api.W/2,api.H*0.20); g.scale(pop,pop);
-        g.font="900 28px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
-        g.globalAlpha=clamp(luckyTeachT,0,1);
-        const ltxt="きょうの ラッキーいろは "+(SWNAME[luckyColor]||"")+"!";
-        g.lineJoin="round"; g.lineWidth=7; g.strokeStyle="rgba(120,40,90,.85)"; g.shadowBlur=0; g.strokeText(ltxt,0,0);
-        g.shadowColor=luckyColor; g.shadowBlur=16;
-        g.fillStyle="#fff7c2"; g.fillText(ltxt,0,0); g.shadowBlur=0;
-        g.restore(); g.globalAlpha=1; g.textAlign="left"; } if(luckyTeachT<0)luckyTeachT=0; }
-      // ② ラッキー! 小バナー(2回目以降)
-      if(luckyMsgT>0){ luckyMsgT-=0.016*dt; if(clearT<=0){
-        const pop=1+Math.max(0,luckyMsgT-0.6)*1.3;
-        g.save(); g.translate(api.W/2,api.H*0.44); g.scale(pop,pop);
-        g.font="900 26px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
-        g.globalAlpha=clamp(luckyMsgT*1.5,0,1);
-        const lmtxt="ラッキー! "+(SWNAME[luckyColor]||"")+"は あたり";
-        g.lineJoin="round"; g.lineWidth=7; g.strokeStyle="rgba(120,40,90,.85)"; g.shadowBlur=0; g.strokeText(lmtxt,0,0);
-        g.shadowColor=luckyColor; g.shadowBlur=14;
-        g.fillStyle="#fff7c2"; g.fillText(lmtxt,0,0); g.shadowBlur=0;
-        g.restore(); g.globalAlpha=1; g.textAlign="left"; } if(luckyMsgT<0)luckyMsgT=0; }
-      // ④ ながれぼし キャッチ! バナー
-      if(catchMsgT>0){ catchMsgT-=0.016*dt; if(clearT<=0){
-        const pop=1+Math.max(0,catchMsgT-0.9)*1.3;
-        g.save(); g.translate(api.W/2,api.H*0.36); g.scale(pop,pop);
-        g.font="900 28px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
-        g.globalAlpha=clamp(catchMsgT*1.4,0,1);
-        g.lineJoin="round"; g.lineWidth=7; g.strokeStyle="rgba(120,40,90,.85)"; g.shadowBlur=0; g.strokeText("ながれぼし キャッチ!",0,0);
-        g.shadowColor="rgba(255,210,60,.9)"; g.shadowBlur=16;
-        g.fillStyle="#ffd23f"; g.fillText("ながれぼし キャッチ!",0,0); g.shadowBlur=0;
-        g.restore(); g.globalAlpha=1; g.textAlign="left"; } if(catchMsgT<0)catchMsgT=0; }
-      // フィーバー! バナー(クリア帯・他バナーと重ならない高さ H*0.28)
-      if(feverBanner>0 && clearT<=0){
+      // フィーバー! バナー(暗い帯つき)
+      if(feverBanner>0 && clearT<=0 && !bannerBusy){ bannerBusy=true;
         const pop=1+Math.max(0,feverBanner-1.6)*1.2, col=SWIRLCOL[Math.floor(tsec*8)%SWIRLCOL.length];
         const fvA=clamp(feverBanner*1.4,0,1);
         g.save(); g.globalAlpha=fvA*0.35; g.fillStyle="#7a1f55"; g.shadowBlur=0;
@@ -529,16 +509,27 @@ function build_candyswirl(api){
         g.fillStyle="#fff"; g.fillText("フィーバー! ぜんぶ 2ばい!",0,0);
         g.shadowBlur=0;
         g.restore(); g.globalAlpha=1; g.textAlign="left"; }
-      // ③ ノンストップ ボーナス! バナー(クリア文字の下=重ねない)
-      if(nonstopT>0){ nonstopT-=0.014*dt;
-        const pop=1+Math.max(0,nonstopT-1.3)*1.4;
-        g.save(); g.translate(api.W/2,api.H*0.60); g.scale(pop,pop);
-        g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
-        g.globalAlpha=clamp(nonstopT*1.3,0,1);
-        g.lineJoin="round"; g.lineWidth=7; g.strokeStyle="rgba(120,40,90,.85)"; g.shadowBlur=0; g.strokeText("ずーっと つづいた! ボーナス!",0,0);
+      // ④ ながれぼし キャッチ! バナー
+      if(catchMsgT>0 && !bannerBusy){ catchMsgT-=0.016*dt; if(clearT<=0){ bannerBusy=true;
+        const pop=1+Math.max(0,catchMsgT-0.9)*1.3;
+        g.save(); g.translate(api.W/2,api.H*0.36); g.scale(pop,pop);
+        g.font="900 28px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
+        g.globalAlpha=clamp(catchMsgT*1.4,0,1);
+        g.lineJoin="round"; g.lineWidth=7; g.strokeStyle="rgba(120,40,90,.85)"; g.shadowBlur=0; g.strokeText("ながれぼし キャッチ!",0,0);
         g.shadowColor="rgba(255,210,60,.9)"; g.shadowBlur=16;
-        g.fillStyle="#ffe6a0"; g.fillText("ずーっと つづいた! ボーナス!",0,0); g.shadowBlur=0;
-        g.restore(); g.globalAlpha=1; g.textAlign="left"; if(nonstopT<0)nonstopT=0; }
+        g.fillStyle="#ffd23f"; g.fillText("ながれぼし キャッチ!",0,0); g.shadowBlur=0;
+        g.restore(); g.globalAlpha=1; g.textAlign="left"; } if(catchMsgT<0)catchMsgT=0; }
+      // ② ラッキー(1つに統合): 初回だけ「きょうの ラッキーいろは ◯◯!」、2回目以降は「ラッキー! ◯◯は あたり」
+      if(luckyMsgT>0 && !bannerBusy){ luckyMsgT-=0.016*dt; if(clearT<=0){ bannerBusy=true;
+        const pop=1+Math.max(0,luckyMsgT-(luckyFirst?1.5:0.6))*1.3;
+        g.save(); g.translate(api.W/2,api.H*0.44); g.scale(pop,pop);
+        g.font="900 "+(luckyFirst?28:26)+"px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
+        g.globalAlpha=clamp(luckyMsgT*1.5,0,1);
+        const lmtxt=luckyFirst?("きょうの ラッキーいろは "+(SWNAME[luckyColor]||"")+"!"):("ラッキー! "+(SWNAME[luckyColor]||"")+"は あたり");
+        g.lineJoin="round"; g.lineWidth=7; g.strokeStyle="rgba(120,40,90,.85)"; g.shadowBlur=0; g.strokeText(lmtxt,0,0);
+        g.shadowColor=luckyColor; g.shadowBlur=14;
+        g.fillStyle="#fff7c2"; g.fillText(lmtxt,0,0); g.shadowBlur=0;
+        g.restore(); g.globalAlpha=1; g.textAlign="left"; } if(luckyMsgT<=0){ luckyMsgT=0; luckyFirst=false; } }
 
       // ---- HUD: stage + progress (top center safe band) ----
       drawHUD();
@@ -629,12 +620,15 @@ function build_candyswirl(api){
     } else if(def.kind==="cake"){
       // little cake slice / cupcake top
       g.fillStyle="#fff3f7"; rrect(-r*0.75,-r*0.1,r*1.5,r*0.85,r*0.18); g.fill(); // cup
+      g.strokeStyle="rgba(120,40,90,.55)"; g.lineWidth=4; g.stroke();   // 白いカップが白い背景に溶けないよう縁取り
       g.strokeStyle="rgba(200,130,170,.4)"; g.lineWidth=2;
       for(let i=-2;i<=2;i++){g.beginPath(); g.moveTo(i*r*0.3,-r*0.05); g.lineTo(i*r*0.3,r*0.7); g.stroke();}
       const grd=g.createRadialGradient(-r*0.2,-r*0.5,r*0.1,0,-r*0.3,r);
       grd.addColorStop(0,lighten(def.col,70)); grd.addColorStop(1,def.col);
       g.fillStyle=grd; g.beginPath(); g.arc(0,-r*0.25,r*0.78,Math.PI,TAU); g.fill();
       g.fillRect(-r*0.78,-r*0.25,r*1.56,r*0.18);
+      g.strokeStyle="rgba(120,40,90,.55)"; g.lineWidth=4; g.lineJoin="round";
+      g.beginPath(); g.arc(0,-r*0.25,r*0.78,Math.PI,TAU); g.stroke();
       // cherry
       g.fillStyle="#ff5b7e"; g.beginPath(); g.arc(0,-r*0.85,r*0.18,0,TAU); g.fill();
       g.fillStyle="rgba(255,255,255,.7)"; g.beginPath(); g.arc(-r*0.05,-r*0.9,r*0.05,0,TAU); g.fill();

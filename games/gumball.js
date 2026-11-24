@@ -165,7 +165,7 @@ function build_gumball(api){
     api.shake(4+Math.min(combo,8));
     // hitStopはゴールド/コンボ節目のみ+クールダウン30f以上
     if((s.gold||combo===5||combo===10)&&hsCd<=0){api.hitStop(s.gold?4:3);hsCd=34;}
-    if(s.gold) goldBurst(hx,hy,baseY-unit*1.3);
+    if(s.gold) goldBurst(hx,hy,bigY(baseY));
     if(s.rainbow) rainbowBurst(hx,hy);
     // ② ラッキー色命中: 小さめの祝福 + 頭上に小さな星のキラッ(気づけるヒント)
     if(isLucky){
@@ -180,7 +180,7 @@ function build_gumball(api){
     if(combo>1&&!s.rainbow&&!s.gold&&(combo<=3||combo%5===0)) addFloat({x:clamp(hx+unit*1.8,unit,W-unit*1.5),y:baseY,txt:"x"+combo,life:1,vy:-1,
       col:combo>=8?"#ff2bff":combo>=5?"#ff5b8a":"#ffd23f",size:combo>=4?38:28});
     if(ball.eaten===4) addFloat({x:hx,y:bigY(hy),txt:"おおきく なった！",life:1,vy:-0.7,col:"#ffe14a",size:22});
-    if(ball.eaten===8){ const bxL=Math.max(W*0.12,125); addFloat({x:clamp(hx,bxL,Math.max(bxL,W*0.5)),y:bigY(hy),txt:"きょだいガムボール！",life:1.4,vy:-0.7,col:"#ffd0ff",size:24,stroke:"rgba(60,0,60,.95)",lw:10}); }   // 軸6: 太陽(右上)から離れた左側に出し、太い縁取りで雲の上でも読める
+    if(ball.eaten===8){ const bxL=Math.max(W*0.12,125); addFloat({x:clamp(hx,bxL,Math.max(bxL,W*0.38)),y:bigY(hy),txt:"きょだいガムボール！",life:1.4,vy:-0.7,col:"#ffd0ff",size:24,stroke:"rgba(60,0,60,.95)",lw:10}); }   // 軸6: 太陽(右上)から離れた左側に出し、太い縁取りで雲の上でも読める
     checkStage();
   }
 
@@ -320,7 +320,7 @@ function build_gumball(api){
       // ---- フィーバー中: 虹色に脈打つ空 ----
       if(fever>0){
         g.save();g.globalCompositeOperation="lighter";
-        g.globalAlpha=0.15+0.06*Math.sin(tsec*8);
+        g.globalAlpha=0.08+0.04*Math.sin(tsec*8);
         g.fillStyle="hsl("+(((tsec*160)|0)%360)+",90%,65%)";g.fillRect(0,0,W,H);
         g.restore();g.globalAlpha=1;
       }
@@ -646,10 +646,12 @@ function build_gumball(api){
         g.save();g.translate(W/2,H*0.47);g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";   // 軸6: 共通バナー(H*0.3)から離す
         g.font="900 46px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor="rgba(255,43,255,.9)";g.shadowBlur=24;
-        g.fillStyle="hsl("+(((tsec*220)|0)%360)+",95%,66%)";
+        g.lineWidth=10;g.lineJoin="round";g.strokeStyle="rgba(60,0,60,.85)";g.strokeText("フィーバータイム！",0,0);   // 軸6: にじいろバナーと同じ暗い縁取り
+        g.fillStyle="hsl("+(((tsec*220)|0)%360)+",95%,58%)";
         g.fillText("フィーバータイム！",0,0);
         g.shadowBlur=0;g.lineWidth=2.5;g.strokeStyle="#fff";g.strokeText("フィーバータイム！",0,0);
         g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";g.fillStyle="#fff";
+        g.lineWidth=7;g.lineJoin="round";g.strokeStyle="rgba(60,0,60,.85)";g.strokeText("てんすう 2ばい！",0,40);
         g.fillText("てんすう 2ばい！",0,40);
         g.restore();g.globalAlpha=1;g.textAlign="left";}
         if(feverBann<0)feverBann=0;

@@ -11,8 +11,8 @@ function buildObsidian(api){
   let fever=0,feverGauge=0,feverBann=0,hitCd=0;
   const FEVER_LEN=560; // frames (~9.3s)
   // 火山ガラスの宝石トーン(暗いが色みがある=②ラッキー色を見分けられる)
-  const COLORS=["#3a2350","#20305a","#1f3d33","#4a2130"]; // むらさき/あお/みどり/あか
-  const COLNAME={"#3a2350":"むらさき","#20305a":"あお","#1f3d33":"みどり","#4a2130":"あか"};
+  const COLORS=["#6a3f9a","#2f5fb4","#2f8a62","#a8384c"]; // むらさき/あお/みどり/あか
+  const COLNAME={"#6a3f9a":"むらさき","#2f5fb4":"あお","#2f8a62":"みどり","#a8384c":"あか"};
   const RAINBOW=["#ff5b5b","#ffd23f","#4db8ff","#7be08a","#ff7bd0","#b58bff"];
   // ---- 隠し発見レイヤー(クレーン/ハンマー/トラックと同じ思想) ----
   // ② きょうのラッキー色: 秘密の1色。その色の いわ を こわすと +1 と 頭上に星のキラッ(気づけるヒント)
@@ -296,7 +296,7 @@ function buildObsidian(api){
         // ブロック帯の後ろだけ ほんのり暗くして、くらい いわ が絵に埋もれないようにする
         const fr=Math.max(0,api.W*0.75);
         const fv=g.createRadialGradient(api.W/2,by+rows*S*0.5,0,api.W/2,by+rows*S*0.5,fr);
-        fv.addColorStop(0,"rgba(20,6,12,.34)");fv.addColorStop(0.6,"rgba(20,6,12,.14)");fv.addColorStop(1,"rgba(20,6,12,0)");
+        fv.addColorStop(0,"rgba(20,6,12,.18)");fv.addColorStop(0.6,"rgba(20,6,12,.06)");fv.addColorStop(1,"rgba(20,6,12,0)");
         g.fillStyle=fv;g.fillRect(0,0,api.W,api.H);
       } else {
       let grd=g.createLinearGradient(0,0,0,api.H);
@@ -539,6 +539,9 @@ function buildObsidian(api){
       g.beginPath();g.arc(cx-rad*0.32,cy-rad*0.36,Math.max(0,rad*0.36),0,TAU);g.fill();
       g.strokeStyle="rgba(0,0,0,.5)";g.lineWidth=1.5;
       g.beginPath();g.arc(cx,cy,rad,0,TAU);g.stroke();
+      // 明るい縁取り: くらい背景の上でも まるい石の輪郭が浮いて見える
+      g.strokeStyle="rgba(255,225,190,.45)";g.lineWidth=2;
+      g.beginPath();g.arc(cx,cy,Math.max(0,rad-1.5),0,TAU);g.stroke();
       // 大きい岩はもう1回たたく必要があると分かるよう、ひび割れの筋を1本足す
       if(b.big&&b.hp>1){g.strokeStyle="rgba(0,0,0,.4)";g.lineWidth=Math.max(1,s*0.05);
         g.beginPath();g.moveTo(cx-rad*0.3,cy-rad*0.5);g.lineTo(cx+rad*0.1,cy);g.lineTo(cx-rad*0.15,cy+rad*0.5);g.stroke();}
@@ -612,7 +615,8 @@ function buildObsidian(api){
     if(b.glow>0){g.save();g.globalCompositeOperation="lighter";g.globalAlpha=b.glow*0.5;
       g.fillStyle="#ff8a2a";g.fillRect(x,y,s,s);g.globalCompositeOperation="source-over";g.restore();}
     // outline (画像ブロックは絵の輪郭を活かす)
-    if(!useImg){g.strokeStyle="rgba(0,0,0,.5)";g.lineWidth=1.5;g.strokeRect(x+0.5,y+0.5,s-1,s-1);}
+    if(!useImg){g.strokeStyle="rgba(0,0,0,.5)";g.lineWidth=1.5;g.strokeRect(x+0.5,y+0.5,s-1,s-1);
+      g.strokeStyle="rgba(255,225,190,.45)";g.lineWidth=2;g.strokeRect(x+1.5,y+1.5,s-3,s-3);}
     if(b.gold||b.rainbow)g.restore();
   }
   function drawSpirit(){

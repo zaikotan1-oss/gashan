@@ -432,7 +432,7 @@ function build_donutfall(api){
       // ② きょうのラッキー色 ヒント／ラッキー! バナー
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
         const pop=1+Math.max(0,luckyMsgT-1)*1.2;
-        g.save();g.translate(api.W/2,api.H*0.29);g.scale(pop,pop);g.textAlign="center";
+        g.save();g.translate(api.W/2,api.H*0.70);g.scale(pop,pop);g.textAlign="center";
         g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 24px 'Hiragino Maru Gothic ProN',system-ui";
         const t2="きょうの ラッキーいろは "+(COLNAME[luckyColor]||"")+"！";
         g.shadowColor=luckyColor;g.shadowBlur=12;g.fillStyle="#fff";g.fillText(t2,0,0);
@@ -515,7 +515,8 @@ function build_donutfall(api){
       g.save();g.translate(api.W/2,y-14);g.scale(pu,pu);
       g.strokeText("フィーバー！ ぜんぶ 2ばい！",0,0);
       g.fillStyle="#ff2bcf";g.fillText("フィーバー！ ぜんぶ 2ばい！",0,0);g.restore();}
-    else{g.strokeText("フィーバーまで ためよう！",api.W/2,y-14);g.fillStyle="#7a3b5a";g.fillText("フィーバーまで ためよう！",api.W/2,y-14);}
+    else{g.save();g.shadowBlur=0;g.fillStyle="rgba(255,255,255,.7)";rrect(api.W/2-170,y-14-26,340,32,12);g.fill();g.restore();
+      g.strokeText("フィーバーまで ためよう！",api.W/2,y-14);g.fillStyle="#7a3b5a";g.fillText("フィーバーまで ためよう！",api.W/2,y-14);}
     g.restore();g.textAlign="left";
   }
 

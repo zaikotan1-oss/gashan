@@ -224,6 +224,7 @@ function build_cakesmash(api){
     if(t.rb){
       // ① にじいろ段 撃破: 虹の輪が6色ぶわっと + ファンファーレ + 大量得点。激レアの爽快ごほうび。
       rbMsgT=1.4;
+      if(luckyMsgT>1.2)luckySeen=false;luckyMsgT=0;   // にじいろバナー(H*0.30)と同じ高さのラッキー文言は消す(重なり防止)
       api.shake(16);hstop(5);flash=Math.min(1,flash+0.5);flashCol="#ffe6f2";shockT=Math.min(1,shockT+0.7);
       const RBC=["#ff5da2","#ff8a3a","#ffd23f","#7be08a","#36c9ff","#b066ff"];
       for(let k=0;k<RBC.length;k++)rings.push({x,y,r:w*0.2,vr:w*(0.5+k*0.13),life:1,decay:0.04,col:RBC[k]});
@@ -255,7 +256,7 @@ function build_cakesmash(api){
       api.tone(1046,0.14,"triangle",0.1);api.tone(1568,0.16,"triangle",0.08);
       for(let i=0;i<7;i++){const a=rnd(-TAU*0.5,0),s=rnd(2,6);
         sparks.push({x,y:y-tierH*0.4,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,len:rnd(6,12),life:1,decay:rnd(0.04,0.07)});}
-      if(fever>FEVER_LEN-1.5||rbMsgT>0.2){/*フィーバー開始直後は中央の文言を出さない*/}
+      if(fever>FEVER_LEN-1.5||rbMsgT>0){/*フィーバー開始直後は中央の文言を出さない*/}
       else if(!luckySeen){luckyMsgT=1.8;luckySeen=true;}else luckyMsgT=Math.max(luckyMsgT,0.7);
       floats.push({x,y:y-tierH*1.8,txt:"ラッキー！ +"+pts,life:1,vy:-1,col:FRUIT[luckyColor],size:24});   // 「x n」(y-tierH)の上に縦に並べる
     }
@@ -661,10 +662,12 @@ function build_cakesmash(api){
         g.restore();g.globalAlpha=1;g.textAlign="left";if(rbMsgT<0)rbMsgT=0;}
       // ② きょうのラッキー色 はっけん！ 中央の小ヒント(初回は長め・以降は小さく)
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
-        g.save();g.translate(W/2,H*0.30);g.textAlign="center";
+        g.save();g.translate(W/2,rbMsgT>0?H*0.40:H*0.30);g.textAlign="center";   // にじいろバナーが残っている間は下へ逃がして重ねない
         g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
-        const t2=luckySeen&&luckyMsgT>1.2?"きょうのラッキー色は "+FRUITNAME[luckyColor]+"！":"ラッキー色 はっけん！";
-        g.lineWidth=5;g.strokeStyle="rgba(120,40,80,.4)";g.strokeText(t2,0,0);
+        const t2=luckySeen&&luckyMsgT>1.2?"きょうのラッキーいろは "+FRUITNAME[luckyColor]+"！":"ラッキーいろ はっけん！";
+        const lw=g.measureText(t2).width+28;
+        g.save();g.globalAlpha*=0.6;g.fillStyle="#7a2a4a";roundRect(-lw/2,-26,lw,36,10);g.fill();g.restore();   // ひさしの縞の上でも読める帯
+        g.lineJoin="round";g.lineWidth=7;g.strokeStyle="rgba(120,40,80,.9)";g.strokeText(t2,0,0);
         g.fillStyle=FRUIT[luckyColor];g.fillText(t2,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";if(luckyMsgT<0)luckyMsgT=0;}
       // ③ パーフェクト！ バナー(クリア文字 H*0.44 と重ねない下側)
@@ -966,15 +969,15 @@ function build_cakesmash(api){
     g.lineJoin="round";g.lineWidth=4;g.strokeStyle="rgba(255,255,255,.85)";g.strokeText(hudTxt,W/2,by-10);
     g.fillStyle="#7a2a4a";g.fillText(hudTxt,W/2,by-10);
     g.shadowBlur=0;
-    g.fillStyle="rgba(120,40,80,.25)";roundRect(bx,by,bw,bh,bh/2);g.fill();
+    g.fillStyle="rgba(120,40,80,.5)";roundRect(bx,by,bw,bh,bh/2);g.fill();
     const fr=clamp(stageSmash/stageGoal,0,1);
     if(fr>0){const gg=g.createLinearGradient(bx,0,bx+bw,0);
       gg.addColorStop(0,"#ff9ac2");gg.addColorStop(1,"#ffd23f");
       g.fillStyle=gg;roundRect(bx,by,Math.max(bh,bw*fr),bh,bh/2);g.fill();}
-    g.strokeStyle="rgba(255,255,255,.7)";g.lineWidth=2;roundRect(bx,by,bw,bh,bh/2);g.stroke();
+    g.strokeStyle="rgba(255,255,255,.85)";g.lineWidth=3;roundRect(bx,by,bw,bh,bh/2);g.stroke();
     // ---- fever gauge (fills as you smash; during fever = remaining time, rainbow) ----
     const gw=bw*0.72,gh=12,gx=(W-gw)/2,gy=by+bh+7;
-    g.fillStyle="rgba(120,40,80,.22)";roundRect(gx,gy,gw,gh,gh/2);g.fill();
+    g.fillStyle="rgba(120,40,80,.45)";roundRect(gx,gy,gw,gh,gh/2);g.fill();
     const gf=fever>0?clamp(fever/FEVER_LEN,0,1):feverGauge;
     if(gf>0.01){
       const cg=g.createLinearGradient(gx,0,gx+gw,0);
@@ -984,7 +987,7 @@ function build_cakesmash(api){
       g.save();if(fever>0){g.shadowBlur=10+5*Math.sin(tsec*8);g.shadowColor="#ff2bff";}
       g.fillStyle=cg;roundRect(gx,gy,Math.max(gh,gw*gf),gh,gh/2);g.fill();g.restore();
     }
-    g.strokeStyle="rgba(255,255,255,.6)";g.lineWidth=1.5;roundRect(gx,gy,gw,gh,gh/2);g.stroke();
+    g.strokeStyle="rgba(255,255,255,.8)";g.lineWidth=2.5;roundRect(gx,gy,gw,gh,gh/2);g.stroke();
     // 常時HUDは2段(文字+バー / 細いフィーバーゲージ)。フィーバー中も文字行は足さない(虹色ゲージ+開始バナーで伝わる)
     g.fillStyle=fever>0?"#ff2bff":"rgba(255,43,255,.75)";
     g.font="800 14px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="right";

@@ -439,8 +439,8 @@ function build_snowman(api){
       // ② きょうの ラッキー色 はっけん(初回だけ 大きく色名を教える)
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
         g.save();g.translate(api.W/2,clearT>0?api.H*0.28:api.H*0.37);g.textAlign="center";
-        g.globalAlpha=clamp(luckyMsgT*1.4,0,1);g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
-        const t2="きょうの ラッキー色は "+(SCARFNAME[SCARF.indexOf(luckyColor)]||"")+"！";
+        g.globalAlpha=clamp(luckyMsgT*1.4,0,1);g.font="800 26px 'Hiragino Maru Gothic ProN',system-ui";
+        const t2="きょうの ラッキーいろは "+(SCARFNAME[SCARF.indexOf(luckyColor)]||"")+"！";
         g.lineWidth=5;g.strokeStyle="rgba(10,40,70,.45)";g.strokeText(t2,0,0);
         g.fillStyle=luckyColor;g.fillText(t2,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";if(luckyMsgT<0)luckyMsgT=0;}
@@ -488,9 +488,9 @@ function build_snowman(api){
     const left=clamp(stageGoal-stageKill,0,stageGoal);
     const bw=Math.min(api.W*0.6,360),bh=16,bx=(api.W-bw)/2,by=api.H*0.055;
     g.save();g.textAlign="center";
-    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
+    g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
     g.fillStyle="#0a3a5a";g.shadowColor="rgba(255,255,255,.6)";g.shadowBlur=6;
-    g.fillText("ステージ "+stage+"      あと "+left+" こ",api.W/2,by-8);
+    g.fillText("ステージ "+stage+"      あと "+left+" こ",api.W/2,by-10);
     g.shadowBlur=0;
     g.fillStyle="rgba(10,40,70,.3)";roundRect(bx,by,bw,bh,bh/2);g.fill();
     const fr=clamp(stageKill/stageGoal,0,1);
@@ -504,7 +504,7 @@ function build_snowman(api){
     g.fillStyle="rgba(10,40,70,.3)";roundRect(fx,fy,fw,fh,fh/2);g.fill();
     if(ff>0){g.fillStyle=fever>0?"#ffd23f":"#ffb347";roundRect(fx,fy,Math.max(fh,fw*ff),fh,fh/2);g.fill();}
     g.strokeStyle="rgba(255,255,255,.7)";g.lineWidth=1.5;roundRect(fx,fy,fw,fh,fh/2);g.stroke();
-    g.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="right";
+    g.font="800 20px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="right";
     g.lineWidth=4;g.strokeStyle="rgba(255,255,255,.75)";
     g.strokeText(fever>0?"フィーバー！":"フィーバー",fx-8,fy+fh);
     g.fillStyle=fever>0?"#b86a00":"#0a3a5a";g.fillText(fever>0?"フィーバー！":"フィーバー",fx-8,fy+fh);
