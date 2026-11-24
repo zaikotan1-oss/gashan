@@ -115,7 +115,9 @@ function buildVolcano(api){
   // ⑦ 新カテゴリ「隕石」: 空を横切る乗り物/生き物 とは別の"重量物"。ゆっくり落下・多段ヒット・地面で土煙
   function spawnMeteor(){
     const r=clamp(api.W*0.075,40,74);
-    flyers.push({x:rnd(api.W*0.18,api.W*0.82),y:-r,t:"meteor",r,
+    // 軸6(見やすさ): 火口の真上(弾道)と的の密集帯を避け、火口の左右どちらかの外側へ落とす
+    const side=Math.random()<0.5?-1:1,mx=clamp(craterX+side*rnd(api.W*0.28,api.W*0.4),r,api.W-r);
+    flyers.push({x:mx,y:-r,t:"meteor",r,
       vx:rnd(-0.15,0.15),vy:rnd(0.5,0.8)*speedMul(),color:"#8a7358",bob:0,
       hp:3,hitT:0,zig:0,rare:false,offset:rnd(0,10),big:true});
   }
@@ -352,6 +354,10 @@ function buildVolcano(api){
       for(const f of flyers){
         if(f.t==="meteor"){f.x+=f.vx*dt;f.y+=f.vy*dt;f.bob+=0.03*dt;if(f.hitT>0)f.hitT-=dt;continue;}
         f.x+=f.vx*dt;f.bob+=0.05*dt;
+        // 軸6(見やすさ): 的どうしのゆるい押しのけ(yだけ離す。xは触らないので横流れの速さは変わらない)
+        if(tick>=180)for(const o of flyers){if(o===f)continue; // 開始3秒は触らない(最初の成功までの秒数を守る)
+          const d=Math.hypot(f.x-o.x,f.y-o.y);
+          if(d<(f.r+o.r)*0.75)f.y+=Math.sign(f.y-o.y||1)*0.6*dt;}
         if(f.t==="ufo"){f.zig+=0.09*dt;f.y+=Math.sin(f.zig)*1.1*dt;}
         else f.y+=Math.sin(f.bob)*0.3*dt;
         f.y=clamp(f.y,api.H*0.1,craterY-f.r);
@@ -503,7 +509,7 @@ function buildVolcano(api){
       g.save();g.globalAlpha=hintA;
       g.font="800 15px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
       const htxt="ながおしで マグマをためて、はなして ふんか！";
-      const hw2=(g.measureText(htxt)||{}).width||htxt.length*13,pw=hw2+34,px2=(api.W-pw)/2,py2=api.H-34,ph=26;
+      const hw2=(g.measureText(htxt)||{}).width||htxt.length*13,pw=hw2+34,px2=(api.W-pw)/2,py2=api.H-40,ph=26;
       g.fillStyle="rgba(40,24,48,0.55)";roundRect(px2,py2,pw,ph,13);g.fill();
       g.strokeStyle="rgba(255,200,120,0.5)";g.lineWidth=2;roundRect(px2,py2,pw,ph,13);g.stroke();
       const ty=py2+ph*0.62+5;
@@ -518,14 +524,14 @@ function buildVolcano(api){
       // ① にじいろ！ げきは の中央バナー(虹色に色替わり)
       if(rbMsgT>0){rbMsgT-=0.016*dt;
         const pop=1+Math.max(0,rbMsgT-1)*1.3,col=RB[Math.floor(tick*0.12)%RB.length];
-        g.save();g.translate(api.W/2,api.H*0.56);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
+        g.save();g.translate(api.W/2,api.H*0.50);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(rbMsgT*1.4,0,1);g.font="900 34px 'Hiragino Maru Gothic ProN',system-ui";
         g.lineWidth=7;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText("にじいろ！",0,0);
         g.fillStyle=col;g.fillText("にじいろ！",0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(rbMsgT<0)rbMsgT=0;}
       // ② きょうのラッキー色 はっけん！ 中央の小ヒント(初回だけ)
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
-        g.save();g.translate(api.W/2,api.H*0.72);g.textAlign="center";g.textBaseline="middle";
+        g.save();g.translate(api.W/2,api.H*0.78);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
         const t2="きょうのラッキーいろは "+(COLNAME[luckyColor]||"")+"！";
         // 軸6: 的の帯の外(下段)へ出し、暗い背板を敷いて色文字が空に溶けないようにする
@@ -536,7 +542,7 @@ function buildVolcano(api){
       // ③ ノーミス！ バナー(ウェーブ/ステージ バナーと重ねない下段)
       if(noMissT>0){noMissT-=0.014*dt;
         const pop=1+Math.max(0,noMissT-1.2)*1.3;
-        g.save();g.translate(api.W/2,api.H*0.64);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
+        g.save();g.translate(api.W/2,api.H*0.70);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(noMissT*1.3,0,1);g.font="900 28px 'Hiragino Maru Gothic ProN',system-ui";
         g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText("ノーミス！",0,0);
         g.shadowColor="rgba(120,255,150,.8)";g.shadowBlur=14;g.fillStyle="#c7ffcf";g.fillText("ノーミス！",0,0);g.shadowBlur=0;
@@ -590,8 +596,8 @@ function buildVolcano(api){
     if(!banner)return;
     const t=bannerT,fade=clamp(t/22,0,1);
     g.save();g.textAlign="center";
-    // 軸6(見やすさ): 的が飛ぶ帯(spawnFlyerのy=H*0.12〜craterY-r*1.5)に被らない高さへ(達成バナーが的の顔に重ならないように)
-    const cy=api.H*0.20;
+    // 軸6(見やすさ): 的が飛ぶ帯(y=H*0.12〜craterY-r=約0.5H)の"下"=火山の山腹へ(達成バナーが的の顔に重ならないように)
+    const cy=api.H*0.60;
     // big celebratory glow if a全クリ banner
     if(cleared){g.globalCompositeOperation="lighter";
       const wg=g.createRadialGradient(api.W/2,cy,10,api.W/2,cy,Math.max(api.W,api.H)*0.6);

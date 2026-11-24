@@ -67,12 +67,19 @@ function build_gumball(api){
     // トップアップ式: 生き残りは残したまま目標数まで補充する(尽きてSTALLしない)
     const target=7+Math.min(stage,4)+(fever>0?4:0); // フィーバー中は大量発生
     for(let i=sweets.length;i<target;i++){
-      const relx=rnd(0.30,0.92);
+      // 軸6: 近いx位置に重ねて出さない(ドーナツ同士が重なる対策。8回まで引き直す)
+      let relx=rnd(0.30,0.92);
+      for(let t=0;t<8&&sweets.some(q=>!q.dead&&Math.abs((q.relx!=null?q.relx:q.x/W)-relx)<0.06);t++) relx=rnd(0.30,0.92);
       const x=clamp(relx*W,unit,W-unit);
       const airN=sweets.filter(q=>q.air&&!q.dead).length;
-      const onGround=airN>=3||Math.random()<0.55;   // 空中のお菓子が溜まりすぎない(地面分は必ず残る)
+      let onGround=airN>=3||Math.random()<0.55;   // 空中のお菓子が溜まりすぎない(地面分は必ず残る)
       // 空中に出す場合も坂の少し上(必ずボールが届く高さへ落ちてくる)
-      const y=onGround? slopeAt(x)-unit*0.5 : slopeAt(x)-unit*rnd(2.0,3.6);
+      let y=slopeAt(x)-unit*0.5;
+      if(!onGround){
+        // 軸6: 上端は H*0.26 まで(コンボ表示などHUD帯に標的を入れない)。坂が高い所では空中にせず地面に出す
+        const ay=Math.max(H*0.26,slopeAt(x)-unit*rnd(2.0,3.6));
+        if(slopeAt(x)-ay<unit*1.6) onGround=true; else y=ay;
+      }
       // ① 激レア にじいろガムボール(ステージ2以降・約3%): 虹色に光り、食べると大量点+虹の大破裂
       const rainbow=(stage>=2)&&Math.random()<0.032;
       // 低確率でゴールドキャンディ(星型・光る・大量点)
@@ -173,7 +180,7 @@ function build_gumball(api){
     if(combo>1&&!s.rainbow&&!s.gold&&(combo<=3||combo%5===0)) addFloat({x:clamp(hx+unit*1.8,unit,W-unit*1.5),y:baseY,txt:"x"+combo,life:1,vy:-1,
       col:combo>=8?"#ff2bff":combo>=5?"#ff5b8a":"#ffd23f",size:combo>=4?38:28});
     if(ball.eaten===4) addFloat({x:hx,y:bigY(hy),txt:"おおきく なった！",life:1,vy:-0.7,col:"#ffe14a",size:22});
-    if(ball.eaten===8) addFloat({x:hx,y:bigY(hy),txt:"きょだいガムボール！",life:1.4,vy:-0.7,col:"#ffd0ff",size:24,stroke:"rgba(60,0,60,.85)"});
+    if(ball.eaten===8){ const bxL=Math.max(W*0.12,125); addFloat({x:clamp(hx,bxL,Math.max(bxL,W*0.5)),y:bigY(hy),txt:"きょだいガムボール！",life:1.4,vy:-0.7,col:"#ffd0ff",size:24,stroke:"rgba(60,0,60,.95)",lw:10}); }   // 軸6: 太陽(右上)から離れた左側に出し、太い縁取りで雲の上でも読める
     checkStage();
   }
 
@@ -238,7 +245,7 @@ function build_gumball(api){
       api.boom(0.5);api.shake(12);
       api.slide(523,784,0.3,0.2,"triangle");api.tone(988,0.3,"triangle",0.1);
       for(let i=0;i<22;i++){const a=rnd(0,TAU),sp=rnd(3,9);
-        shards.push({x:W/2,y:H*0.42,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-2,s:rnd(unit*0.2,unit*0.4),
+        shards.push({x:W/2,y:H*0.60,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-2,s:rnd(unit*0.2,unit*0.4),
           col:pick(CANDY),rot:rnd(0,TAU),vr:rnd(-0.4,0.4),life:1,decay:rnd(0.012,0.02)});}
       stage++;stageGoal=goalFor(stage);stageEat=0;buildBg();
     }
@@ -407,7 +414,7 @@ function build_gumball(api){
           shards.push({x:rnd(0,W),y:-12,vx:rnd(-1,1),vy:rnd(2,4.5),s:rnd(unit*0.16,unit*0.3),
             col:pick(CANDY),rot:rnd(0,TAU),vr:rnd(-0.3,0.3),life:1,decay:0.008});
         if(fever<=0){ // 終了演出
-          floats.push({x:W/2,y:H*0.37,txt:"フィーバー おわり！",life:1,vy:-0.5,col:"#fff",size:24});
+          floats.push({x:W/2,y:H*0.45,txt:"フィーバー おわり！",life:1,vy:-0.5,col:"#fff",size:24});
           api.slide(784,392,0.35,0.16,"triangle");
         }
       }
@@ -554,7 +561,7 @@ function build_gumball(api){
       for(const f of floats){f.y+=f.vy*dt;f.life-=0.016*dt;
         g.save();g.globalAlpha=Math.max(0,Math.min(1,f.life*2));
         g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-        g.lineWidth=8;g.lineJoin="round";g.strokeStyle=f.stroke||"rgba(0,0,0,.75)";g.strokeText(f.txt,f.x,f.y);
+        g.lineWidth=f.lw||8;g.lineJoin="round";g.strokeStyle=f.stroke||"rgba(0,0,0,.75)";g.strokeText(f.txt,f.x,f.y);
         g.fillStyle=f.col;g.fillText(f.txt,f.x,f.y);g.restore();}
       g.globalAlpha=1;g.textAlign="left";
       floats=floats.filter(f=>f.life>0);
@@ -626,7 +633,7 @@ function build_gumball(api){
       // ---- ③ パーフェクトロール！ 祝福バナー(クリア文字と重ならない下側) ----
       if(perfectT>0){perfectT-=0.016*dt;
         if(!paused){const a=clamp(perfectT*1.3,0,1),pop=1+Math.max(0,perfectT-1.2)*1.6;
-        g.save();g.translate(W/2,H*0.6);g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";
+        g.save();g.translate(W/2,H*0.68);g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";
         g.font="900 32px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor="rgba(123,224,138,.9)";g.shadowBlur=16;g.fillStyle="#c7ffcf";
         g.fillText("パーフェクトロール！",0,0);
@@ -636,7 +643,7 @@ function build_gumball(api){
       // ---- フィーバー突入バナー ----
       if(feverBann>0){feverBann-=0.016*dt;
         if(!paused){const a=clamp(feverBann*1.5,0,1),pop=1+Math.max(0,feverBann-1.2)*2.2;
-        g.save();g.translate(W/2,H*0.35);g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";
+        g.save();g.translate(W/2,H*0.47);g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";   // 軸6: 共通バナー(H*0.3)から離す
         g.font="900 46px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor="rgba(255,43,255,.9)";g.shadowBlur=24;
         g.fillStyle="hsl("+(((tsec*220)|0)%360)+",95%,66%)";
@@ -651,9 +658,9 @@ function build_gumball(api){
       // ---- ステージクリア演出 ----
       if(clearT>0){clearT-=0.016*dt;
         const a=clamp(clearT*1.4,0,1);
-        g.save();g.globalAlpha=a*0.45;g.fillStyle="#000";g.fillRect(0,H*0.34,W,H*0.22);g.restore();
+        g.save();g.globalAlpha=a*0.45;g.fillStyle="#000";g.fillRect(0,H*0.50,W,H*0.22);g.restore();
         const pop=1+Math.max(0,clearT-1.4)*1.8;
-        g.save();g.translate(W/2,H*0.45);g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";
+        g.save();g.translate(W/2,H*0.61);g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";   // 軸6: 共通バナー(H*0.3)と帯が重ならないよう下げた
         g.font="900 44px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor="rgba(255,140,200,.9)";g.shadowBlur=20;g.fillStyle="#ffd23f";
         g.fillText("ステージ"+clearStage+" クリア！",0,0);
@@ -673,7 +680,7 @@ function build_gumball(api){
         if(tsec%0.06<0.016*dt) shards.push({x:rnd(0,W),y:-10,vx:rnd(-1,1),vy:rnd(2,5),
           s:rnd(unit*0.2,unit*0.4),col:pick(CANDY),rot:rnd(0,TAU),vr:rnd(-0.3,0.3),life:1,decay:0.008});
         const pop=1+Math.sin(tsec*6)*0.06;
-        g.save();g.translate(W/2,H*0.42);g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";
+        g.save();g.translate(W/2,H*0.52);g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";
         g.font="900 52px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor="rgba(255,210,60,1)";g.shadowBlur=26;g.fillStyle="#ffd23f";
         g.fillText("ぜんぶ クリア！",0,0);

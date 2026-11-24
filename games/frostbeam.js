@@ -9,6 +9,7 @@ function build_frostbeam(api){
   let fever=0,feverGauge=0,feverBann=0,hsCd=0;
   // stage progression (endless, never game-over)
   let stage=1,stageKill=0,stageGoal=8,clearT=0,clearStage=0;
+  let quietF=0,prevCount=0;   // 軸3: 何も得点が無い時間(フレーム)。長く続いたら こおりビームが ひとりでに うつ助け舟
   let firstSpawnDone=false;   // ① 最初の1体だけ大きく・中央近くに出し、開始10秒以内の最初の成功を確実にする
   const PREVIEWS=["おおきい こおりくん","きらきら ジェム","はやい こおりくん","ゴールドスター","オーロラの そら"];
   function nextPreview(s){return PREVIEWS[(s-2)%PREVIEWS.length];}
@@ -243,6 +244,16 @@ function build_frostbeam(api){
     },
     frame(dt,now){
       tsec+=0.016*dt;
+      // 助け舟: 7秒ずっと得点が無ければ、画面中央に近い動く子へ「こおりビーム」が ひとりでに飛ぶ(叱らない・何度でも)
+      if(count!==prevCount){prevCount=count;quietF=0;}else if(clearT<=0)quietF+=dt;
+      if(quietF>420){quietF=0;
+        if(!targets.some(t=>!t.dead&&t.frozen)){
+          let best=null,bd=1e9;
+          for(const t of targets){if(t.dead||t.frozen||t.x<t.r||t.x>api.W-t.r)continue;
+            const d=Math.hypot(t.x-api.W/2,t.y-api.H/2);if(d<bd){bd=d;best=t;}}
+          if(best)freeze(best);else spawn();
+        }
+      }
       if(hsCd>0)hsCd-=dt;
       if(fever>0){fever-=dt;
         if(fever<=0){fever=0;flash=Math.min(1,flash+0.3);

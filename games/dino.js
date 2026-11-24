@@ -408,10 +408,16 @@ function buildDino(api){
   };
   function drawObj(o,front){
     if(o.state==="gone")return;
-    let yo=0,a=front?0.5:1; // 恐竜の真正面の物は少し透かして、恐竜の頭が隠れきらないように
+    // 恐竜の真正面の物はほぼ不透明(0.85)で描く。きん/にじいろ(+5/+8の大事な標的)は完全に不透明。白縁と光で色あせず読める(軸6)
+    let yo=0,a=front?((o.type==="gold"||o.type==="rainbow")?1:0.85):1;
     if(o.state==="rise"){yo=(1-o.rise)*o.h;a=ease?ease(o.rise):o.rise;}
     else if(o.state==="stand"&&o.ttl>0&&o.ttl<60&&Math.floor(o.ttl/5)%2===0)a=0.4; // 消える直前の点滅(予告)
     g.save();g.globalAlpha=a;
+    if(front&&o.state!=="fly"){ // 恐竜の胴(黄色)と混ざらないよう、標的の後ろに白い光と白縁を敷く
+      g.save();g.globalAlpha=a*0.3;g.fillStyle="#ffffff";
+      g.beginPath();g.ellipse(o.x,groundY+yo-o.h*0.5,Math.max(0,o.w*0.75),Math.max(0,o.h*0.58),0,0,TAU);g.fill();g.restore();
+      if(o.type!=="tree"&&o.type!=="castle"&&o.type!=="lamp"){
+        g.save();g.lineWidth=3;g.strokeStyle="rgba(255,255,255,.9)";g.strokeRect(o.x-o.w/2-2,groundY-o.h+yo-2,o.w+4,o.h+4);g.restore();}}
     if(o.state==="fly"){g.translate(o.x,groundY-o.h*0.5+(o.fy||0));g.rotate(o.rot);g.translate(-o.x,-(groundY-o.h*0.5));}
     // soft ground shadow
     if(o.state!=="fly"){g.save();g.globalAlpha=a*0.18;g.fillStyle="#000";
@@ -422,6 +428,8 @@ function buildDino(api){
       const swx=Math.sin(o.sway)*o.w*0.04;
       // 画像の木(細長い鉢植え型・不透明部は幅0.6/高さ0.99): 高さ基準の正方形で、鉢の底(0.99)が地面に来るよう配置
       const ts=Math.max(1,Math.max(o.h*1.15,o.w*1.5));
+      if(o.state!=="fly"){g.save();g.globalAlpha=a*0.25;g.fillStyle="#ffffff"; // 画像の木が緑の背景に沈まないよう足元に薄い光
+        g.beginPath();g.ellipse(o.x,groundY+yo-o.h*0.4,Math.max(0,o.w*0.55),Math.max(0,o.h*0.5),0,0,TAU);g.fill();g.restore();}
       if(api.drawAsset("tree.png",o.x+swx,groundY+yo-ts*0.49,ts,ts,{center:true,rot:Math.sin(o.sway)*0.03})){
         g.globalAlpha=1;g.restore();return;}
       g.fillStyle="#6a4a2a";g.fillRect(o.x-o.w*0.12,groundY-o.h*0.5+yo,o.w*0.24,o.h*0.5);
@@ -476,6 +484,8 @@ function buildDino(api){
     // 画像のお城(不透明部は幅0.75/高さ0.97): 高さ基準で少し縦長に描き(横0.8倍)、隣スロットへのはみ出しを抑える。
     // 壁の底(0.97)が地面に来るよう配置。被弾フラッシュは共通で重ねる
     const imH=Math.max(1,Math.max(h,w*1.5)),imW=Math.max(1,imH*0.8);
+    if(o.state!=="fly"){g.save();g.globalAlpha*=0.22;g.fillStyle="#ffffff"; // お城も足元に薄い光で背景から浮かせる
+      g.beginPath();g.ellipse(o.x,groundY+yo-imH*0.4,Math.max(0,imW*0.5),Math.max(0,imH*0.45),0,0,TAU);g.fill();g.restore();}
     if(api.drawAsset("castle.png",o.x,groundY+yo-imH*0.47,imW,imH,{center:true})){
       if(o.flash>0){g.save();g.globalAlpha=o.flash*0.6;g.fillStyle="#fff";
         g.beginPath();g.ellipse(o.x,groundY+yo-h*0.5,Math.max(0,w*0.75),Math.max(0,h*0.55),0,0,TAU);g.fill();g.restore();o.flash-=0.12;}

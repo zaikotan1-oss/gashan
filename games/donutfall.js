@@ -37,7 +37,7 @@ function build_donutfall(api){
   const STAGE1_GAP=28;
   // 第6ラウンド: 助け舟を約3秒→約2秒(120フレーム)に早める(maxQuietSecを12秒以内へ)。
   const IDLE_HELP=120;
-  function spawnGap(){const g0=stage<=1?STAGE1_GAP:clamp(28-(stage-1)*2.5,10,28);return fever>0?Math.max(8,g0*0.45):g0;}
+  function spawnGap(){const g0=stage<=1?STAGE1_GAP:clamp(28-(stage-1)*2.5,10,28);return fever>0?Math.max(12,g0*0.45):g0;} // 第11ラウンド: フィーバー時の下限8→12(同時数を約22個→約16個に。当たり判定は不変)
   // hitStop は大ヒット限定 + 30フレーム以上のクールダウン
   function tryHitStop(f){if(hsCd<=0){api.hitStop(f);hsCd=32;}}
 
@@ -85,9 +85,10 @@ function build_donutfall(api){
     else if(type==="mini"){col=pick(PAL);r=R*0.6;}     // ⑦ 小さい一口サイズ(大きいcake/gold/rainbowの逆側)
     const pickX=()=>stage<=1?clamp(api.W*rnd(0.16,0.84),r*1.2,api.W-r*1.2):rnd(r*1.2,api.W-r*1.2);
     let nx=pickX();
-    // 第10ラウンド: フィーバー中だけ、上の方にいる的と近すぎたら最大4回引き直す(団子状に重なって見づらいのを減らす。密度は据え置き)
-    if(fever>0){for(let t=0;t<4;t++){
-      if(!sweets.some(o=>!o.dead&&o.y<R*3&&Math.hypot(o.x-nx,o.y-(-r*1.4))<R*1.8))break;
+    // 第10ラウンド: フィーバー中だけ、近すぎる的があったら引き直す(団子状に重なって見づらいのを減らす)
+    // 第11ラウンド: 上の方の的だけでなく生きている全部の的と比べ、引き直しを最大8回に増やす
+    if(fever>0){for(let t=0;t<8;t++){
+      if(!sweets.some(o=>!o.dead&&Math.hypot(o.x-nx,o.y-(-r*1.4))<R*1.8))break;
       nx=pickX();}}
     sweets.push({x:nx,y:-r*1.4,
       vy:fallSpeed()*rnd(0.85,1.15)*(type==="gold"||type==="rainbow"?0.66:1),
@@ -476,7 +477,7 @@ function build_donutfall(api){
     g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
     const ht="ステージ "+stage+"      あと "+left+" こ";
     const tw=Math.max(bw,g.measureText(ht).width);
-    g.fillStyle="rgba(255,255,255,.6)";rrect(api.W/2-tw/2-14,by-36,tw+28,36+bh+10,14);g.fill();
+    g.fillStyle="rgba(255,255,255,.8)";rrect(api.W/2-tw/2-14,by-36,tw+28,36+bh+10,14);g.fill();
     g.lineWidth=5;g.lineJoin="round";g.strokeStyle="rgba(255,255,255,.95)";g.strokeText(ht,api.W/2,by-10);
     g.fillStyle="#7a3b5a";g.shadowColor="rgba(255,255,255,.6)";g.shadowBlur=6;
     g.fillText(ht,api.W/2,by-10);
@@ -509,10 +510,12 @@ function build_donutfall(api){
     g.lineWidth=5;g.lineJoin="round";g.strokeStyle="rgba(255,255,255,.95)";
     g.shadowColor="rgba(255,255,255,.7)";g.shadowBlur=6;
     if(fever>0){const pu=1+0.08*Math.sin(tsec*10);
+      // 第11ラウンド: 文字の下に白い背板(的の上に文字が直接載らない)
+      g.save();g.shadowBlur=0;g.fillStyle="rgba(255,255,255,.7)";rrect(api.W/2-170,y-14-26,340,32,12);g.fill();g.restore();
       g.save();g.translate(api.W/2,y-14);g.scale(pu,pu);
-      g.strokeText("フィーバー！ てん 2ばい！",0,0);
-      g.fillStyle="#ff2bcf";g.fillText("フィーバー！ てん 2ばい！",0,0);g.restore();}
-    else{g.strokeText("フィーバーゲージ",api.W/2,y-14);g.fillStyle="#7a3b5a";g.fillText("フィーバーゲージ",api.W/2,y-14);}
+      g.strokeText("フィーバー！ ぜんぶ 2ばい！",0,0);
+      g.fillStyle="#ff2bcf";g.fillText("フィーバー！ ぜんぶ 2ばい！",0,0);g.restore();}
+    else{g.strokeText("フィーバーまで ためよう！",api.W/2,y-14);g.fillStyle="#7a3b5a";g.fillText("フィーバーまで ためよう！",api.W/2,y-14);}
     g.restore();g.textAlign="left";
   }
 

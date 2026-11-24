@@ -133,7 +133,7 @@ function buildObsidian(api){
     const px=b.x+S/2,py=b.y;
     for(let i=0;i<5;i++){const a=-TAU*0.25+rnd(-0.6,0.6),v=rnd(1.5,3.5);
       if(sparks.length<150)sparks.push({x:px,y:py,vx:Math.cos(a)*v,vy:Math.sin(a)*v-2,
-        life:1,decay:rnd(0.02,0.035),s:rnd(1.6,3),col:i%2?"#fff6c8":luckyColor});}
+        life:1,decay:rnd(0.02,0.035),s:rnd(1.6,3),col:i%2?"#fff6c8":shade(luckyColor,110)});}
     api.tone(1046,0.12,"triangle",0.12);api.tone(1568,0.14,"triangle",0.08);
     if(!luckySeen){luckySeen=true;luckyMsgT=1.6;}
   }
@@ -433,7 +433,7 @@ function buildObsidian(api){
         g.fillStyle=flashHue;g.fillRect(0,0,api.W,api.H);g.restore();}
       // ---- HUD (top center, safe band) ----
       const alive=blocks.filter(b=>!b._dead).length;
-      g.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
+      g.font="800 20px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
       g.lineWidth=4;g.lineJoin="round";g.strokeStyle="rgba(40,10,0,.6)";
       const hud="ステージ "+stage+"      のこり "+alive;
       g.strokeText(hud,api.W/2,28);g.fillStyle="#ffe6c8";g.fillText(hud,api.W/2,28);
@@ -462,7 +462,7 @@ function buildObsidian(api){
         g.save();g.translate(api.W/2,api.H*0.14);g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";
         g.font="900 26px 'Hiragino Maru Gothic ProN',system-ui";
         g.lineWidth=6;g.lineJoin="round";g.strokeStyle="rgba(40,10,0,.6)";
-        g.strokeText("ラッキー！",0,0);g.fillStyle=luckyColor;g.fillText("ラッキー！",0,0);
+        g.strokeText("ラッキー！",0,0);g.fillStyle=shade(luckyColor,150);g.fillText("ラッキー！",0,0);
         g.globalAlpha=1;g.lineJoin="miter";g.restore();g.textAlign="left";}
       // ① にじいろ！ 大きな中央バナー(虹色に色替わり)
       if(rbMsgT>0){const a=clamp(rbMsgT*1.4,0,1),pop=1+Math.max(0,rbMsgT-1)*1.2;
@@ -518,7 +518,7 @@ function buildObsidian(api){
       g.save();if(fever>0||feverGauge>0.85){g.shadowBlur=12+6*Math.sin(tsec*8);g.shadowColor="#ffd23f";}
       g.fillStyle=pg;g.fillRect(x,y,fw,h);g.restore();
       g.fillStyle="rgba(255,255,255,.3)";g.fillRect(x,y+1,fw,h*0.35);}
-    g.font="800 13px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
+    g.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
     g.lineWidth=4;g.lineJoin="round";g.strokeStyle="rgba(40,10,0,.6)";
     const lb=fever>0?"フィーバー ちゅう！":"フィーバー ゲージ";
     g.strokeText(lb,api.W/2,y-6);g.fillStyle=fever>0?"#fff":"#ffe6c8";g.fillText(lb,api.W/2,y-6);

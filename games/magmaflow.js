@@ -151,7 +151,7 @@ function build_magmaflow(api){
           life:1,decay:rnd(0.015,0.03),col:RAINBOW[i%RAINBOW.length]});}
       floats.push({x:clamp(p.x,80,api.W-80),y:Math.min(p.y+laneH*0.55,api.H-70),txt:"にじいろ ようがん！ +"+pts,life:1,vy:-0.9,col:"#ff7bd0",size:26});
     }else if(fever>0&&!lucky&&floats.filter(f=>f.plus).length<3){   // 軸6: ラッキーと重ねない・「+N」は同時3個まで・横にずらして上へ早く抜ける
-      floats.push({x:clamp(p.x,50,api.W-50)+rnd(-28,28),y:p.y-laneH*0.5,txt:"+"+pts,life:1,vy:-1.4,col:"#fff",size:20,plus:true});
+      floats.push({x:clamp(p.x,50,api.W-50)+rnd(-28,28),y:p.y-laneH*0.5,txt:"+"+pts,life:1,vy:-1.4,col:"#fff",size:24,plus:true});
     }
     if(lucky){ // ② ラッキー色命中: 頭上に小さな星のキラッ(気づけるヒント)+ 小さめ祝福
       api.tone(1046,0.12,"triangle",0.1);api.tone(1568,0.14,"triangle",0.08);
@@ -347,6 +347,7 @@ function build_magmaflow(api){
       for(let i=0;i<9;i++){const a=i/9*TAU,rr=Math.max(0,r*(0.78+0.24*Math.sin(i*1.7+it.bob)));
         g.lineTo(Math.cos(a)*rr,Math.sin(a)*rr);}
       g.closePath();g.fill();
+      g.strokeStyle="rgba(20,10,10,.7)";g.lineWidth=Math.max(2,r*0.06);g.stroke();
       g.strokeStyle="rgba(20,18,20,.55)";g.lineWidth=Math.max(2,r*0.05);g.lineCap="round";
       g.beginPath();g.moveTo(-r*0.28,-r*0.5);g.lineTo(-r*0.04,r*0.08);g.lineTo(-r*0.34,r*0.5);g.stroke();
       g.fillStyle="rgba(255,255,255,.2)";g.beginPath();g.arc(-r*0.32,-r*0.34,Math.max(0,r*0.24),0,TAU);g.fill();
@@ -356,6 +357,7 @@ function build_magmaflow(api){
       grd.addColorStop(0,"#ccd0d6");grd.addColorStop(1,"#7a7f88");
       g.fillStyle=it.burn>0?"#c07a3a":grd;
       g.beginPath();g.arc(0,0,Math.max(0,r),0,TAU);g.fill();
+      g.strokeStyle="rgba(20,10,10,.7)";g.lineWidth=Math.max(2,r*0.06);g.stroke();
       g.fillStyle="rgba(255,255,255,.3)";g.beginPath();g.arc(-r*0.28,-r*0.28,Math.max(0,r*0.26),0,TAU);g.fill();
     }else{
       // rock: lumpy grey boulder
@@ -688,15 +690,21 @@ function build_magmaflow(api){
         g.save();g.translate(api.W/2,api.H*0.24);g.globalAlpha=a;g.textAlign="center";
         g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
         const t2="きょうの ラッキーいろは 「"+luckyName+"」！";
-        g.lineWidth=5;g.lineJoin="round";g.strokeStyle="rgba(30,10,4,.6)";g.strokeText(t2,0,0);
-        g.fillStyle=luckyCol;g.fillText(t2,0,0);
+        const lw=g.measureText(t2).width;
+        g.fillStyle="rgba(0,0,0,.45)";g.fillRect(-lw/2-12,-24,lw+24,36);
+        g.lineWidth=6;g.lineJoin="round";g.strokeStyle="rgba(20,6,2,.9)";g.strokeText(t2,0,0);
+        g.lineWidth=2.5;g.strokeStyle=luckyCol;g.strokeText(t2,0,0);
+        g.fillStyle="#ffffff";g.fillText(t2,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";g.lineJoin="miter";if(luckyMsgT<0)luckyMsgT=0;}
       // ① にじいろ ようがん が でた！ 接近予告(下寄り=上部バナーと重ねない)
       if(rbComingT>0){rbComingT-=0.016*dt;
-        const col=RAINBOW[Math.floor(tGlobal*0.12)%RAINBOW.length];
+        const CMGCOL=["#ff7bd0","#4db8ff","#b58bff","#7be08a","#ffffff"];
+        const col=CMGCOL[Math.floor(tGlobal*0.12)%CMGCOL.length];
         g.save();g.translate(api.W/2,api.H*0.66);g.textAlign="center";
-        g.globalAlpha=clamp(rbComingT*1.4,0,1);g.font="800 21px 'Hiragino Maru Gothic ProN',system-ui";
-        g.lineWidth=4;g.lineJoin="round";g.strokeStyle="rgba(30,10,4,.6)";g.strokeText("にじいろ ようがん が でた！",0,0);
+        g.globalAlpha=clamp(rbComingT*1.4,0,1);g.font="800 28px 'Hiragino Maru Gothic ProN',system-ui";
+        const cmw=g.measureText("にじいろ ようがん が でた！").width;
+        g.fillStyle="rgba(0,0,0,.5)";g.fillRect(-cmw/2-12,-26,cmw+24,38);
+        g.lineWidth=6;g.lineJoin="round";g.strokeStyle="rgba(20,6,2,.92)";g.strokeText("にじいろ ようがん が でた！",0,0);
         g.fillStyle=col;g.fillText("にじいろ ようがん が でた！",0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";g.lineJoin="miter";if(rbComingT<0)rbComingT=0;}
       // ① にじいろ ようがん！ 撃破バナー(虹色に色替わり)
@@ -776,11 +784,11 @@ function build_magmaflow(api){
         g.fillStyle=pg;}
       roundRect(fx,fy,Math.max(fh,fw*fr),fh,fh/2);g.fill();g.shadowBlur=0;}
     g.strokeStyle="rgba(255,255,255,.5)";g.lineWidth=2;roundRect(fx-4,fy-3,fw+8,fh+6,(fh+6)/2);g.stroke();
-    g.font="800 14px 'Hiragino Maru Gothic ProN',system-ui";
-    g.lineWidth=4;g.lineJoin="round";g.strokeStyle="rgba(30,10,4,.6)";
+    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
+    g.lineWidth=5;g.lineJoin="round";g.strokeStyle="rgba(30,10,4,.85)";
     const label=active?"フィーバーちゅう！ 2ばい！":"フィーバー ゲージ";
-    g.strokeText(label,api.W/2,fy-8);
-    g.fillStyle=active?"#ffe14a":"#fff5d6";g.fillText(label,api.W/2,fy-8);
+    g.strokeText(label,api.W/2,fy-10);
+    g.fillStyle=active?"#ffe14a":"#fff5d6";g.fillText(label,api.W/2,fy-10);
     g.restore();g.textAlign="left";g.lineJoin="miter";
   }
   function roundRect(x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);

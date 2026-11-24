@@ -449,7 +449,7 @@ function build_cakesmash(api){
         g.fillStyle="rgba(255,255,255,.12)";g.fillRect(0,baseY,W,3);
       }
       // cake plate
-      g.fillStyle="rgba(90,30,50,.35)";   // 皿の下の影(床や売り台と色が近くても皿が浮く)
+      g.fillStyle="rgba(90,30,50,.45)";   // 皿の下の影(床や売り台と色が近くても皿が浮く)
       g.beginPath();g.ellipse(baseX,baseY+tierH*0.22,Math.max(0,tierW*0.82),Math.max(0,tierH*0.46),0,0,TAU);g.fill();
       g.fillStyle="rgba(255,255,255,.92)";
       g.beginPath();g.ellipse(baseX,baseY+4,tierW*0.78,tierH*0.4,0,0,TAU);g.fill();
@@ -473,7 +473,7 @@ function build_cakesmash(api){
       // ① にじいろ接近の予告: このケーキに にじいろ段 が残っていたら、上に虹の予告マーク(=次くるかもの ドキドキ)
       const rbTier=tiers.find(t=>!t.dead&&t.rb);
       if(rbTier&&clearT<=0&&finaleT<=0){
-        const mx=baseX, my=Math.max(H*0.24,(tt?tt.y-(tt.shape==="donut"?rOut(tt)-tierH*0.5:0):baseY)-tierH*1.5), pulse=0.5+0.5*Math.sin(tsec*6);
+        const mx=baseX, my=Math.max(H*0.24,(tt?tt.y-(tt.shape==="donut"?rOut(tt)-tierH*0.5:0):baseY)-tierH*2.0), pulse=0.5+0.5*Math.sin(tsec*6);
         const RBC=["#ff5da2","#ff8a3a","#ffd23f","#7be08a","#36c9ff","#b066ff"];
         g.save();g.lineCap="round";g.lineJoin="round";
         g.globalAlpha=0.4+0.35*pulse;g.lineWidth=3;
@@ -497,6 +497,7 @@ function build_cakesmash(api){
         c.life-=c.decay*dt;
         g.save();g.globalAlpha=Math.max(0,c.life);g.translate(c.x,c.y);g.rotate(c.rot);
         g.fillStyle=c.col;roundRect(-c.s/2,-c.s/2,c.s,c.s*0.8,c.s*0.2);g.fill();
+        g.strokeStyle="rgba(120,50,70,.6)";g.lineWidth=2;g.stroke();
         g.fillStyle="rgba(255,255,255,.25)";g.fillRect(-c.s/2,-c.s/2,c.s,c.s*0.25);
         g.restore();}
       crumbs=crumbs.filter(c=>c.life>0);
@@ -505,7 +506,8 @@ function build_cakesmash(api){
       // ---- cream blobs ----
       for(const cr of creams){cr.vy+=0.34*dt;cr.x+=cr.vx*dt;cr.y+=cr.vy*dt;cr.life-=cr.decay*dt;
         g.save();g.globalAlpha=Math.max(0,cr.life);g.fillStyle=cr.col;
-        g.beginPath();g.arc(cr.x,cr.y,cr.r*(0.6+cr.life*0.4),0,TAU);g.fill();
+        g.beginPath();g.arc(cr.x,cr.y,Math.max(0,cr.r*(0.6+cr.life*0.4)),0,TAU);g.fill();
+        g.strokeStyle="rgba(120,50,70,.55)";g.lineWidth=2;g.stroke();
         g.fillStyle="rgba(255,255,255,.5)";
         g.beginPath();g.arc(cr.x-cr.r*0.25,cr.y-cr.r*0.25,cr.r*0.25,0,TAU);g.fill();
         g.restore();}
@@ -516,7 +518,8 @@ function build_cakesmash(api){
         if(b.y>baseY-2){b.y=baseY-2;b.vy*=-0.45;b.vx*=0.72;if(Math.abs(b.vy)<1.4)b.life-=0.03*dt;}
         b.life-=b.decay*dt;
         g.save();g.globalAlpha=Math.max(0,b.life);g.translate(b.x,b.y);g.rotate(b.rot);
-        g.fillStyle=b.col;g.beginPath();g.arc(0,0,b.r,0,TAU);g.fill();
+        g.fillStyle=b.col;g.beginPath();g.arc(0,0,Math.max(0,b.r),0,TAU);g.fill();
+        g.strokeStyle="rgba(120,50,70,.6)";g.lineWidth=2;g.stroke();
         g.fillStyle="rgba(255,255,255,.55)";g.beginPath();g.arc(-b.r*0.3,-b.r*0.3,b.r*0.28,0,TAU);g.fill();
         g.restore();}
       berries=berries.filter(b=>b.life>0);
@@ -530,6 +533,7 @@ function build_cakesmash(api){
         const rr=Math.max(0,r.r*(0.7+r.life*0.3));
         g.save();g.globalAlpha=Math.max(0,r.life);g.translate(r.x,r.y);g.rotate(r.rot);
         g.fillStyle=r.col;g.beginPath();g.arc(0,0,rr,0,TAU);g.fill();
+        g.strokeStyle="rgba(120,50,70,.6)";g.lineWidth=2;g.stroke();
         g.fillStyle="rgba(0,0,0,.16)";g.beginPath();g.arc(0,0,Math.max(0,rr*0.42),0,TAU);g.fill();
         g.fillStyle=r.glaze;g.beginPath();g.arc(0,-rr*0.15,Math.max(0,rr*0.7),TAU*0.05,TAU*0.5);g.fill();
         g.fillStyle="rgba(255,255,255,.5)";g.beginPath();g.arc(-rr*0.3,-rr*0.3,Math.max(0,rr*0.16),0,TAU);g.fill();
@@ -548,13 +552,14 @@ function build_cakesmash(api){
       if(halves.length>20)halves.splice(0,halves.length-20);
 
       // ---- crisp shell shards (軸7補助: フィーバーカップケーキ専用のパリッと弾け割れる破片) ----
-      g.save();g.globalCompositeOperation="lighter";
+      g.save();
       for(const s of shards){
         s.vy+=0.3*dt;s.x+=s.vx*dt;s.y+=s.vy*dt;s.rot+=s.vr*dt;s.life-=s.decay*dt;
         const sl=Math.max(0,s.s);
-        g.save();g.globalAlpha=Math.max(0,s.life)*0.85;g.translate(s.x,s.y);g.rotate(s.rot);
+        g.save();g.globalAlpha=Math.max(0,s.life);g.translate(s.x,s.y);g.rotate(s.rot);
         g.fillStyle=s.col;
         g.beginPath();g.moveTo(0,-sl*0.5);g.lineTo(sl*0.22,sl*0.4);g.lineTo(-sl*0.22,sl*0.4);g.closePath();g.fill();
+        g.lineJoin="round";g.strokeStyle="rgba(120,50,70,.7)";g.lineWidth=2;g.stroke();
         g.restore();
       }
       g.restore();g.globalAlpha=1;g.globalCompositeOperation="source-over";
@@ -588,16 +593,21 @@ function build_cakesmash(api){
 
       // ---- shockwave rings ----
       for(const ri of rings){ri.r+=ri.vr*dt;ri.life-=ri.decay*dt;
-        g.save();g.globalAlpha=Math.max(0,ri.life)*0.7;g.strokeStyle=ri.col;
-        g.lineWidth=3+ri.life*4;g.beginPath();g.arc(ri.x,ri.y,ri.r,0,TAU);g.stroke();g.restore();}
+        g.save();g.globalAlpha=Math.max(0,ri.life)*0.7;
+        const rrad=Math.max(0,ri.r);
+        g.strokeStyle="rgba(120,50,70,.5)";g.lineWidth=6+ri.life*4;g.beginPath();g.arc(ri.x,ri.y,rrad,0,TAU);g.stroke();
+        g.strokeStyle=ri.col;g.lineWidth=3+ri.life*4;g.beginPath();g.arc(ri.x,ri.y,rrad,0,TAU);g.stroke();g.restore();}
       rings=rings.filter(ri=>ri.life>0);
 
       // ---- glint sparks (additive) ----
-      g.save();g.globalCompositeOperation="lighter";g.lineCap="round";
+      g.save();g.lineCap="round";
       for(const sp of sparks){sp.x+=sp.vx*dt;sp.y+=sp.vy*dt;sp.vx*=0.9;sp.vy*=0.9;sp.life-=sp.decay*dt;
-        g.globalAlpha=Math.max(0,sp.life);g.strokeStyle="#fff7c2";g.lineWidth=2.5;
-        const a=Math.atan2(sp.vy,sp.vx);
-        g.beginPath();g.moveTo(sp.x,sp.y);g.lineTo(sp.x-Math.cos(a)*sp.len,sp.y-Math.sin(a)*sp.len);g.stroke();}
+        g.globalAlpha=Math.max(0,sp.life);
+        const a=Math.atan2(sp.vy,sp.vx),ex=sp.x-Math.cos(a)*sp.len,ey=sp.y-Math.sin(a)*sp.len;
+        g.strokeStyle="rgba(120,50,70,.6)";g.lineWidth=5;
+        g.beginPath();g.moveTo(sp.x,sp.y);g.lineTo(ex,ey);g.stroke();
+        g.strokeStyle="#fff7c2";g.lineWidth=2.5;
+        g.beginPath();g.moveTo(sp.x,sp.y);g.lineTo(ex,ey);g.stroke();}
       g.restore();g.globalAlpha=1;
       sparks=sparks.filter(sp=>sp.life>0);
 
@@ -776,7 +786,7 @@ function build_cakesmash(api){
     g.strokeStyle="rgba(255,255,255,.25)";g.lineWidth=2;
     roundRect(-w/2,-h*0.5,w,h,h*0.32);g.stroke();
     // 暗い輪郭線: 「ももいろ」「ソーダ」味でも床や売り台から浮いて見える
-    g.strokeStyle="rgba(120,50,70,.6)";g.lineWidth=3;
+    g.strokeStyle="rgba(120,50,70,.85)";g.lineWidth=4;
     roundRect(-w/2,-h*0.5,w,h,h*0.32);g.stroke();
     // crack hint if this tier still needs another tap
     if(t.hp>1){
@@ -832,7 +842,7 @@ function build_cakesmash(api){
     // rim light
     g.strokeStyle="rgba(255,255,255,.3)";g.lineWidth=2;
     g.beginPath();g.arc(0,0,rOuter,0,TAU);g.stroke();
-    g.strokeStyle="rgba(120,50,70,.6)";g.lineWidth=3;
+    g.strokeStyle="rgba(120,50,70,.85)";g.lineWidth=4;
     g.beginPath();g.arc(0,0,rOuter,0,TAU);g.stroke();
     g.strokeStyle="rgba(120,70,40,.35)";g.lineWidth=1.5;
     g.beginPath();g.arc(0,0,rInner,0,TAU);g.stroke();
@@ -874,7 +884,7 @@ function build_cakesmash(api){
     // rim light
     g.strokeStyle="rgba(255,255,255,.3)";g.lineWidth=2;
     roundRect(-rW,-rH,rW*2,rH*2,rH);g.stroke();
-    g.strokeStyle="rgba(120,50,70,.6)";g.lineWidth=3;
+    g.strokeStyle="rgba(120,50,70,.85)";g.lineWidth=4;
     roundRect(-rW,-rH,rW*2,rH*2,rH);g.stroke();
     // powdered sugar dusting along the top
     g.fillStyle="rgba(255,255,255,.7)";
@@ -940,7 +950,7 @@ function build_cakesmash(api){
       g.beginPath();g.arc(0,0,Math.max(0,r*k/5.2),0,TAU);g.fill();
     }
     g.restore();
-    g.strokeStyle="rgba(120,70,40,.4)";g.lineWidth=1.5;
+    g.strokeStyle="rgba(120,50,70,.7)";g.lineWidth=2.5;
     g.beginPath();g.arc(0,0,r,hf.side<0?Math.PI*0.5:-Math.PI*0.5,hf.side<0?Math.PI*1.5:Math.PI*0.5);g.stroke();
     g.fillStyle="rgba(255,255,255,.3)";
     g.beginPath();g.ellipse(hf.side<0?-r*0.3:r*0.3,-r*0.35,Math.max(0,r*0.18),Math.max(0,r*0.1),0,0,TAU);g.fill();
@@ -963,7 +973,7 @@ function build_cakesmash(api){
       g.fillStyle=gg;roundRect(bx,by,Math.max(bh,bw*fr),bh,bh/2);g.fill();}
     g.strokeStyle="rgba(255,255,255,.7)";g.lineWidth=2;roundRect(bx,by,bw,bh,bh/2);g.stroke();
     // ---- fever gauge (fills as you smash; during fever = remaining time, rainbow) ----
-    const gw=bw*0.72,gh=9,gx=(W-gw)/2,gy=by+bh+7;
+    const gw=bw*0.72,gh=12,gx=(W-gw)/2,gy=by+bh+7;
     g.fillStyle="rgba(120,40,80,.22)";roundRect(gx,gy,gw,gh,gh/2);g.fill();
     const gf=fever>0?clamp(fever/FEVER_LEN,0,1):feverGauge;
     if(gf>0.01){

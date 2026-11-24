@@ -374,8 +374,18 @@ function buildBalloon(api){
       }
       g.restore();g.globalAlpha=1;g.shadowBlur=0;g.globalCompositeOperation="source-over";
       links=links.filter(ln=>ln.life>0);
-      // 下のヒント帯: ふうせんより先に描き、下から上がってくるふうせんが帯の上に乗って隠れないようにする
-      {
+      // draw balloons (sorted by y so lower in front)
+      const order=balloons.slice().sort((a,b)=>a.y-b.y);
+      for(const b of order)drawBalloon(b);
+      // 空気が抜けて ぷしゅーと飛ぶどうぶつふうせん(ジグザグに飛んで小さくなって消える)
+      for(const gh of ghosts){gh.t+=dt;gh.life-=0.0085*dt;gh.ang+=Math.sin(gh.t*0.35)*0.22*dt;
+        gh.gx+=Math.cos(gh.ang)*gh.sp*dt;gh.gy+=Math.sin(gh.ang)*gh.sp*dt-0.4*dt;gh.r=Math.max(3,gh.r*Math.pow(0.987,dt));gh.rot+=0.12*dt*Math.sin(gh.t*0.35);
+        gh.phase+=0.3*dt;gh.wob+=0.3*dt;gh.shimmer+=0.06*dt;
+        if(gh.life<=0)continue;
+        g.save();g.globalAlpha=clamp(gh.life*1.6,0,1);g.translate(gh.gx,gh.gy);g.rotate(gh.rot+gh.ang*0.5);drawBalloon(gh);g.restore();}
+      g.globalAlpha=1;ghosts=ghosts.filter(gh=>gh.life>0&&gh.gx>-80&&gh.gx<api.W+80&&gh.gy>-120&&gh.gy<api.H+80);
+      // 下のヒント帯: ふうせんより後に描いて隠れないようにし、最初の数個を割ったら消す
+      if(stageClears===0&&count<4){
       hintPulse+=0.05*dt;
       // cute rounded HUD: hint pill (bottom)
       g.save();const hint="うえの いろを タップ！ おなじ いろが れんさで われる！";
@@ -388,16 +398,6 @@ function buildBalloon(api){
       g.fillStyle="#fff";g.shadowColor="rgba(80,120,180,.9)";g.shadowBlur=6;
       g.fillText(hint,0,1);g.restore();g.textAlign="left";g.textBaseline="alphabetic";
       }
-      // draw balloons (sorted by y so lower in front)
-      const order=balloons.slice().sort((a,b)=>a.y-b.y);
-      for(const b of order)drawBalloon(b);
-      // 空気が抜けて ぷしゅーと飛ぶどうぶつふうせん(ジグザグに飛んで小さくなって消える)
-      for(const gh of ghosts){gh.t+=dt;gh.life-=0.0085*dt;gh.ang+=Math.sin(gh.t*0.35)*0.22*dt;
-        gh.gx+=Math.cos(gh.ang)*gh.sp*dt;gh.gy+=Math.sin(gh.ang)*gh.sp*dt-0.4*dt;gh.r=Math.max(3,gh.r*Math.pow(0.987,dt));gh.rot+=0.12*dt*Math.sin(gh.t*0.35);
-        gh.phase+=0.3*dt;gh.wob+=0.3*dt;gh.shimmer+=0.06*dt;
-        if(gh.life<=0)continue;
-        g.save();g.globalAlpha=clamp(gh.life*1.6,0,1);g.translate(gh.gx,gh.gy);g.rotate(gh.rot+gh.ang*0.5);drawBalloon(gh);g.restore();}
-      g.globalAlpha=1;ghosts=ghosts.filter(gh=>gh.life>0&&gh.gx>-80&&gh.gx<api.W+80&&gh.gy>-120&&gh.gy<api.H+80);
       // 落ちていくボスのゴンドラ
       for(const gd of gondolas){gd.vy+=0.35*dt;gd.x+=gd.vx*dt;gd.y+=gd.vy*dt;gd.rot+=gd.vr*dt;gd.life-=0.011*dt;
         if(gd.life<=0)continue;
@@ -483,7 +483,7 @@ function buildBalloon(api){
         const a=clamp(megaWarnT,0,1),col="hsl("+((now*0.2)%360)+",85%,62%)";
         g.save();g.globalAlpha=a;g.translate(api.W/2,api.H*0.2);
         g.font="900 24px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";g.textBaseline="middle";
-        g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.35)";g.strokeText("キラキラ ふうせん せっきん！",0,0);
+        g.lineWidth=10;g.strokeStyle="rgba(20,30,60,.7)";g.lineJoin="round";g.strokeText("キラキラ ふうせん せっきん！",0,0);
         g.shadowColor=col;g.shadowBlur=16;g.fillStyle=col;g.fillText("キラキラ ふうせん せっきん！",0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(megaWarnT<0)megaWarnT=0;}
       // ① きょうのラッキー色 お知らせ(初回だけ・中央)
@@ -492,7 +492,7 @@ function buildBalloon(api){
         g.save();g.globalAlpha=a;g.translate(api.W/2,api.H*0.6);g.scale(pop,pop);
         g.font="900 26px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";g.textBaseline="middle";
         const txt="きょうの ラッキーいろは "+CNAME[COLORS.indexOf(luckyColor)]+"！";
-        g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.4)";g.strokeText(txt,0,0);
+        g.lineWidth=10;g.strokeStyle="rgba(20,30,60,.7)";g.lineJoin="round";g.strokeText(txt,0,0);
         g.shadowColor=luckyColor;g.shadowBlur=16;g.fillStyle="#fff";g.fillText(txt,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";
         if(luckyIntroT<=0){luckyIntroShown=true;luckyIntroT=0;}}
@@ -501,7 +501,7 @@ function buildBalloon(api){
         const a=clamp(perfectT*1.3,0,1),pop=1+Math.max(0,perfectT-1.6)*1.5;
         g.save();g.globalAlpha=a;g.translate(api.W/2,api.H*0.68);g.scale(pop,pop);
         g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";g.textBaseline="middle";
-        g.lineWidth=6;g.strokeStyle="rgba(20,90,40,.6)";g.strokeText("パーフェクト！",0,0);
+        g.lineWidth=12;g.strokeStyle="rgba(20,30,60,.75)";g.lineJoin="round";g.strokeText("パーフェクト！",0,0);
         g.shadowColor="rgba(123,224,138,.9)";g.shadowBlur=18;g.fillStyle="#c7ffcf";g.fillText("パーフェクト！",0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(perfectT<0)perfectT=0;}
       g.globalCompositeOperation="source-over";

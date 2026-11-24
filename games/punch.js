@@ -123,10 +123,16 @@ function buildPunch(api){
     else if(kind==="tower")api.noise(0.16,0.22,220,"lowpass");
     else if(kind==="car")api.tone(200,0.09,"square",0.14);
   }
+  // 1マスの基準サイズ。iPad横など広い画面では主役(壁)を大きく。細い/低い画面では従来の52pxを下回らない。
+  function calcBaseS(){
+    const old=clamp(Math.floor(api.W/9),34,52);
+    const wide=clamp(Math.floor(Math.min(api.W/9,api.H/11)),34,76);
+    return Math.max(old,wide);
+  }
   function layout(){
     groundY=api.H*0.84;
-    const baseS=clamp(Math.floor(api.W/9),34,52);
-    S=clamp(Math.round(baseS*sizeScale),24,88);
+    const baseS=calcBaseS();
+    S=clamp(Math.round(baseS*sizeScale),44,88);
     wallX=Math.round(api.W*0.56);
     bricks.forEach(b=>{b.x=wallX+b.col*S;b.y=groundY-(b.row+1)*S;});
   }
@@ -150,7 +156,7 @@ function buildPunch(api){
     theme=pickTheme();COLORS=theme.cols;
     bricks=[];layout();                       // sizeScaleを反映してからレイアウト
     // 縦横の範囲は一定に保ちつつ、1マスの大きさ(S)だけ変える→でか少数/こまか粒を同じ範囲で作り分け
-    const baseS=clamp(Math.floor(api.W/9),34,52);
+    const baseS=calcBaseS();
     const maxH=groundY-api.H*0.16;
     // 壁の大きさは level で変えず一定に保つ(=描画数が時間で右肩上がりに増えない)。
     //  難度の上げ幅は「1ステージあたりの壁数(wavesPerStage)」「ボス出現」「ステージ数」で表現。
@@ -245,7 +251,7 @@ function buildPunch(api){
   }
   function announceBomb(){
     flash=Math.min(1,flash+0.4);
-    floats(api.W/2,api.H*0.34,"ぜんぶ ばくだん！","#ffd23f");
+    floats(api.W/2,api.H*0.40,"ぜんぶ ばくだん！","#ffd23f");
     api.tone(660,0.1,"square",0.12);setTimeout(()=>api.tone(990,0.12,"square",0.1),90);
   }
   // ============ デカボス（大仏 / 怪獣 / ロボ） ==================================
@@ -440,7 +446,7 @@ function buildPunch(api){
     api.slide(520,1100,0.18,0.3,"square");api.tone(880,0.14,"triangle",0.2);
     rings.push({x:wallX+S,y:fist.y,r:S,vr:S*1.6,life:1,decay:0.03,w:10});
     flash=Math.min(1,flash+0.7);
-    floats(api.W/2,api.H*0.34,"ドッカーン！","#ffd23f");
+    floats(api.W/2,api.H*0.44,"ドッカーン！","#ffd23f");
   }
   function punch(){
     const charge=fist.charge;
@@ -588,7 +594,7 @@ function buildPunch(api){
             for(let i=0;i<10;i++)dust.push({x:boss.cx+rnd(-boss.w*0.5,boss.w*0.5),y:groundY-6,
               r:rnd(S*0.5,S*0.9),vr:rnd(1,2),life:1,decay:0.018,hue:rnd(0,1)});
             rings.push({x:boss.cx,y:groundY-6,r:S,vr:S*1.6,life:1,decay:0.03,w:8});
-            floats(api.W/2,api.H*0.24,boss.type.name+"が おりた！","#fff");noBreak=0;
+            floats(api.W/2,api.H*0.36,boss.type.name+"が おりた！","#fff");noBreak=0;
           }
         }
         if(boss.dying){boss.dieT+=0.04*dt;boss.y+=2*dt;}
@@ -809,7 +815,7 @@ function buildPunch(api){
       // 出現テーマの予告表示（数字/名前だけ・短時間チラ見せ）
       if(spawnTitle>0){
         g.save();g.textAlign="center";
-        const a=clamp(spawnTitle/30,0,1);g.globalAlpha=a;
+        const a=Math.min(0.9,clamp(spawnTitle/20,0,1));g.globalAlpha=a;
         g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";
         g.lineWidth=7;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText(spawnTxt+"！",api.W/2,api.H*0.30);
         g.fillStyle="#fff2a0";g.fillText(spawnTxt+"！",api.W/2,api.H*0.30);

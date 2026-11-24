@@ -445,9 +445,9 @@ function build_snowman(api){
         g.fillStyle=luckyColor;g.fillText(t2,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";if(luckyMsgT<0)luckyMsgT=0;}
       // ⑤ フィーバー！ バナー(はじまりの 1.6びょうだけ 大きく。2ばい と 1げきで こわせる を教える)
-      if(feverBann>0){feverBann-=0.016*dt;
+      if(feverBann>0&&clearT<=0){feverBann-=0.016*dt;
         const pop=1+Math.max(0,feverBann-1.2)*1.2,col=RAINBOW[Math.floor(tGlobal*0.15)%RAINBOW.length];
-        g.save();g.translate(api.W/2,api.H*0.30);g.scale(pop,pop);g.textAlign="center";
+        g.save();g.translate(api.W/2,api.H*0.56);g.scale(pop,pop);g.textAlign="center";
         g.globalAlpha=clamp(feverBann*1.4,0,1);g.font="900 38px 'Hiragino Maru Gothic ProN',system-ui";
         g.lineWidth=7;g.strokeStyle="rgba(10,40,70,.6)";g.strokeText("フィーバー！",0,0);
         g.shadowColor=col;g.shadowBlur=16;g.fillStyle="#fff0a6";g.fillText("フィーバー！",0,0);
@@ -458,7 +458,7 @@ function build_snowman(api){
       // ③ パーフェクト！ バナー(クリア文字の下=重ねない)
       if(perfectT>0){perfectT-=0.014*dt;
         const pop=1+Math.max(0,perfectT-1.3)*1.4;
-        g.save();g.translate(api.W/2,api.H*0.62);g.scale(pop,pop);g.textAlign="center";
+        g.save();g.translate(api.W/2,api.H*0.70);g.scale(pop,pop);g.textAlign="center";
         g.globalAlpha=clamp(perfectT*1.3,0,1);g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor="rgba(255,210,63,.9)";g.shadowBlur=16;g.fillStyle="#fff0a6";
         g.fillText("パーフェクト！",0,0);
@@ -504,7 +504,7 @@ function build_snowman(api){
     g.fillStyle="rgba(10,40,70,.3)";roundRect(fx,fy,fw,fh,fh/2);g.fill();
     if(ff>0){g.fillStyle=fever>0?"#ffd23f":"#ffb347";roundRect(fx,fy,Math.max(fh,fw*ff),fh,fh/2);g.fill();}
     g.strokeStyle="rgba(255,255,255,.7)";g.lineWidth=1.5;roundRect(fx,fy,fw,fh,fh/2);g.stroke();
-    g.font="800 14px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="right";
+    g.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="right";
     g.lineWidth=4;g.strokeStyle="rgba(255,255,255,.75)";
     g.strokeText(fever>0?"フィーバー！":"フィーバー",fx-8,fy+fh);
     g.fillStyle=fever>0?"#b86a00":"#0a3a5a";g.fillText(fever>0?"フィーバー！":"フィーバー",fx-8,fy+fh);

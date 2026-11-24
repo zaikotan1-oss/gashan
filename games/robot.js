@@ -136,7 +136,7 @@ function buildRobot(api){
     }
     // 積みコンテナは上から1段ずつへこんで落ちる(3段→2段→1段→最後で崩壊)。tough(カチン)とは別の壊れ方
     if(b.type==="stack"&&b.hp>1){
-      b.hp--;
+      b.hp--;b.state="up";   // stomp() が入れた 'stomping' を戻す(戻さないと2段目以降が二度と壊せない)
       const tierH=b.baseH/(b.hp+1);
       b.baseH-=tierH;b.h=b.baseH;b.squash=1;
       api.slide(220,90,0.16,0.35,"square");api.noise(0.16,0.28,700,"lowpass");
@@ -461,7 +461,7 @@ function buildRobot(api){
         g.fillStyle=col;g.fillText("にじいろビル！",0,0);
         g.restore();g.globalAlpha=1;g.shadowBlur=0;g.textAlign="left";g.textBaseline="alphabetic";if(rbMsgT<0)rbMsgT=0;}
       // ② きょうのラッキー色 はっけん！ 中央の小ヒント(初回だけ)
-      if(luckyMsgT>0&&rbMsgT<=0&&stageBannerT<=0){luckyMsgT-=0.016*dt;
+      if(luckyMsgT>0&&rbMsgT<=0&&stageBannerT<=0&&!rampage){luckyMsgT-=0.016*dt;
         // ロボに重ならない上の空き(HUDの下)・暗い丸ボタンの上に白文字・色は丸で見せる=どの色でも読める
         g.save();g.translate(api.W/2,api.H*0.105);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 23px 'Hiragino Maru Gothic ProN',system-ui";

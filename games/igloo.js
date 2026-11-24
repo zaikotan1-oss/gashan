@@ -55,6 +55,7 @@ function build_igloo(api){
     spawnCount++;
     const r=rFor()*kmul*sizeRnd;
     // keep clear of the engine HUD corners (top-left/top-right y<56)
+    // つららは背景の森の帯(上〜中段)に溶けやすいので、少し下(雪面側)に出す
     let x=rnd(r+20,api.W-r-20), y=rnd(api.H*0.34,api.H*0.84);
     const gold=Math.random()<0.08;                    // レア: ゴールドイグルー
     const rainbow=!gold&&Math.random()<0.045;         // ① 激レア: にじいろイグルー(数%・短命で逃げる=ドキドキ)
@@ -515,8 +516,8 @@ function build_igloo(api){
       gr.addColorStop(0,hexA(ac,ga));gr.addColorStop(1,hexA(ac,0));
       g.fillStyle=gr;g.beginPath();g.arc(0,-r*0.2,Math.max(0,r*1.6),0,TAU);g.fill();g.restore(); }
     // ground shadow (形なりに横幅を変える)
-    const shW=kind==="icicle"?r*0.55:kind==="tower"?r*0.75:r*1.05;
-    g.fillStyle="rgba(40,80,120,.18)";g.beginPath();g.ellipse(0,r*0.5,Math.max(0,shW),Math.max(0,r*0.3),0,0,TAU);g.fill();
+    const shW=kind==="icicle"?r*0.8:kind==="tower"?r*0.75:r*1.05;
+    g.fillStyle=(kind==="icicle"||kind==="stack")?"rgba(40,80,120,.32)":"rgba(40,80,120,.18)";g.beginPath();g.ellipse(0,r*0.5,Math.max(0,shW),Math.max(0,r*0.3),0,0,TAU);g.fill();
     // 画像イグルー: ふつう(dome)=氷ブロックの絵。ゴールド/ボス/にじいろ/塔/だるま/つららは手描き。
     // 絵は「ドーム(幅≈全体の7割)＋雪の台座(幅いっぱい)」で、内容は正方形の縦64%(上18%〜下82%)に収まる。
     // 当たり判定(半径r)にドーム幅≈2rを合わせるため 一辺 r*2.6・中心 y=-0.3r で描く
@@ -617,6 +618,9 @@ function build_igloo(api){
     g.moveTo(-w/2+rad,top);g.lineTo(w/2-rad,top);g.arcTo(w/2,top,w/2,top+rad,rad);
     g.lineTo(w/2,bot);g.lineTo(-w/2,bot);g.lineTo(-w/2,top+rad);g.arcTo(-w/2,top,-w/2+rad,top,rad);
     g.closePath();g.fill();
+    // 濃い縁(淡い雪面でも読める)
+    g.strokeStyle=it.gold?"rgba(200,150,40,.75)":(it.rainbow?"rgba(255,255,255,.8)":"rgba(40,90,140,.75)");
+    g.lineWidth=Math.max(2.5,r*0.06);g.lineJoin="round";g.stroke();g.lineJoin="miter";
     // flat base
     g.fillStyle=shade(col,-18);g.fillRect(-w*0.62,bot-1,w*1.24,Math.max(0,r*0.16));
     // horizontal seams (積み木感)
@@ -638,8 +642,8 @@ function build_igloo(api){
     const g2=g.createRadialGradient(-rt*0.3,cyT-rt*0.3,Math.max(0,rt*0.1),0,cyT,Math.max(0,rt*1.2));
     g2.addColorStop(0,"#ffffff");g2.addColorStop(0.6,col);g2.addColorStop(1,shade(col,-28));
     g.fillStyle=g2;g.beginPath();g.arc(0,cyT,rt,0,TAU);g.fill();
-    g.strokeStyle=it.gold?"rgba(200,150,40,.5)":(it.rainbow?"rgba(255,255,255,.6)":"rgba(120,160,200,.5)");
-    g.lineWidth=Math.max(1.5,r*0.035);
+    g.strokeStyle=it.gold?"rgba(200,150,40,.75)":(it.rainbow?"rgba(255,255,255,.8)":"rgba(40,90,140,.75)");
+    g.lineWidth=Math.max(2.5,r*0.06);
     g.beginPath();g.arc(0,cyT,rt,0,TAU);g.stroke();
     g.beginPath();g.arc(0,cyB,rb,0,TAU);g.stroke();
     // 下だまの小さな扉(見分け用)
@@ -647,10 +651,13 @@ function build_igloo(api){
   }
   function drawIcicleBody(it,r,col){
     // つらら(icicle): 細い三角(小さくて速く狙う標的・大きさのバラエティ)
-    const top=-r*1.05,bw=Math.max(0,r*0.3),bot=r*0.4;
+    // 見やすさ: 指先(約44px)に近い太さ + 濃紺の縁 + 根元を濃く(淡い雪面・木々の前でも浮く)
+    const top=-r*1.05,bw=Math.max(0,r*0.42),bot=r*0.4;
     const grd=g.createLinearGradient(0,top,0,bot);
-    grd.addColorStop(0,"#ffffff");grd.addColorStop(0.55,col);grd.addColorStop(1,shade(col,-24));
+    grd.addColorStop(0,"#ffffff");grd.addColorStop(0.5,col);grd.addColorStop(1,shade(col,-48));
     g.fillStyle=grd;g.beginPath();g.moveTo(0,top);g.lineTo(bw,bot);g.lineTo(-bw,bot);g.closePath();g.fill();
+    g.strokeStyle="rgba(20,60,100,.65)";g.lineWidth=Math.max(2.5,r*0.09);g.lineJoin="round";g.stroke();
+    g.lineJoin="miter";
     g.strokeStyle="rgba(255,255,255,.7)";g.lineWidth=Math.max(1,r*0.03);
     g.beginPath();g.moveTo(-bw*0.25,top+r*0.2);g.lineTo(-bw*0.1,bot-r*0.1);g.stroke();
   }

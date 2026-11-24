@@ -54,6 +54,8 @@ function buildWrecking(api){
       if(!o.big)o.size=Math.max(16,Math.min(o.size,26)*0.82);
       o.vy=-0.4;
     }
+    // ステージクリア演出中は バナー(H*0.5)・タリー(H*0.66)の下の空き帯へ逃がす（文字が重ならないように）
+    if(clearBanner>0||stageClearing){o.y=api.H*0.84+(fresh%3)*24;o.x=api.W/2;o.vy=-0.3;}
     floats[floats.length]=o;
     if(floats.length>7)floats.splice(0,floats.length-7);
   }
@@ -245,7 +247,7 @@ function buildWrecking(api){
     // 柱ぜんけし判定の基準: いま全列が埋まっている状態から開始（列が空になった瞬間に発火）
     occSet=new Set();for(let c=0;c<cols;c++)occSet.add(c);
     // 出現の瞬間わくわく: テーマ名を大きくチラ見せ（allBomb/rainbowは専用告知が既に出ている）
-    spawnTxt=rec.name;spawnTitle=(rec.allBomb||rec.rainbow)?1.0:1.7;
+    spawnTxt=rec.name;spawnTitle=(rec.allBomb||rec.rainbow)?1.2:2.0;
   }
   function applyGravity(){
     let dropSum=0;
@@ -333,6 +335,7 @@ function buildWrecking(api){
     if(!info)return;
     const bonus=info[1];count+=bonus;api.setScore(count);
     celebrate=Math.max(celebrate,2.4);flash=1;flashHue=info[2];
+    floats=floats.filter(f=>f.big);   // 先に出ていた小さい文字(きんピカ！+20 等)は捨てて重ならないように
     pushFloat({x:api.W/2,y:api.H*0.30,txt:"とっておき！",life:1.6,vy:-0.4,col:"#fff",size:40,big:true});
     pushFloat({x:api.W/2,y:api.H*0.30+46,txt:info[0]+" さいご！ +"+bonus,life:1.4,vy:-0.3,col:info[2],size:24});
     for(let k=0;k<9;k++)spark(api.W/2,api.H*0.34,COLORS[k%COLORS.length],4,9);
@@ -580,6 +583,8 @@ function buildWrecking(api){
   function stageClear(fromGiant){
     if(stageClearing)return;stageClearing=true;
     level++;stage++;setStage++;
+    // クリアバナー/タリーの帯(H*0.38〜0.78)にいる先行の文字は消して重なりを防ぐ
+    floats=floats.filter(f=>f.y<api.H*0.38||f.y>api.H*0.78);
     const town=setStage%SET_LEN===0;
     if(town){
       townCele=2.6;celebrate=2.4;flash=1;flashHue=theme().accent;
@@ -681,7 +686,7 @@ function buildWrecking(api){
       if(moonCD>0)moonCD-=dt;
       if(mascotCD>0)mascotCD-=dt;
       if(luckyCD>0)luckyCD-=dt;
-      if(spawnTitle>0)spawnTitle=Math.max(0,spawnTitle-0.016*dt);
+      if(spawnTitle>0&&clearBanner<0.6)spawnTitle=Math.max(0,spawnTitle-0.016*dt);
       if(rainbow>0)rainbow=Math.max(0,rainbow-0.03*dt);
       // 柱ぜんけし検知（どの壊し方でも＝スマッシュ/爆風/ギガ解放でも発火）: 列が空になったらごほうび。
       //  最後の1列で建物が空になる瞬間(blocks.length→0)は クリア演出に任せて出さない。
@@ -809,7 +814,7 @@ function buildWrecking(api){
             g.restore();}}}
       g.lineJoin="miter";g.textAlign="left";
       // 出現わくわく: 新ビルのテーマ名を上部中央に大きくチラ見せ（すっと出て すっと消える）
-      if(spawnTitle>0){const a=Math.min(1,spawnTitle*1.5),pop=1+0.08*Math.sin(tsec*9)*a;
+      if(spawnTitle>0&&clearBanner<0.6){const a=Math.min(1,spawnTitle*1.5),pop=1+0.08*Math.sin(tsec*9)*a;
         g.save();g.globalAlpha=a;g.textAlign="center";g.lineJoin="round";
         g.translate(api.W/2,api.H*0.19);g.scale(pop,pop);
         g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";
@@ -947,9 +952,13 @@ function buildWrecking(api){
       if(clearBanner>0){clearBanner=Math.max(0,clearBanner-0.016*dt);
         const ba=Math.min(1,clearBanner*1.6),pop=1+0.15*Math.sin(tsec*10)*ba;
         const big=clearTxt.length>7,fs=(big?38:46)*pop;
-        g.save();g.translate(api.W/2,api.H*0.4);g.scale(1,1);
+        g.save();g.translate(api.W/2,api.H*0.5);g.scale(1,1);
         g.globalAlpha=ba;g.font="900 "+fs+"px 'Hiragino Maru Gothic ProN',system-ui";
         g.textAlign="center";g.lineJoin="round";
+        // 文字の後ろに暗い横長の板を敷く（砂煙・破片に埋もれない）
+        {const pw=Math.min(api.W-24,Math.max(g.measureText(clearTxt).width,nextRecipe?220:0)+56),
+           ph=fs*0.85+(nextRecipe?fs*0.7+14+16:fs*0.35+10);
+         g.fillStyle="rgba(20,12,40,.45)";rrect(-pw/2,-fs*0.85,pw,ph,16);g.fill();}
         g.lineWidth=10;g.strokeStyle="rgba(20,12,40,.7)";g.strokeText(clearTxt,0,0);
         let bg3=g.createLinearGradient(0,-fs*0.6,0,fs*0.6);
         bg3.addColorStop(0,"#fff6c8");bg3.addColorStop(0.5,theme().accent);bg3.addColorStop(1,"#ff7aa8");
@@ -1282,9 +1291,9 @@ function buildWrecking(api){
     g.save();g.globalAlpha=a;g.textAlign="center";
     g.font="800 17px 'Hiragino Maru Gothic ProN',system-ui";
     g.lineWidth=5;g.lineJoin="round";g.strokeStyle="rgba(20,12,40,.6)";
-    g.strokeText("きょうの はっけん",api.W/2,api.H*0.55-24);
-    g.fillStyle="#fff";g.fillText("きょうの はっけん",api.W/2,api.H*0.55-24);
-    const gap=Math.min(66,api.W*0.17),x0=api.W/2-(vals.length-1)*gap/2,yy=api.H*0.55+8;
+    g.strokeText("きょうの はっけん",api.W/2,api.H*0.66-24);
+    g.fillStyle="#fff";g.fillText("きょうの はっけん",api.W/2,api.H*0.66-24);
+    const gap=Math.min(66,api.W*0.17),x0=api.W/2-(vals.length-1)*gap/2,yy=api.H*0.66+8;
     for(let i=0;i<vals.length;i++){const x=x0+i*gap,lit=vals[i]>0;
       g.save();g.translate(x,yy);
       if(lit){g.globalCompositeOperation="lighter";g.shadowBlur=10;g.shadowColor=cols[i];g.globalAlpha=a;}

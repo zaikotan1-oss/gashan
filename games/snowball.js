@@ -61,6 +61,13 @@ function build_snowball(api){
     const big=!gold&&stage>=2&&Math.random()<clamp(0.22+0.07*(stage-2),0.22,0.55);  // でか砦は少し多め(7〜8歳向け)
     const tiny=!gold&&!big&&Math.random()<0.25;    // 軸7: 大中小の3段階サイズにして大きさ差をはっきりさせる
     const r=U*(big?1.55:(tiny?0.72:1.05));
+    // 軸6: 砦どうしが重ならないよう最大8回まで位置をやり直す(最初の1体の中央寄りは上でそのまま)
+    if(forts.length>0){
+      for(let t=0;t<8;t++){
+        x=rnd(api.W*0.14,api.W*0.86); y=rnd(api.H*0.41,api.H*0.55);
+        if(!forts.some(o=>Math.hypot(o.x-x,o.y-y)<(o.r+r)*1.15))break;
+      }
+    }
     // ② ラッキー旗: ふつう/でか砦には色つきの小旗を立てる(色さがしのヒント)
     // 軸7(壊す物のバラエティ): 見た目の形そのものを角丸四角/丸/つらら/だんご3段でランダムに変える
     const shape=tiny?pick(["cube","round","stack"]):pick(["cube","round","tall","stack"]);   // ちびのつららは指より細いので出さない
@@ -134,7 +141,7 @@ function build_snowball(api){
     for(const f of forts){const d=Math.hypot(f.x-tx,f.y-ty)-f.r;
       if(d<bd){bd=d; ax=f.x; ay=f.y;}}
     // 吸着には縁からの距離上限を設ける。離れすぎたタップは生のタップ座標へ撃つ(=狙わない連打は外れる)。
-    const MAG=U*(!firstHit?3:((idleT<4)?MAGK:1.5));   // 最初の得点まで・4秒以上得点が無い時はやさしく広く拾い、得点が続く間は狭め
+    const MAG=U*(!firstHit?3:((idleT<4)?MAGK:1.0));   // 最初の得点まで・4秒以上得点が無い時はやさしく広く拾い、得点が続く間は狭め
     if(bd>MAG){ax=tx; ay=ty;}
     const sx=launchX, sy=launchY-U*0.6;
     const dx=ax-sx, dy=ay-sy;
@@ -411,9 +418,12 @@ function build_snowball(api){
         b.vy+=0.28*dt; b.x+=b.vx*dt; b.y+=b.vy*dt;
         // collide with forts
         for(let i=forts.length-1;i>=0;i--){const f=forts[i];
+          if(b.hitSet&&b.hitSet.indexOf(f)>=0)continue;   // 貫通中の大玉は同じ砦を二重に叩かない
           if(Math.hypot(b.x-f.x,b.y-f.y)<b.r+hitR(f)){
             smashFort(f,b.x,b.y,b.big);
-            b.life=0; break;
+            // 軸3: ためた大玉(チャージ)は1体目を砕いても貫通して後ろの砦に当たる(狙って長押しするほど得)。1フレーム1体
+            if(b.big){(b.hitSet||(b.hitSet=[])).push(f);}else b.life=0;
+            break;
           }
         }
         // tiny trail puff
@@ -488,7 +498,10 @@ function build_snowball(api){
         g.fillStyle=flashCol;
         // 軸6(見やすさ): 上部HUD帯(ステージ文字/フィーバーゲージ)はフラッシュの白飛びから外し、常に読めるようにする
         const hudBand=api.H*0.22;
-        g.fillRect(0,hudBand,api.W,api.H-hudBand);
+        {const fy1=api.H*0.30, fg=g.createLinearGradient(0,hudBand,0,fy1);
+          fg.addColorStop(0,"rgba(255,255,255,0)"); fg.addColorStop(1,flashCol);
+          g.fillStyle=fg; g.fillRect(0,hudBand,api.W,fy1-hudBand);
+          g.fillStyle=flashCol; g.fillRect(0,fy1,api.W,api.H-fy1);}
         g.restore(); g.globalAlpha=1; g.globalCompositeOperation="source-over";}
 
       // ---- combo text (top center safe zone) ----
@@ -601,9 +614,10 @@ function build_snowball(api){
       lg2.addColorStop(0,"#ff7bd0"); lg2.addColorStop(0.5,"#ffd23f"); lg2.addColorStop(1,"#4db8ff");
       g.globalAlpha=blink;
       if(fr2>0){g.fillStyle=lg2; roundRect(gx,gy,Math.max(gh,gw*fr2),gh,gh/2); g.fill();}
-      g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui"; g.fillStyle="#ffd23f";
-      g.shadowColor="rgba(0,0,0,.5)"; g.shadowBlur=4;
-      g.fillText("フィーバー！ てんすう 2ばい",api.W/2,gy+gh+24);
+      // 軸6: 上部HUDを2段に収める。長い文言はやめ、ゲージ右端に小さく「2ばい」だけ(説明はバナーが担当)
+      g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui"; g.fillStyle="#ffd23f"; g.textAlign="left";
+      g.shadowColor="rgba(0,0,0,.6)"; g.shadowBlur=4;
+      g.fillText("2ばい",gx+gw+8,gy+gh+3); g.textAlign="center";
       g.shadowBlur=0; g.globalAlpha=1;
     }else if(feverGauge>0){
       const lg2=g.createLinearGradient(gx,0,gx+gw,0);

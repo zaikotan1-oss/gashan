@@ -560,9 +560,9 @@ function buildLavaball(api){
         g.save(); g.translate(api.W/2,api.H*0.19); g.scale(pop,pop);
         g.font="800 32px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
         g.globalAlpha=clamp(comboT,0,1); g.shadowColor="rgba(255,120,30,.9)"; g.shadowBlur=14;
-        g.fillStyle="#ffd23f"; g.fillText("コンボ x"+combo,0,0);
-        g.shadowBlur=0; g.lineWidth=1.5; g.strokeStyle="rgba(255,255,255,.6)";
-        g.strokeText("コンボ x"+combo,0,0); g.restore(); g.globalAlpha=1; g.textAlign="left";
+        g.shadowBlur=0; g.lineWidth=7; g.lineJoin="round"; g.strokeStyle="rgba(20,6,4,.9)";
+        g.strokeText("コンボ x"+combo,0,0);
+        g.shadowBlur=14; g.fillStyle="#ffd23f"; g.fillText("コンボ x"+combo,0,0); g.restore(); g.globalAlpha=1; g.textAlign="left";
       }
 
       // ---------- A. にじいろいわ！ バナー(虹色に色替わり=激レアの大きな祝福) ----------
@@ -571,6 +571,7 @@ function buildLavaball(api){
         // ⑥ 0.24Hだとコンボ/ラッキー/共通エンジンの祝福バナーと重なるので下寄りに逃がす
         g.save(); g.translate(api.W/2,api.H*0.7); g.scale(pop,pop); g.textAlign="center";
         g.globalAlpha=clamp(rbMsgT*1.4,0,1); g.font="900 34px 'Hiragino Maru Gothic ProN',system-ui";
+        g.shadowBlur=0; g.lineWidth=7; g.lineJoin="round"; g.strokeStyle="rgba(20,6,4,.9)"; g.strokeText("すごい！",0,0);
         g.shadowColor=col; g.shadowBlur=18; g.fillStyle="#fff"; g.fillText("すごい！",0,0);
         g.shadowBlur=0; g.lineWidth=2; g.strokeStyle=col; g.strokeText("すごい！",0,0);
         g.restore(); g.globalAlpha=1; g.textAlign="left"; if(rbMsgT<0)rbMsgT=0; }
@@ -581,16 +582,17 @@ function buildLavaball(api){
         g.globalAlpha=clamp(luckyMsgT*1.4,0,1); g.font="900 23px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor=luckyColor; g.shadowBlur=14;
         const t2=luckyMsgT>1?("きょうの ラッキーいろは "+(CNAME[luckyColor]||"")+"！"):"ラッキー！";
-        g.fillStyle="#fff5d6"; g.fillText(t2,0,0);
+        g.shadowBlur=0; g.lineWidth=6; g.lineJoin="round"; g.strokeStyle="rgba(20,6,4,.9)"; g.strokeText(t2,0,0);
+        g.shadowBlur=14; g.fillStyle="#fff5d6"; g.fillText(t2,0,0);
         g.restore(); g.globalAlpha=1; g.textAlign="left"; if(luckyMsgT<0)luckyMsgT=0; }
       // ---------- ③ パーフェクト！ バナー(クリア文字と重ならない下側) ----------
       if(perfectT>0){ perfectT-=0.014*dt;
         const pop=1+Math.max(0,perfectT-1.3)*1.3;
         g.save(); g.translate(api.W/2,api.H*0.6); g.scale(pop,pop); g.textAlign="center";
         g.globalAlpha=clamp(perfectT*1.3,0,1); g.shadowColor="rgba(123,224,138,.9)"; g.shadowBlur=16;
-        g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";
-        g.fillStyle="#c7ffcf"; g.fillText("パーフェクト！",0,0);
-        g.shadowBlur=0; g.lineWidth=1.5; g.strokeStyle="rgba(40,120,60,.7)"; g.strokeText("パーフェクト！",0,0);
+        g.font="900 34px 'Hiragino Maru Gothic ProN',system-ui";
+        g.shadowBlur=0; g.lineWidth=7; g.lineJoin="round"; g.strokeStyle="rgba(20,6,4,.9)"; g.strokeText("パーフェクト！",0,0);
+        g.shadowBlur=16; g.fillStyle="#c7ffcf"; g.fillText("パーフェクト！",0,0);
         g.restore(); g.globalAlpha=1; g.textAlign="left"; if(perfectT<0)perfectT=0; }
 
       // ---------- B. フィーバー開始バナー(コンボと同じ0.19H・ラッキー0.40H・エンジン祝福0.3H) ----------
@@ -620,6 +622,7 @@ function buildLavaball(api){
         g.fillRect(0,api.H*0.32,api.W,api.H*0.24); g.restore();
         g.save(); g.translate(api.W/2,api.H*0.44); g.scale(pop,pop); g.globalAlpha=a;
         g.textAlign="center"; g.font="900 46px 'Hiragino Maru Gothic ProN',system-ui";
+        g.shadowBlur=0; g.lineWidth=8; g.lineJoin="round"; g.strokeStyle="rgba(20,6,4,.9)"; g.strokeText("ステージ "+stage+" クリア！",0,0);
         g.shadowColor="rgba(255,120,30,.9)"; g.shadowBlur=22; g.fillStyle="#ffd23f";
         g.fillText("ステージ "+stage+" クリア！",0,0);
         g.shadowBlur=0; g.lineWidth=2; g.strokeStyle="#fff"; g.strokeText("ステージ "+stage+" クリア！",0,0);
@@ -689,7 +692,8 @@ function buildLavaball(api){
     if(o.paint){ grd.addColorStop(0,"#ffffff"); grd.addColorStop(0.45,o.paint); grd.addColorStop(1,"#2a201c"); }
     else { grd.addColorStop(0,"#7a6a60"); grd.addColorStop(0.6,"#4a3a34"); grd.addColorStop(1,"#2a201c"); }
     g.fillStyle=grd; rockBodyPath(r,shape); g.fill();
-    g.strokeStyle="rgba(255,170,90,.55)"; g.lineWidth=3; g.stroke();
+    g.lineJoin="round"; g.strokeStyle="rgba(20,6,4,.8)"; g.lineWidth=5; g.stroke();
+    g.strokeStyle="rgba(255,170,90,.8)"; g.lineWidth=2.5; g.stroke();
     // small glowing seams(丸い岩は放射状のひび、それ以外は従来の斜めの筋)
     g.save(); g.globalCompositeOperation="lighter";
     g.strokeStyle="rgba(255,100,40,.5)"; g.lineWidth=1.5;
@@ -711,7 +715,8 @@ function buildLavaball(api){
     g.ellipse(r*0.28,r*0.05,Math.max(0,r*0.7),Math.max(0,r*0.62),0,0,TAU);
     g.ellipse(0,-r*0.35,Math.max(0,r*0.55),Math.max(0,r*0.5),0,0,TAU);
     g.fill();
-    g.strokeStyle="rgba(255,170,90,.55)"; g.lineWidth=3; g.stroke();
+    g.lineJoin="round"; g.strokeStyle="rgba(20,6,4,.8)"; g.lineWidth=5; g.stroke();
+    g.strokeStyle="rgba(255,170,90,.8)"; g.lineWidth=2.5; g.stroke();
     if(o.hp<2){ // 1発当てて ひび割れ
       g.strokeStyle="rgba(20,10,8,.75)"; g.lineWidth=3; g.lineCap="round";
       g.beginPath(); g.moveTo(-r*0.3,-r*0.4); g.lineTo(r*0.05,r*0.05); g.lineTo(-r*0.15,r*0.5); g.stroke();
@@ -763,6 +768,8 @@ function buildLavaball(api){
     // little wooden hut
     g.fillStyle="#7a4a26"; g.fillRect(-r*0.7,-r*0.2,r*1.4,r*0.9);
     g.fillStyle="#5a3418"; g.fillRect(-r*0.7,-r*0.2,r*1.4,r*0.16);
+    g.lineJoin="round"; g.strokeStyle="rgba(20,6,4,.8)"; g.lineWidth=5; g.strokeRect(-r*0.7,-r*0.2,r*1.4,r*0.9);
+    g.strokeStyle="rgba(255,180,90,.75)"; g.lineWidth=2.5; g.strokeRect(-r*0.7,-r*0.2,r*1.4,r*0.9);
     // plank lines
     g.strokeStyle="rgba(0,0,0,.3)"; g.lineWidth=1.5;
     for(let i=-1;i<=1;i++){g.beginPath();g.moveTo(i*r*0.35,-r*0.2);g.lineTo(i*r*0.35,r*0.7);g.stroke();}
@@ -771,7 +778,8 @@ function buildLavaball(api){
     // roof
     g.fillStyle="#a85a2a"; g.beginPath();
     g.moveTo(-r*0.95,-r*0.18); g.lineTo(0,-r*1.0); g.lineTo(r*0.95,-r*0.18); g.closePath(); g.fill();
-    g.strokeStyle="rgba(255,180,90,.4)"; g.lineWidth=2; g.stroke();
+    g.lineJoin="round"; g.strokeStyle="rgba(20,6,4,.8)"; g.lineWidth=5; g.stroke();
+    g.strokeStyle="rgba(255,180,90,.75)"; g.lineWidth=2.5; g.stroke();
     if(o.hp<2){ // cracked once
       g.strokeStyle="rgba(20,10,8,.7)"; g.lineWidth=2; g.lineCap="round";
       g.beginPath(); g.moveTo(-r*0.2,-r*0.1); g.lineTo(r*0.05,r*0.2); g.lineTo(-r*0.1,r*0.5); g.stroke();

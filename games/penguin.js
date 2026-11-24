@@ -27,7 +27,7 @@ function buildPenguin(api){
   const BANDNAME={"#ff6b6b":"あか","#4db8ff":"あお","#ffd23f":"きいろ","#7be08a":"みどり","#ff8fb3":"ピンク"};
   let luckyBand=pick(BANDCOLS),luckyMsgT=2.2;   // ② きょうのラッキー色: 秘密の1色(最初に一度だけ教える)
   let rbMsgT=0;                                  // ① にじいろピン 発見バナー
-  let stageWhiff=0,noMissT=0;                    // ③ ノーミス(毎投1本以上)判定
+  let stageWhiff=0,noMissT=0,nmDelay=0;                    // ③ ノーミス(毎投1本以上)判定
   let sunWink=0;                                 // ④ 太陽ひみつタップ
   let twinkles=[];                               // ② ④ 小さな星のキラッ
   let aimDX=0,aimDY=0;                           // タップ判定用(ダウン位置)
@@ -260,16 +260,12 @@ function buildPenguin(api){
   }
   function checkStage(){
     if(stageDown<stageGoal || clearT>0) return;
-    if(strikeT>0) strikeY=api.H*0.50;   // 出ている最中のストライク文字はクリア帯の上へ
+    if(strikeT>0){ strikeY=api.H*0.36; strikeT=Math.min(strikeT,0.8); }   // 同時のストライク文字はクリア帯(0.54H〜)から離して早めに消す
     clearStage=stage; clearT=2.0; flash=Math.min(1,flash+0.6);
     api.boom(0.5); api.shake(14);
     api.slide(523,784,0.3,0.2,"triangle"); api.tone(988,0.3,"triangle",0.12);
     // ③ ノーミス ボーナス: この ステージ 中 ずっと 毎投1本以上たおしたら +5 & みどりの星シャワー(気づくと得)
-    if(stageWhiff===0){ count+=5; api.setScore(count); noMissT=1.9;
-      api.tone(1318,0.16,"triangle",0.1);
-      if(shards.length<150) for(let i=0;i<14;i++){ const a=rnd(0,TAU),s=rnd(3,8);
-        shards.push({x:api.W/2,y:api.H*0.42,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2.5,s:rnd(4,8),
-          rot:rnd(0,TAU),vr:rnd(-0.3,0.3),life:1,decay:rnd(0.012,0.02),col:"#7be08a"}); } }
+    if(stageWhiff===0){ count+=5; api.setScore(count); nmDelay=0.9; }   // 文字・星はクリア文字の拡大が収まってから(frame側)
     stageWhiff=0;
     stage++; stageGoal=stageGoalFor(stage); stageDown=0;
     // next-stage teaser: name the new sky + pin count so kids want "one more"
@@ -568,21 +564,32 @@ function buildPenguin(api){
         g.shadowBlur=0; g.lineWidth=2.5; g.strokeStyle="#fff"; g.strokeText(strikeTxt,0,0);
         g.restore(); g.globalAlpha=1; g.textAlign="left";
       }
+      // ノーミス: クリア文字の拡大が収まってから出す
+      if(nmDelay>0){ nmDelay-=0.016*dt;
+        if(nmDelay<=0){ nmDelay=0; noMissT=1.9;
+          api.tone(1318,0.16,"triangle",0.1);
+          if(shards.length<150) for(let i=0;i<14;i++){ const a=rnd(0,TAU),s=rnd(3,8);
+            shards.push({x:api.W/2,y:api.H*0.42,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2.5,s:rnd(4,8),
+              rot:rnd(0,TAU),vr:rnd(-0.3,0.3),life:1,decay:rnd(0.012,0.02),col:"#7be08a"}); } } }
       // stage clear banner
       if(clearT>0){ clearT-=0.016*dt;
         const a=clamp(clearT*1.4,0,1), pop=1+Math.max(0,clearT-1.3)*1.8;
-        g.save(); g.globalAlpha=a*0.45; g.fillStyle="#0a2a44"; g.fillRect(0,api.H*0.54,api.W,api.H*0.2); g.restore();
+        g.save(); g.globalAlpha=a*0.45; g.fillStyle="#0a2a44"; g.fillRect(0,api.H*0.54,api.W,api.H*0.28); g.restore();
         g.save(); g.translate(api.W/2,api.H*0.65); g.scale(pop,pop); g.globalAlpha=a; g.textAlign="center";
         g.font="900 44px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor="rgba(80,180,240,.9)"; g.shadowBlur=20; g.fillStyle="#9be8ff";
         g.fillText("ステージ"+clearStage+" クリア！",0,0);
         g.shadowBlur=0; g.lineWidth=2; g.strokeStyle="#fff"; g.strokeText("ステージ"+clearStage+" クリア！",0,0);
+        g.restore();
+        // 説明の2行は拡大させず帯の中の固定位置へ
+        g.save(); g.globalAlpha=a; g.textAlign="center";
+        const y0=api.H*0.65, l2=Math.min(38,api.H*0.045), l3=Math.max(l2+24,Math.min(66,api.H*0.075));
         g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui"; g.fillStyle="#fff";
-        g.fillText("つぎは ステージ"+(clearStage+1)+"！",0,36);
+        g.fillText("つぎは ステージ"+(clearStage+1)+"！",api.W/2,y0+l2);
         if(clearSub){ let fs=18; g.font="800 "+fs+"px 'Hiragino Maru Gothic ProN',system-ui";
-          const mw=g.measureText(clearSub).width, lim=api.W*0.9/Math.max(pop,1);
+          const mw=g.measureText(clearSub).width, lim=api.W*0.9;
           if(mw>lim){ fs=Math.max(11,Math.floor(fs*lim/mw)); g.font="800 "+fs+"px 'Hiragino Maru Gothic ProN',system-ui"; }
-          g.fillStyle="#d8f4ff"; g.fillText(clearSub,0,Math.min(62,api.H*0.07)); }
+          g.fillStyle="#d8f4ff"; g.fillText(clearSub,api.W/2,y0+l3); }
         g.restore(); g.globalAlpha=1; g.textAlign="left";
       }
       // ① にじいろピン！ 発見バナー(虹色に色替わり)
@@ -604,10 +611,13 @@ function buildPenguin(api){
       // ③ ノーミス ボーナス！ バナー(クリア文字と重ねない下側)
       if(noMissT>0){ noMissT-=0.014*dt;
         const pop=1+Math.max(0,noMissT-1.3)*1.4;
-        g.save(); g.translate(api.W/2,api.H*0.80); g.scale(pop,pop); g.textAlign="center";
+        g.save(); g.translate(api.W/2,api.H*0.78); g.scale(pop,pop); g.textAlign="center";
         g.globalAlpha=clamp(noMissT*1.3,0,1); g.font="900 28px 'Hiragino Maru Gothic ProN',system-ui";
-        g.shadowColor="rgba(123,224,138,.9)"; g.shadowBlur=16; g.fillStyle="#c7ffcf"; g.fillText("ノーミス ボーナス！",0,0);
-        g.shadowBlur=0; g.lineWidth=1.5; g.strokeStyle="rgba(40,120,60,.7)"; g.strokeText("ノーミス ボーナス！",0,0);
+        const nmw=Math.min(api.W*0.8,g.measureText("ノーミス ボーナス！").width+36);
+        g.fillStyle="rgba(0,40,80,.6)"; rr(-nmw/2,-24,nmw,42,14); g.fill();
+        g.lineJoin="round"; g.lineWidth=4; g.strokeStyle="rgba(0,60,30,.85)"; g.strokeText("ノーミス ボーナス！",0,0);
+        g.shadowColor="rgba(123,224,138,.9)"; g.shadowBlur=12; g.fillStyle="#c7ffcf"; g.fillText("ノーミス ボーナス！",0,0);
+        g.shadowBlur=0;
         g.restore(); g.globalAlpha=1; g.textAlign="left"; if(noMissT<0)noMissT=0; }
     },
     stop(){}

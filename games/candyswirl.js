@@ -171,7 +171,7 @@ function build_candyswirl(api){
         shards.push({x:s.x,y:s.y-s.r*0.6,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-2,r:rnd(3,5.5),
           rot:rnd(0,TAU),vr:rnd(-0.3,0.3),life:1,decay:rnd(0.02,0.03),col:luckyColor});}
     }
-    if(combo>1)floats.push({x:s.x,y:s.y-s.r,txt:"x"+combo,life:1,vy:-1.1,
+    if(combo>1)floats.push({x:s.x,y:s.y-s.r*((gold||rainbow)?2.6:1),txt:"x"+combo,life:1,vy:-1.1,
       col:combo>=8?"#ff2bff":combo>=5?"#ff8c42":"#ffd23f",size:combo>=5?40:30});
     checkStage();
   }
@@ -446,9 +446,10 @@ function build_candyswirl(api){
       // ③ ノンストップ判定: 積み上げたコンボが切れたら「切らした」と記録(このステージはボーナス対象外に)
       if(combo>0){ comboT-=0.016*dt; if(comboT<=0){ if(combo>1)nonstopBroken=true; combo=0; } }
       for(const f of floats){ f.y+=f.vy*dt; f.life-=0.02*dt;
-        g.globalAlpha=Math.max(0,f.life); g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";
-        g.textAlign="center"; g.lineWidth=6; g.strokeStyle="rgba(120,40,90,.5)";
-        g.strokeText(f.txt,f.x,f.y); g.fillStyle=f.col; g.fillText(f.txt,f.x,f.y); }
+        const fy=Math.max(f.y,api.H*0.2);   // 上部HUD/コンボバナーに入り込ませない
+        g.globalAlpha=Math.max(0,Math.min(1,f.life*2.2)); g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";
+        g.textAlign="center"; g.lineWidth=7; g.strokeStyle="rgba(120,40,90,.85)";
+        g.strokeText(f.txt,f.x,fy); g.fillStyle=f.col; g.fillText(f.txt,f.x,fy); }
       g.globalAlpha=1; g.textAlign="left"; floats=floats.filter(f=>f.life>0);
 
       // ---- impact flash (soft pink bloom) ----

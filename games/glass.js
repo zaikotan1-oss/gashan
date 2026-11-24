@@ -158,9 +158,11 @@ function buildGlass(api){
     }
     // ② ラッキー色命中: きらっと小さめの祝福(白飛びしないよう控えめ)+頭上に星
     if(isLucky){
+      const luckyWas=luckySeen;
       luckyMsgT=luckySeen?Math.max(luckyMsgT,0.7):1.6;luckySeen=true;
       burstSparks(cx0,pane.ty-8,8,6,pane.tint);
-      floats.push({x:api.W/2,y:((isFinale||paneInStage+1>=PER_STAGE)?api.H*0.5+70:api.H*0.4+80),txt:"ラッキー！",col:pane.tint.e,life:1,vy:-0.5,size:26,pop:0});
+      // 初回は上の案内文(きょうの ラッキーいろは…)が出るので重ねない。2回目以降だけ短い「ラッキー！」を出す
+      if(luckyWas)floats.push({x:api.W/2,y:((isFinale||paneInStage+1>=PER_STAGE)?api.H*0.5+70:api.H*0.4+80),txt:"ラッキー！",col:pane.tint.e,life:1,vy:-0.5,size:26,pop:0});
       api.tone(1046,0.12,"triangle",0.1);api.tone(1568,0.14,"triangle",0.08);
     }
     // スコア: 通常+1, コンボ/金/にじ/フィナーレ/ラッキーでボーナス
@@ -395,7 +397,7 @@ function buildGlass(api){
         g.restore();g.globalAlpha=1;g.textAlign="left";if(rbMsgT<0)rbMsgT=0;}
       // ② きょうのラッキー色 はっけん！ 中央の小ヒント(初回だけ大きく教える)
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
-        g.save();g.textAlign="center";g.translate(api.W/2,api.H*0.37);
+        g.save();g.textAlign="center";g.translate(api.W/2,api.H*0.12);
         g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 23px 'Hiragino Maru Gothic ProN',system-ui";
         const t3="きょうの ラッキーいろは "+luckyName+"！";
         g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.4)";g.strokeText(t3,0,0);
@@ -404,10 +406,10 @@ function buildGlass(api){
       // hint (cute rounded glass pill)
       {const t2=pane.tint;
         g.save();g.textAlign="center";
-        g.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";
+        g.font="800 20px 'Hiragino Maru Gothic ProN',system-ui";
         const msg="タップして ガラスを わろう！";
         const tm=g.measureText(msg);const tw=(tm&&tm.width)||msg.length*8;
-        const pw=tw+44,ph=38,px=api.W/2-pw/2,py=api.H-ph-14;
+        const pw=tw+52,ph=46,px=api.W/2-pw/2,py=api.H-ph-14;
         const bob=Math.sin(tms*0.06)*2;
         g.translate(0,bob);
         // pill body
@@ -424,7 +426,7 @@ function buildGlass(api){
         roundRect(px+6,py+4,pw-12,ph*0.4,ph*0.2);g.fill();
         // text
         g.fillStyle=t2.e;g.shadowColor=t2.glow;g.shadowBlur=8;
-        g.fillText(msg,api.W/2,py+ph/2+6);
+        g.fillText(msg,api.W/2,py+ph/2+7);
         g.restore();}
       g.textAlign="left";
     }
@@ -502,22 +504,22 @@ function buildGlass(api){
     else if(pane.kind==="jarstack"){const jw=w*0.9,jx=x+(w-jw)/2;g.beginPath();g.rect(jx,y,jw,h);g.clip();}
     g.shadowColor=t.glow;g.shadowBlur=6;g.lineCap="round";
     for(const cr of pane.cracks){cr.t=Math.min(1,cr.t+0.25);const a=cr.t;
-      g.strokeStyle="rgba(255,255,255,"+(0.85*a)+")";g.lineWidth=2;
+      g.strokeStyle="rgba(255,255,255,"+(0.85*a)+")";g.lineWidth=3;
       for(const ln of cr.lines){g.beginPath();g.moveTo(cr.x,cr.y);
         for(const s of ln.segs)g.lineTo(cr.x+(s.x-cr.x)*a,cr.y+(s.y-cr.y)*a);g.stroke();}
       g.fillStyle="rgba(255,255,255,"+(0.6*a)+")";g.beginPath();g.arc(cr.x,cr.y,3,0,TAU);g.fill();}
     g.restore();
     g.restore();
     // hits indicator (cute round pips above pane)
-    const left=Math.max(0,pane.need-pane.hits),gap=pane.need>8?15:20,startx=pane.x+w/2-(pane.need-1)*gap/2,py=pane.y-22;
+    const left=Math.max(0,pane.need-pane.hits),gap=pane.need>8?20:26,startx=pane.x+w/2-(pane.need-1)*gap/2,py=pane.y-22;
     g.save();
     if(settled)for(let i=0;i<pane.need;i++){const px=startx+i*gap,alive=i<left;
       const pls=alive?1+0.12*Math.sin(tms*0.12+i):1;
       g.save();g.translate(px,py);g.scale(pls,pls);
       if(alive){g.shadowColor=t.glow;g.shadowBlur=8;g.fillStyle=t.e;}
       else{g.shadowBlur=0;g.fillStyle="rgba(255,255,255,.18)";}
-      g.beginPath();g.arc(0,0,5,0,TAU);g.fill();
-      if(alive){g.shadowBlur=0;g.fillStyle="rgba(255,255,255,.7)";g.beginPath();g.arc(-1.4,-1.4,1.6,0,TAU);g.fill();}
+      g.beginPath();g.arc(0,0,7,0,TAU);g.fill();
+      if(alive){g.shadowBlur=0;g.fillStyle="rgba(255,255,255,.7)";g.beginPath();g.arc(-2,-2,2.2,0,TAU);g.fill();}
       g.restore();}
     g.restore();
   }

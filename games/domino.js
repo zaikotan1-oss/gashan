@@ -25,7 +25,10 @@ function buildDomino(api){
   let rbMsgT;                                     // ① にじいろばくだん 発見バナー
   let chainStarts;                                // ③ パーフェクト(ワンチェイン)判定用
   let shootStar,starTimer;                        // ④ ながれ星 ひみつ発見
-  function layout(){baseConnR=clamp(api.W*0.10,55,120);applyConnR();}
+  // 軸6: 主役を大きくした分(baseR 0.04→0.047)、つながる距離(CONNR)も同じ比率で広げる。
+  //   広げないと後半の面(CONNR が0.7倍まで縮む)で 重ならずに隣へ置ける間隔が つながる距離より長くなり、連鎖が作れない。
+  function bombBaseR(){return clamp(api.W*0.047,22,38);}
+  function layout(){baseConnR=clamp(api.W*0.10,55,120)*Math.max(1,bombBaseR()/clamp(api.W*0.04,20,32));applyConnR();}
   function applyConnR(){const sh=stage?stage:1;CONNR=baseConnR*clamp(1.0-sh*0.06,0.62,1);} // 7〜8歳向け: 吸着半径を狭め、面が進んでも広がりすぎないようにする
   function reset(){bombs=[];pending=[];rings=[];shards=[];sparks=[];floats=[];glints=[];motes=[];crumbles=[];topples=[];lap=0;totalStars=0;clearStarBonus=0;goldMode=false;lapPerfect=true;nextGold=false;hudStars=0;starPop=[0,0,0];bestChain=0;clearBest=0;clearNewRecord=false;count=0;total=0;chain=0;maxChain=0;flash=0;megaFlash=0;hintT=0;bgT=0;hitCd=0;
     stage=1;banner=0;clearT=0;clearStars=0;allClear=false;clearPerfect=false;
@@ -49,7 +52,7 @@ function buildDomino(api){
     // 混ぜて、どの面にも 2〜4 個のつながる鎖が必ず1本以上できるようにする(ドミノの名前どおり1タップで次々つながる)。
     const XL=api.W*0.16,XR=api.W*0.84,YT=api.H*0.18,YB=api.H*0.78;
     const tries=stageBombs*12;let placed=0;
-    const fits=(x,y,r,k)=>{for(const o of bombs){if(Math.hypot(o.x-x,o.y-y)<(o.r+r)*k)return false;}return true;};
+    const fits=(x,y,nb,k)=>{const e=ext(nb.type,nb.r);for(const o of bombs){if(clash(o,x,y,e,k))return false;}return true;};
     for(let a=0;a<tries&&placed<stageBombs;a++){
       // 1面は 最初に特大(木箱)・2個目に積み木箱・3個目にドミノの列を保証: 最初の10秒から丸以外が4形見える
       // 軸7: 2面以降も 最初の3個は面ごとの固定表から(丸い爆弾ばかりで始まらない・最初の連鎖で必ず違う物が壊れる)
@@ -59,17 +62,27 @@ function buildDomino(api){
       const cluster=placed>0&&(placed<3||placed%3===1||Math.random()<0.25);
       let x,y,ok=false;
       if(cluster){
+        // となりに置く: 角度を数回ためして、重ならない所を見つける(積み木とくるまのように 横にしか並べない組み合わせは 横向きの角度も ためす)
         const an=bombs[rint(0,bombs.length-1)];
-        const lo=Math.max(CONNR*0.55,(an.r+nb.r)*1.12),hi=Math.min(reachOf(an),CONNR*nb.sz)*0.95;
-        const d=hi>lo?rnd(lo,hi):Math.min(lo,hi*1.0);
-        const ang=rnd(0,TAU);x=an.x+Math.cos(ang)*d;y=an.y+Math.sin(ang)*d;
-        ok=x>=XL&&x<=XR&&y>=YT&&y<=YB&&fits(x,y,nb.r,(n>=2&&placed<3&&FORCE[n])?0.85:1.1); // 固定の3個は大きい物同士でも必ず隣に置けるよう、すこしだけ詰めてよい
+        const lo=Math.max(CONNR*0.55,Math.min(an.r+nb.r,CONNR*0.8)),hi=Math.min(reachOf(an),CONNR*nb.sz)*0.95;
+        for(let q=0;q<10&&!ok;q++){
+          const d=hi>lo?rnd(lo,hi):hi;
+          const ang=q<4?rnd(0,TAU):(Math.random()<0.5?0:Math.PI)+rnd(-0.6,0.6);
+          x=an.x+Math.cos(ang)*d;y=an.y+Math.sin(ang)*d;
+          ok=x>=XL&&x<=XR&&y>=YT&&y<=YB&&fits(x,y,nb,1.0);
+        }
       }else{
-        x=rnd(XL,XR);y=rnd(YT,YB);ok=fits(x,y,nb.r,1.25);
+        x=rnd(XL,XR);y=rnd(YT,YB);ok=fits(x,y,nb,1.12);
       }
       if(ok){nb.x=x;nb.y=y;bombs.push(nb);placed++;}
     }
-    while(bombs.length<stageBombs)bombs.push(mkBomb(rnd(XL,XR),rnd(YT,YB),rollType(n)));
+    // 軸6: 置ききれなかった分。2面以降は重ならない場所をさがして置く(見つからなければ その1個は置かない)。1面は配置を変えない
+    for(let a=0;a<stageBombs*4&&bombs.length<stageBombs;a++){
+      const nb=mkBomb(0,0,rollType(n));
+      if(n<2){nb.x=rnd(XL,XR);nb.y=rnd(YT,YB);bombs.push(nb);continue;}
+      const sp=freeSpot(nb.r,XL,XR,YT,YB,nb.type);
+      if(sp.ok){nb.x=sp.x;nb.y=sp.y;bombs.push(nb);}
+    }
   }
   // stage cleared: tally results, star rating, fire celebration
   function clearStage(){
@@ -132,7 +145,7 @@ function buildDomino(api){
   }
   function mkMote(){const z=rnd(0.3,1);return{x:rnd(0,api.W),y:rnd(0,api.H),z,r:lerp(1.2,4.5,z),vy:-lerp(0.08,0.32,z),drift:rnd(0,TAU),ds:rnd(0.004,0.01),col:pick(["#ffd9a0","#cdb6ff","#ffe27a","#a7d8ff"]),tw:rnd(0,TAU)};}
   function mkBomb(x,y,type){type=type||"normal";
-    const baseR=clamp(api.W*0.04,20,32);
+    const baseR=bombBaseR();
     // 軸7: 大きさに差をつける(ふつうは0.8〜1.25倍・特大は1.5倍)。reachOf も大きさに比例させる
     const sz=type==="big"?1.5:type==="normal"?rnd(0.7,1.35):1;
     // 軸7: ドミノの列は細長いので r を少し大きく(当たりの円 1.6r を指より大きく保つ)。くるまは横長なので r を更に大きく
@@ -150,16 +163,20 @@ function buildDomino(api){
   // scorePerTapが0.79〜0.86→約0.25〜0.30まで下がっており、この効果で十分と判断した。
   // 重なった所では「見えている中心がいちばん近い」爆弾を返す(配列の先頭ではなく b.r で割った距離が最小のもの)。範囲は 1.6r のまま
   function near(x,y){let best=null,bd=1e9;for(const b of bombs){const d=Math.hypot(b.x-x,b.y-y)/Math.max(1,b.r);if(d<1.6&&d<bd){bd=d;best=b;}}return best;}
-  // 見やすさ: 後から足す爆弾(報酬・時限)が既存の爆弾と重ならない位置を最大20回さがす。駄目なら最後の候補をそのまま使う
-  function freeSpot(r,x0,x1,y0,y1){
-    let x=rnd(x0,x1),y=rnd(y0,y1);
-    for(let k=0;k<20;k++){
+  // 軸6(見やすさ): 見た目の広がり(横の半分×縦の半分)を種類ごとに持つ。積み木は縦に長く(±1.5r+導火線)、くるまは横に長い。
+  //   中心間の距離だけで重なりを見ると 積み木の一番下の箱に となりの爆弾の頭が食い込むので、広がりの楕円で見る。
+  function ext(type,r){
+    return type==="stack"?[r*0.8,r*1.7]:type==="car"?[r*1.2,r*0.9]:type==="row"?[r*1.0,r*1.0]:type==="big"?[r*0.95,r*1.1]:[r*1.1,r*1.2];}
+  function clash(o,x,y,e,k){const a=ext(o.type,o.r),A=(a[0]+e[0])*k,B=(a[1]+e[1])*k,dx=(o.x-x)/A,dy=(o.y-y)/B;return dx*dx+dy*dy<1;}
+  // 見やすさ: 後から足す爆弾(報酬・時限)が既存の爆弾と重ならない位置を最大20回さがす。駄目なら最後の候補をそのまま使う(ok=false)
+  function freeSpot(r,x0,x1,y0,y1,type){
+    const e=ext(type||"normal",r);let x=rnd(x0,x1),y=rnd(y0,y1),found=false;
+    for(let k=0;k<20&&!found;k++){
       x=rnd(x0,x1);y=rnd(y0,y1);
-      let ok=true;
-      for(const o of bombs){if(Math.hypot(o.x-x,o.y-y)<(o.r+r)*1.3){ok=false;break;}}
-      if(ok)break;
+      found=true;
+      for(const o of bombs){if(clash(o,x,y,e,1.15)){found=false;break;}}
     }
-    return{x,y};
+    return{x,y,ok:found};
   }
   function ignite(b,delay){if(b.state!=="idle")return;b.state="lit";b.t=delay||10;}
   function explode(b){
@@ -268,7 +285,7 @@ function buildDomino(api){
     const n=c>=10?3:2;
     for(let i=0;i<n;i++){
       const nb=mkBomb(0,0,pick(c>=10?["color","big","color"]:["color","normal","color"]));
-      const sp=freeSpot(nb.r,api.W*0.2,api.W*0.8,api.H*0.15,api.H*0.7);nb.x=sp.x;nb.y=sp.y;
+      const sp=freeSpot(nb.r,api.W*0.2,api.W*0.8,api.H*0.15,api.H*0.7,nb.type);nb.x=sp.x;nb.y=sp.y;
       nb.born=1.4;bombs.push(nb);
       glints.push({x:nb.x,y:nb.y,vx:0,vy:-1.5,life:1,decay:0.02,size:16,rot:0});
     }
@@ -379,7 +396,7 @@ function buildDomino(api){
         ambientT-=dt;
         if(ambientT<=0){
           const nb=mkBomb(0,0,"timed");
-          const sp=freeSpot(nb.r,api.W*0.2,api.W*0.8,api.H*0.2,api.H*0.75);nb.x=sp.x;nb.y=sp.y;
+          const sp=freeSpot(nb.r,api.W*0.2,api.W*0.8,api.H*0.2,api.H*0.75,nb.type);nb.x=sp.x;nb.y=sp.y;
           nb.armT=rnd(50,110);bombs.push(nb);
           ambientT=rint(200,300);
         }
