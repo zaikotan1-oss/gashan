@@ -195,7 +195,7 @@ function buildAvalanche(api){
     api.shake(3);
     // ねらいが外れた時は叱らず、玉の頭上に小さく「ころころ」(得点は0でも雪けむりと音は残す)
     if(lane<0&&fever<=0)feverGauge=Math.max(0,feverGauge-0.06); // ねらわず外すとフィーバーゲージが少し減る(狙いが報われる)
-    if(lane<0&&floats.length<2)pushFloat({x:Math.max(sx,api.W*0.18),y:slopeYAt(sx)-unit*2.4,txt:"ころころ",life:1.1,vy:-0.6,col:"#ffffff",size:28});
+    if(lane<0&&floats.length<2&&!floats.some(f=>f.txt==="ころころ"&&f.life>0.4))pushFloat({x:Math.max(sx,api.W*0.18),y:slopeYAt(sx)-unit*2.4,txt:"ころころ",life:1.1,vy:-0.6,col:"#ffffff",size:28});
   }
 
   function hitObstacle(b,o){

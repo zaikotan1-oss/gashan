@@ -137,6 +137,7 @@ function build_blizzard(api){
     fever=FEVER_LEN;feverBanner=1.8;flash=1;
     api.boom(0.7);api.shake(16);api.slide(300,1200,0.5,0.22,"sawtooth");
     [0,4,7,12,16].forEach((s,i)=>setTimeout(()=>api.tone(659*Math.pow(2,s/12),0.15,"triangle",0.12),i*80));
+    floats.push({x:api.W/2,y:api.H*0.3,txt:"フィーバー スタート!",life:1,vy:-0.5,col:"#ffd23f",size:34});
     for(let i=0;i<12;i++)spawnSnow();
     for(let i=0;i<20;i++){const a=rnd(0,TAU),sp2=rnd(4,10);
       shards.push({x:api.W/2,y:api.H*0.35,vx:Math.cos(a)*sp2,vy:Math.sin(a)*sp2-2,s:rnd(5,10),
@@ -398,13 +399,13 @@ function build_blizzard(api){
         const bobx=Math.sin(b.wob)*1.5;
         g.save();g.translate(b.x+bobx,b.y);g.rotate(b.rot);
         // shadow
-        g.fillStyle="rgba(80,110,150,.18)";g.beginPath();g.ellipse(0,b.r*0.7,b.r*0.8,b.r*0.3,0,0,TAU);g.fill();
+        g.fillStyle="rgba(50,85,135,.38)";g.beginPath();g.ellipse(0,b.r*0.7,Math.max(0,b.r*0.95),Math.max(0,b.r*0.3),0,0,TAU);g.fill();
         if(b.type==="ice"){
           // crystalline ice cube (手描き: 生成画像は床の残りが取れず不採用)
           const ig=g.createLinearGradient(-b.r,-b.r,b.r,b.r);
           ig.addColorStop(0,"#eaffff");ig.addColorStop(0.5,b.col);ig.addColorStop(1,"#7fc8e8");
           g.fillStyle=ig;roundRect(-b.r*0.8,-b.r*0.8,b.r*1.6,b.r*1.6,b.r*0.25);g.fill();
-          g.strokeStyle="rgba(255,255,255,.7)";g.lineWidth=2;
+          g.strokeStyle="rgba(70,110,160,.8)";g.lineWidth=2.5;
           roundRect(-b.r*0.8,-b.r*0.8,b.r*1.6,b.r*1.6,b.r*0.25);g.stroke();
           g.strokeStyle="rgba(255,255,255,.5)";g.lineWidth=1.5;
           g.beginPath();g.moveTo(-b.r*0.4,-b.r*0.6);g.lineTo(b.r*0.2,b.r*0.5);
@@ -486,6 +487,7 @@ function build_blizzard(api){
           const sg=g.createRadialGradient(-b.r*0.3,-b.r*0.35,b.r*0.1,0,0,b.r);
           sg.addColorStop(0,"#ffffff");sg.addColorStop(0.7,b.col);sg.addColorStop(1,"#bcd6ee");
           g.fillStyle=sg;g.beginPath();g.arc(0,0,b.r*0.95,0,TAU);g.fill();
+          g.strokeStyle='rgba(70,110,160,.8)';g.lineWidth=2.5;g.stroke();
           g.fillStyle="rgba(255,255,255,.7)";g.beginPath();g.ellipse(-b.r*0.3,-b.r*0.35,b.r*0.25,b.r*0.16,-0.4,0,TAU);g.fill();
           // sparkle dots
           g.fillStyle="rgba(255,255,255,.6)";
@@ -531,6 +533,18 @@ function build_blizzard(api){
         g.fillStyle=ag;g.beginPath();g.arc(v.x,v.y,rad*1.5,0,TAU);g.fill();
         // swirling arms
         g.save();g.translate(v.x,v.y);g.rotate(v.spin);
+        // 下敷き: 白い雪面の上でも渦巻きが読めるよう、青い影の線を source-over で先に引く
+        g.globalCompositeOperation="source-over";
+        for(let arm=0;arm<3;arm++){
+          g.save();g.rotate(arm*TAU/3);
+          g.globalAlpha=fade;g.strokeStyle="rgba(40,90,150,.45)";g.lineWidth=5.5;g.lineCap="round";
+          g.beginPath();
+          for(let t=0;t<1;t+=0.06){const ang=t*5,rr=rad*t;
+            const px=Math.cos(ang)*rr,py=Math.sin(ang)*rr;
+            if(t===0)g.moveTo(px,py);else g.lineTo(px,py);}
+          g.stroke();g.restore();
+        }
+        g.globalCompositeOperation="lighter";
         for(let arm=0;arm<3;arm++){
           g.save();g.rotate(arm*TAU/3);
           g.globalAlpha=fade*0.6;g.strokeStyle="rgba(255,255,255,.9)";g.lineWidth=2.5;g.lineCap="round";
@@ -652,7 +666,7 @@ function build_blizzard(api){
     g.beginPath();
     g.moveTo(-r*0.55,-r*1.05);g.lineTo(r*0.55,-r*1.05);g.lineTo(r*0.14,r*1.5);g.lineTo(-r*0.14,r*1.5);
     g.closePath();g.fill();
-    g.strokeStyle="rgba(255,255,255,.75)";g.lineWidth=2;g.stroke();
+    if(b.type==="snow"){g.strokeStyle="rgba(70,110,160,.8)";g.lineWidth=2.5;}else{g.strokeStyle="rgba(255,255,255,.75)";g.lineWidth=2;}g.stroke();
     g.strokeStyle="rgba(255,255,255,.55)";g.lineWidth=1.4;
     g.beginPath();g.moveTo(-r*0.18,-r*0.7);g.lineTo(-r*0.06,r*0.9);g.stroke();
     g.beginPath();g.moveTo(r*0.22,-r*0.6);g.lineTo(r*0.08,r*0.5);g.stroke();
@@ -663,7 +677,7 @@ function build_blizzard(api){
     bg.addColorStop(0,"#ffffff");bg.addColorStop(0.55,col||"#eaf6ff");bg.addColorStop(1,"#bcd6ee");
     g.fillStyle=bg;
     roundRect(-r*0.98,-r*0.82,r*1.96,r*1.64,r*0.14);g.fill();
-    g.strokeStyle="rgba(140,175,205,.55)";g.lineWidth=2;
+    g.strokeStyle=b.type==="snow"?"rgba(70,110,160,.8)":"rgba(140,175,205,.55)";g.lineWidth=b.type==="snow"?2.5:2;
     roundRect(-r*0.98,-r*0.82,r*1.96,r*1.64,r*0.14);g.stroke();
     g.strokeStyle="rgba(140,175,205,.35)";g.lineWidth=1.4;
     g.beginPath();g.moveTo(-r*0.98,0);g.lineTo(r*0.98,0);g.moveTo(0,-r*0.82);g.lineTo(0,r*0.82);g.stroke();
@@ -673,9 +687,11 @@ function build_blizzard(api){
     const lowerG=g.createRadialGradient(-r*0.2,r*0.25,r*0.1,0,r*0.42,r*0.75);
     lowerG.addColorStop(0,"#ffffff");lowerG.addColorStop(0.7,col||"#eaf6ff");lowerG.addColorStop(1,"#bcd6ee");
     g.fillStyle=lowerG;g.beginPath();g.arc(0,r*0.42,r*0.72,0,TAU);g.fill();
+    if(b.type==="snow"){g.strokeStyle='rgba(70,110,160,.8)';g.lineWidth=2.5;g.stroke();}
     const upperG=g.createRadialGradient(-r*0.15,-r*0.48,r*0.08,0,-r*0.32,r*0.5);
     upperG.addColorStop(0,"#ffffff");upperG.addColorStop(0.7,col||"#eaf6ff");upperG.addColorStop(1,"#cfe6f7");
     g.fillStyle=upperG;g.beginPath();g.arc(0,-r*0.32,r*0.5,0,TAU);g.fill();
+    if(b.type==="snow"){g.strokeStyle='rgba(70,110,160,.8)';g.lineWidth=2.5;g.stroke();}
     g.fillStyle=fc;
     g.beginPath();g.arc(-r*0.16,-r*0.4,r*0.07,0,TAU);g.arc(r*0.16,-r*0.4,r*0.07,0,TAU);g.fill();
     g.strokeStyle=fc;g.lineWidth=Math.max(1.3,r*0.05);g.lineCap="round";

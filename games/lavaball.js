@@ -57,7 +57,8 @@ function buildLavaball(api){
   // ①③ 上段/下段レーンの見た目の間隔(タップの高さで選ぶ2本の坂)
   function laneGap(){ return clamp(api.W*0.13,55,95); }
   // floats はほぼ同じ位置に何個も積み重なると読めなくなるので、少しだけxをばらけさせる
-  function pushFloat(o){ o.x=(o.x||0)+rnd(-16,16); floats.push(o); }
+  function pushFloat(o){ o.x=(o.x||0)+rnd(-16,16); floats.push(o);
+    if(floats.length>10) floats.splice(0,floats.length-10); }
 
   // 1つぶんの的を作る(種類ごとの大きさ・回数・点数)
   function mkObj(type,x,lane){
@@ -142,7 +143,7 @@ function buildLavaball(api){
       api.tone(1318,0.12,"triangle",0.1); }
     // A. にじいろいわ が並んだ瞬間の予告(見つけて!のワクワク)
     const rb=objs.find(o=>o.type==="rainbow");
-    if(rb){ pushFloat({x:rb.x,y:rb.y-rb.r*1.9,txt:"にじいろいわ！",life:1,vy:-0.5,col:"#ff5da2",size:26});
+    if(rb){ pushFloat({x:rb.x,y:rb.y-rb.r*1.9-(gg?32:0),txt:"にじいろいわ！",life:1,vy:-0.5,col:"#ff5da2",size:26});
       api.tone(1046,0.1,"triangle",0.1); api.tone(1568,0.12,"triangle",0.08); }
   }
   // 転がし終わりに呼ぶ: おいしい道が空になったら新しい行へ。ふつうの道が空の道で からぶり したら いわを2こ足す(固まらない)
@@ -229,7 +230,7 @@ function buildLavaball(api){
     // ⑥ ゴールド/にじいろは「ゴールド！」「+点」「xN」が同時に出る。高さと横をずらして重ならないようにする
     const bigRare=o.type==="gold"||o.type==="rainbow";
     const sideX=clamp(o.x+o.r*1.8,40,api.W-40), sideXL=clamp(o.x-o.r*1.8,40,api.W-40);
-    if(combo>1) pushFloat({x:bigRare?sideX:o.x,y:bigRare?o.y-o.r*4.4:o.y-o.r,txt:"x"+combo,life:1,vy:-1.0,
+    if(combo>1 && (combo<=3 || combo%3===0)) pushFloat({x:bigRare?sideX:o.x,y:bigRare?o.y-o.r*4.4:o.y-o.r,txt:"x"+combo,life:1,vy:-1.0,
       col:combo>=6?"#fff2c0":"#ffe08a",size:combo>=4?40:30});
     if(gain>=4) pushFloat({x:bigRare?sideXL:o.x,y:bigRare?o.y+o.r*0.2:o.y-o.r*2.1,txt:"+"+gain,life:1,vy:-0.8,
       col:o.type==="gold"?"#ffd23f":"#c78bff",size:o.type==="gold"?36:26});
@@ -534,7 +535,7 @@ function buildLavaball(api){
       floats=floats.filter(f=>f.life>0);
 
       // ---------- combo text (top center, safe zone) ----------
-      if(combo>1){
+      if(combo>1 && feverBanner<=0){
         const pop=1+Math.max(0,comboT-0.7)*1.2;
         g.save(); g.translate(api.W/2,api.H*0.19); g.scale(pop,pop);
         g.font="800 32px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
@@ -554,9 +555,9 @@ function buildLavaball(api){
         g.shadowBlur=0; g.lineWidth=2; g.strokeStyle=col; g.strokeText("すごい！",0,0);
         g.restore(); g.globalAlpha=1; g.textAlign="left"; if(rbMsgT<0)rbMsgT=0; }
       // ---------- ② きょうのラッキー色 ヒント(初回は色名つき・以後は短く) ----------
-      if(luckyMsgT>0){ luckyMsgT-=0.016*dt;
+      if(luckyMsgT>0 && feverBanner<=0 && clearBanner<=0 && perfectT<=0 && rbMsgT<=0){ luckyMsgT-=0.016*dt;
         const pop=1+Math.max(0,luckyMsgT-0.8)*1.2;
-        g.save(); g.translate(api.W/2,api.H*0.34); g.scale(pop,pop); g.textAlign="center";
+        g.save(); g.translate(api.W/2,api.H*0.40); g.scale(pop,pop); g.textAlign="center";
         g.globalAlpha=clamp(luckyMsgT*1.4,0,1); g.font="900 23px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor=luckyColor; g.shadowBlur=14;
         const t2=luckyMsgT>1?("きょうの ラッキーいろは "+(CNAME[luckyColor]||"")+"！"):"ラッキー！";
@@ -572,10 +573,10 @@ function buildLavaball(api){
         g.shadowBlur=0; g.lineWidth=1.5; g.strokeStyle="rgba(40,120,60,.7)"; g.strokeText("パーフェクト！",0,0);
         g.restore(); g.globalAlpha=1; g.textAlign="left"; if(perfectT<0)perfectT=0; }
 
-      // ---------- B. フィーバー開始バナー(コンボ0.19H・ラッキー0.34Hの間) ----------
+      // ---------- B. フィーバー開始バナー(コンボと同じ0.19H・ラッキー0.40H・エンジン祝福0.3H) ----------
       if(feverBanner>0){ feverBanner-=0.016*dt;
         const pop=1+Math.max(0,feverBanner-1.4)*1.2, col="hsl("+((tsec*200)%360)+",95%,62%)";
-        g.save(); g.translate(api.W/2,api.H*0.27); g.scale(pop,pop); g.textAlign="center";
+        g.save(); g.translate(api.W/2,api.H*0.19); g.scale(pop,pop); g.textAlign="center";
         g.globalAlpha=clamp(feverBanner*1.5,0,1); g.font="900 40px 'Hiragino Maru Gothic ProN',system-ui";
         g.lineWidth=7; g.strokeStyle="rgba(40,8,6,.8)"; g.strokeText("フィーバー！ 2ばい！",0,0);
         g.shadowColor=col; g.shadowBlur=18; g.fillStyle="#fff"; g.fillText("フィーバー！ 2ばい！",0,0);

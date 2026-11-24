@@ -247,7 +247,8 @@ function build_cakesmash(api){
       feverGauge=Math.min(1,feverGauge+0.35);
     }else{
       feverGauge=Math.min(1,feverGauge+0.12);
-      if(pts>1)floats.push({x,y:y-tierH*0.6,txt:"+"+pts,life:1,vy:-1.2,col:"#ff7ad0",size:24});
+      // ラッキー色の時は下の「ラッキー！ +n」1つにまとめる(文字が重ならないように)。フィーバー中の「+n」は「x n」(y-tierH)から離して低めに出す
+      if(pts>1&&!isLucky)floats.push({x,y:y-tierH*0.4,txt:"+"+pts,life:1,vy:-1.2,col:"#ff7ad0",size:24});
     }
     // ② ラッキー色 命中: きらっと小さめの祝福(白飛びしない控えめ) + 頭上に星のキラッ
     if(isLucky){
@@ -256,7 +257,7 @@ function build_cakesmash(api){
         sparks.push({x,y:y-tierH*0.4,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,len:rnd(6,12),life:1,decay:rnd(0.04,0.07)});}
       if(fever>FEVER_LEN-1.5){/*フィーバー開始直後は中央の文言を出さない*/}
       else if(!luckySeen){luckyMsgT=1.8;luckySeen=true;}else luckyMsgT=Math.max(luckyMsgT,0.7);
-      floats.push({x,y:y-tierH*0.7,txt:"ラッキー！",life:1,vy:-1,col:FRUIT[luckyColor],size:22});
+      floats.push({x,y:y-tierH*1.8,txt:"ラッキー！ +"+pts,life:1,vy:-1,col:FRUIT[luckyColor],size:24});   // 「x n」(y-tierH)の上に縦に並べる
     }
     if(feverGauge>=1&&fever<=0)startFever();
     const isLast=last||aliveCount()===0;
@@ -276,7 +277,7 @@ function build_cakesmash(api){
     }
     if(combo>1)floats.push({x,y:y-tierH,txt:"x"+combo,life:1,vy:-1.1,
       col:combo>=8?"#ff2bff":combo>=5?"#ff3b6b":"#ffd23f",size:combo>=5?40:30});
-    if(combo>0&&combo%6===0)floats.push({x:baseX,y:baseY-tierH*2,txt:"あまーい！",
+    if(combo>0&&combo%6===0)floats.push({x:W*0.25,y:baseY-tierH*2,txt:"あまーい！",
       life:1,vy:-0.7,col:"#ff7aa8",size:26});
     checkStage();
   }
@@ -422,7 +423,7 @@ function build_cakesmash(api){
       for(const m of motes){
         m.y-=m.sp*dt; m.x+=Math.sin(tsec+m.ph)*0.3*dt; m.ph+=0.02*dt;
         if(m.y<-20){m.y=H+20;m.x=rnd(0,W);}
-        g.save();g.globalAlpha=0.55;g.translate(m.x,m.y);g.rotate(Math.sin(tsec*0.5+m.ph)*0.3);
+        g.save();g.globalAlpha=0.7;g.translate(m.x,m.y);g.rotate(Math.sin(tsec*0.5+m.ph)*0.3);
         if(m.kind===0){ // gumdrop
           g.fillStyle=m.col;g.beginPath();g.arc(0,0,m.r,Math.PI,TAU);g.lineTo(m.r,m.r*0.7);
           g.lineTo(-m.r,m.r*0.7);g.closePath();g.fill();
@@ -435,6 +436,7 @@ function build_cakesmash(api){
           g.fillStyle=m.col;g.beginPath();g.arc(0,0,m.r,0,TAU);g.fill();
           g.fillStyle="rgba(255,255,255,.35)";g.beginPath();g.arc(0,0,m.r*0.4,0,TAU);g.fill();
         }
+        g.strokeStyle="rgba(120,50,70,.35)";g.lineWidth=1;g.beginPath();g.arc(0,0,Math.max(0,m.r),0,TAU);g.stroke();   // 白い背景に溶けないよう細い暗縁
         g.restore();
       }
       g.globalAlpha=1;

@@ -81,7 +81,7 @@ function buildPunch(api){
       case"cake": return pick(["#ffd9e6","#ffe6b8","#ffc2d6","#fff0c8"]);
       case"toy":  return pick(COLORS);
       case"face": return pick(["#ffcf6a","#ff9ec2","#9ad6ff","#b7e88a","#ffb27a"]);
-      case"tower":return pick(["#c9b28a","#b89a72","#d9c39c","#a8895f"]);
+      case"tower":return pick(["#9a7a4e","#8a6a40","#b89466","#7e6038"]);
       case"car":  return pick(["#ff5a5a","#4ea8ff","#ffd23f","#5fd68a"]);
       default:    return pick(COLORS);
     }
@@ -293,7 +293,7 @@ function buildPunch(api){
     api.slide(160,80,0.1,0.18,"square");
     // 節目ごとにドカッと（多段の“ゴンゴン→ドカン”）
     if(combo>0&&combo%5===0){wash=Math.min(1,0.5);washCol=comboCol();api.boom(0.4);api.shake(14);
-      floats(api.W*0.32,api.H*0.32,combo+" COMBO!",comboCol());tryHitStop(4);}
+      if(spawnTitle<=0)floats(api.W*0.28,api.H*0.40,combo+" COMBO!",comboCol());tryHitStop(4);}
     else if(charge>0.75||dmg>=2)tryHitStop(3);
     if(boss.hp<=0)killBoss();
   }
@@ -501,7 +501,7 @@ function buildPunch(api){
           wash=Math.min(1,0.4+cf*0.6);washCol=comboCol();
           api.boom(clamp(0.35+cf*0.35,0,0.7));api.shake(10+combo);
           api.slide(440+combo*20,880+combo*20,0.14,0.28,"square");
-          floats(api.W*0.32,api.H*0.34,combo+" COMBO!",comboCol());
+          if(spawnTitle<=0)floats(api.W*0.28,api.H*0.40,combo+" COMBO!",comboCol());
           tryHitStop(4);
         }
       }
@@ -811,8 +811,8 @@ function buildPunch(api){
         g.save();g.textAlign="center";
         const a=clamp(spawnTitle/30,0,1);g.globalAlpha=a;
         g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";
-        g.lineWidth=7;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText(spawnTxt+"！",api.W/2,api.H*0.36);
-        g.fillStyle="#fff2a0";g.fillText(spawnTxt+"！",api.W/2,api.H*0.36);
+        g.lineWidth=7;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText(spawnTxt+"！",api.W/2,api.H*0.30);
+        g.fillStyle="#fff2a0";g.fillText(spawnTxt+"！",api.W/2,api.H*0.30);
         g.restore();g.globalAlpha=1;g.textAlign="left";
       }
       // ボス予告（大きくチラ見せ）
@@ -884,6 +884,10 @@ function buildPunch(api){
   function drawPiece(b){
     const react=b.react||0,k=b.kind;
     if(react>0){const sc=1+0.12*react;g.save();g.translate(b.x+S/2,b.y+S/2);g.scale(sc,2-sc);g.translate(-(b.x+S/2),-(b.y+S/2));}
+    // 背板(軸6): 夕日など明るい背景でも四角い物が溶けないよう、暗い板を1枚敷く(丸い物・くるまは除く)
+    if(k==="ice"||k==="cake"||k==="toy"||k==="tower"||(k!=="rock"&&k!=="crate"&&k!=="tire"&&k!=="face"&&k!=="car")){
+      const bw=b.pw||S,bh=b.ph||S;g.fillStyle="rgba(20,10,30,.35)";g.fillRect(b.x-2,b.y-2,bw+4,bh+4);
+    }
     if(k==="rock")drawRock(b);
     else if(k==="ice")drawIce(b);
     else if(k==="crate")drawCrate(b);
@@ -916,6 +920,7 @@ function buildPunch(api){
     g.fillStyle="rgba(255,255,255,.16)";g.fillRect(x+2,y+2,4,S-4);
     g.fillStyle="rgba(0,0,0,.26)";g.fillRect(x+2,y+S-5,S-4,4);
     g.fillStyle="rgba(0,0,0,.18)";g.fillRect(x+S-5,y+2,3,S-4);
+    g.strokeStyle="rgba(40,20,10,.55)";g.lineWidth=Math.max(2,S*0.05);g.strokeRect(x+1,y+1,S-2,S-2);
   }
   // いわ: ごつごつした多角形＋ファセット陰影＋斑点
   function drawRock(b){
@@ -939,6 +944,7 @@ function buildPunch(api){
     g.strokeStyle="rgba(255,255,255,.7)";g.lineWidth=Math.max(2,S*0.06);g.lineCap="round";
     g.beginPath();g.moveTo(x+S*0.24,y+S*0.16);g.lineTo(x+S*0.4,y+S*0.5);g.stroke();
     g.fillStyle="rgba(255,255,255,.4)";g.fillRect(x+3,y+3,S-6,3);
+    g.strokeStyle="rgba(20,50,90,.55)";g.lineWidth=Math.max(2,S*0.05);g.strokeRect(x+1,y+1,S-2,S-2);
   }
   // きばこ: 木のふちどり＋X字＋くぎ
   function drawCrate(b){
@@ -972,6 +978,8 @@ function buildPunch(api){
     g.fillStyle="#ffdcec";g.fillRect(x+2,y+S*0.3,S-4,S*0.12);
     g.fillStyle="#ff3b6b";g.beginPath();g.arc(x+S*0.5,y+S*0.16,S*0.09,0,TAU);g.fill();
     g.fillStyle="rgba(255,255,255,.7)";g.beginPath();g.arc(x+S*0.46,y+S*0.13,S*0.03,0,TAU);g.fill();
+    g.strokeStyle="rgba(110,40,50,.55)";g.lineWidth=Math.max(2,S*0.05);
+    g.strokeRect(x,y+S*0.34,S,S*0.66);roundRect(x+1,y+S*0.12,S-2,S*0.34,S*0.1);g.stroke();
   }
   // つみき: ふちどりキューブに丸/星のスタンプ（文字は使わない）
   function drawToy(b){
@@ -1038,6 +1046,9 @@ function buildPunch(api){
     g.fillRect(x+w*0.32,bodyY+bodyH*0.18,w*0.36,bodyH*0.14);
     g.fillRect(x+w*0.32,bodyY+bodyH*0.62,w*0.36,bodyH*0.14);
     g.fillStyle="rgba(255,255,255,.3)";g.fillRect(x+3,bodyY,Math.max(0,w-6),3);
+    g.strokeStyle="rgba(40,20,10,.55)";g.lineWidth=Math.max(2,S*0.05);g.lineJoin="round";
+    g.beginPath();g.moveTo(x+w*0.5,y);g.lineTo(x+w*0.06,y+roofH);g.lineTo(x+w*0.94,y+roofH);g.closePath();g.stroke();
+    g.strokeRect(x+3,bodyY,Math.max(0,w-6),Math.max(0,bodyH-3));
   }
   // くるま: 車体＋キャビン＋タイヤ2つ（横2マス＝乗り物カテゴリ）
   function drawCar(b){

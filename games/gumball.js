@@ -167,7 +167,7 @@ function build_gumball(api){
       luckySeen=true;
     }
     // 軸6: 文字は節目だけ(フィーバー中の毎個+2や毎個のxコンボは出さない。コンボはHUDが見せる)
-    if(gain>=3||isLucky) addFloat({x:hx,y:hy-unit*0.2,txt:"+"+gain,life:1,vy:-1,
+    if(gain>=3||isLucky) addFloat({x:hx,y:Math.min(hy-unit*0.2,ball.y-ball.r-unit*0.6),txt:"+"+gain,life:1,vy:-1,
       col:s.rainbow?"#ff5b8a":s.gold?"#ffd23f":"#ff2bff",size:s.rainbow?36:s.gold?34:26});
     if(combo>1&&(combo<=3||combo%5===0)) addFloat({x:hx,y:hy-unit*0.6,txt:"x"+combo,life:1,vy:-1,
       col:combo>=8?"#ff2bff":combo>=5?"#ff5b8a":"#ffd23f",size:combo>=4?38:28});
@@ -203,7 +203,7 @@ function build_gumball(api){
       shards.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-rnd(1,4),s:rnd(unit*0.22,unit*0.46),
         col:pick(CANDY),rot:rnd(0,TAU),vr:rnd(-0.4,0.4),life:1,decay:rnd(0.01,0.018)});}
     spawnSparks(x,y,"#fff6c8",12);
-    floats.push({x,y:y-unit*1.5,txt:"にじいろ！",life:1.2,vy:-0.8,col:"#ff5b8a",size:36});
+    floats.push({x,y:Math.min(y-unit*1.5,ball.y-ball.r-unit*0.6),txt:"にじいろ！",life:1.2,vy:-0.8,col:"#ff5b8a",size:36});
     api.boom(0.6);api.shake(15);
     if(hsCd<=0){api.hitStop(4);hsCd=34;}   // 激レア=節目なのでヒットストップ(クールダウン付き)
     api.tone(784,0.12,"triangle",0.16);
@@ -406,7 +406,7 @@ function build_gumball(api){
           shards.push({x:rnd(0,W),y:-12,vx:rnd(-1,1),vy:rnd(2,4.5),s:rnd(unit*0.16,unit*0.3),
             col:pick(CANDY),rot:rnd(0,TAU),vr:rnd(-0.3,0.3),life:1,decay:0.008});
         if(fever<=0){ // 終了演出
-          floats.push({x:W/2,y:H*0.30,txt:"フィーバー おわり！",life:1,vy:-0.5,col:"#fff",size:24});
+          floats.push({x:W/2,y:H*0.37,txt:"フィーバー おわり！",life:1,vy:-0.5,col:"#fff",size:24});
           api.slide(784,392,0.35,0.16,"triangle");
         }
       }
@@ -604,8 +604,9 @@ function build_gumball(api){
       if(rbMsgT>0){rbMsgT-=0.016*dt;
         if(!paused){const a=clamp(rbMsgT*1.4,0,1),pop=1+Math.max(0,rbMsgT-1.1)*1.6;
         const col="hsl("+(((tsec*220)|0)%360)+",95%,64%)";
-        g.save();g.translate(W/2,H*0.2);g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";
-        g.font="900 40px 'Hiragino Maru Gothic ProN',system-ui";
+        g.save();g.translate(W*0.46,H*0.2);g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";   // 軸6: 太陽(W*0.72)に右端が食い込まないよう左へ
+        g.font="900 36px 'Hiragino Maru Gothic ProN',system-ui";
+        g.lineWidth=9;g.lineJoin="round";g.strokeStyle="rgba(60,0,60,.85)";g.strokeText("にじいろガムボール！",0,0);   // 軸6: 暗い縁取りで明るい空でも読める
         g.shadowColor=col;g.shadowBlur=20;g.fillStyle="#fff";
         g.fillText("にじいろガムボール！",0,0);
         g.shadowBlur=0;g.lineWidth=2.5;g.strokeStyle=col;g.strokeText("にじいろガムボール！",0,0);
@@ -724,7 +725,7 @@ function build_gumball(api){
     g.strokeStyle="rgba(255,255,255,.4)";g.lineWidth=1.5;roundRect(fx2,fy2,fw2,fh2,fh2/2);g.stroke();
     g.restore();g.textAlign="left";
     // コンボ表示(中央)
-    if(combo>1&&rbMsgT<=0&&feverBann<=0){   // 軸6: 大きいバナーが出ている間はコンボを引っ込める
+    if(combo>1&&rbMsgT<=0&&feverBann<=0&&clearT<=0&&endingT<=0){   // 軸6: 大きいバナーが出ている間はコンボを引っ込める
       const pop=1+Math.max(0,comboT-0.7)*1.2;
       g.save();g.translate(W/2,H*0.17);g.scale(pop,pop);g.textAlign="center";
       g.font="800 30px 'Hiragino Maru Gothic ProN',system-ui";

@@ -63,7 +63,7 @@ function buildBalloon(api){
       confetti.push({x:b.x,y:b.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-3,s:rnd(5,12),color:pick(COLORS),rot:rnd(0,TAU),vr:rnd(-0.6,0.6),life:1,decay:rnd(0.01,0.02)});}
     for(let k=16;k>0;k--){const a=rnd(0,TAU),s=rnd(3,9);
       sparks.push({x:b.x,y:b.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,decay:rnd(0.02,0.04),sz:rnd(3,6),col:"#fff"});}
-    floats.push({x:b.x,y:b.y-40,txt:"だいあたり ＋8",life:1,vy:-1.1,t:0,col:"#ffd23f",size:34});
+    floats.push({x:b.x,y:Math.max(b.y-40,api.H*0.64),txt:"だいあたり ＋8",life:1,vy:-1.1,t:0,col:"#ffd23f",size:34});
     if(targetLeft>0){targetLeft=Math.max(0,targetLeft-1);if(targetLeft<=0)clearStage();}
   }
   // ピティ用: 画面の中ほど(中央寄り)にふわっと現れる的カラーの丸ふうせん。下から上ってくるのを待たずに押せる(軸3向け)
@@ -448,7 +448,7 @@ function buildBalloon(api){
         const label="この いろを あと "+targetLeft+"こ！";
         const mt=g.measureText(label),tw=(mt&&mt.width)||label.length*10;
         const bw=tw+58,bh=34,px0=api.W/2-bw/2,py0=10;
-        roundRect(px0,py0,bw,bh,bh/2);g.fillStyle="rgba(40,60,100,.62)";g.fill();
+        roundRect(px0,py0,bw,bh,bh/2);g.fillStyle="rgba(40,60,100,.78)";g.fill();
         g.beginPath();g.arc(px0+24,py0+bh/2,11,0,TAU);g.fillStyle=target;g.shadowColor=target;g.shadowBlur=10;g.fill();g.shadowBlur=0;
         g.fillStyle="#fff";g.fillText(label,px0+44,py0+bh/2+1);g.restore();g.textAlign="left";g.textBaseline="alphabetic";
       }
@@ -475,7 +475,7 @@ function buildBalloon(api){
       // ① きょうのラッキー色 お知らせ(初回だけ・中央)
       if(luckyIntroT>0){luckyIntroT-=0.016*dt;
         const a=clamp(luckyIntroT*1.2,0,1),pop=1+Math.max(0,luckyIntroT-2.2)*1.5;
-        g.save();g.globalAlpha=a;g.translate(api.W/2,api.H*0.5);g.scale(pop,pop);
+        g.save();g.globalAlpha=a;g.translate(api.W/2,api.H*0.6);g.scale(pop,pop);
         g.font="900 26px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";g.textBaseline="middle";
         const txt="きょうの ラッキーいろは "+CNAME[COLORS.indexOf(luckyColor)]+"！";
         g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.4)";g.strokeText(txt,0,0);

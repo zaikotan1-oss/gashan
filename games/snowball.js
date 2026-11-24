@@ -63,7 +63,7 @@ function build_snowball(api){
     const r=U*(big?1.55:(tiny?0.72:1.05));
     // ② ラッキー旗: ふつう/でか砦には色つきの小旗を立てる(色さがしのヒント)
     // 軸7(壊す物のバラエティ): 見た目の形そのものを角丸四角/丸/つらら/だんご3段でランダムに変える
-    const shape=pick(["cube","round","tall","stack"]);
+    const shape=tiny?pick(["cube","round","stack"]):pick(["cube","round","tall","stack"]);   // ちびのつららは指より細いので出さない
     forts.push({x,y,r,hp:(gold||fever>0)?1:(big?2:1),maxhp:big?2:1,
       col:gold?"#ffd23f":pick(COLS),bob:rnd(0,TAU),wob:0,flash:0,big,tiny,gold,rainbow:false,
       flag:gold?null:pick(FLAGCOLS),shape});
@@ -127,7 +127,7 @@ function build_snowball(api){
   }
   // auto-aim + gravity-compensated shot: snap to the fort nearest to the tap
   // and solve the launch velocity so the ball passes exactly through it.
-  const MAGK=0.4;   // 最初の得点のあとの吸着の縁からの距離(U倍)
+  const MAGK=0.3;   // 最初の得点のあとの吸着の縁からの距離(U倍)
   function calcShot(tx,ty,p){
     let ax=tx, ay=ty, bd=1e9;
     // 軸3: 砦の「縁」からの距離で最寄りを選ぶ(小さい砦は狭く・大きい砦は広く吸着する)
@@ -329,7 +329,11 @@ function build_snowball(api){
         g.save(); g.globalCompositeOperation="lighter";
         for(let a2=0;a2<3;a2++){const cy=api.H*(0.16+a2*0.14);
           g.globalAlpha=0.2*(0.6+0.4*Math.sin(tsec*2+a2*1.3));
-          g.fillStyle=RAINBOW[(a2*2)%RAINBOW.length];
+          // 底が平らだと硬い横帯の縁が出るので、リボンごとに縦のフェード(上と下で透明)で塗る
+          const ac=RAINBOW[(a2*2)%RAINBOW.length], ar=parseInt(ac.slice(1,3),16), ag=parseInt(ac.slice(3,5),16), ab=parseInt(ac.slice(5,7),16);
+          const agr=g.createLinearGradient(0,cy-20,0,cy+70);
+          agr.addColorStop(0,"rgba("+ar+","+ag+","+ab+",0)"); agr.addColorStop(0.3,"rgba("+ar+","+ag+","+ab+",1)"); agr.addColorStop(1,"rgba("+ar+","+ag+","+ab+",0)");
+          g.fillStyle=agr;
           g.beginPath(); g.moveTo(0,cy);
           for(let x2=0;x2<=api.W;x2+=28)g.lineTo(x2,cy+Math.sin(x2*0.014+tsec*2.4+a2*2)*20);
           g.lineTo(api.W,cy+70); g.lineTo(0,cy+70); g.closePath(); g.fill();}
@@ -577,7 +581,7 @@ function build_snowball(api){
     const left=clamp(stageGoal-stageKill,0,stageGoal);
     const bw=Math.min(api.W*0.6,360),bh=16,bx=(api.W-bw)/2,by=api.H*0.05;
     g.save(); g.textAlign="center";
-    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
+    g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
     g.fillStyle="#fff"; g.shadowColor="rgba(0,0,0,.5)"; g.shadowBlur=6;
     g.fillText("ステージ "+stage+"      あと "+left+" こ",api.W/2,by-8);
     g.shadowBlur=0;
@@ -597,9 +601,9 @@ function build_snowball(api){
       lg2.addColorStop(0,"#ff7bd0"); lg2.addColorStop(0.5,"#ffd23f"); lg2.addColorStop(1,"#4db8ff");
       g.globalAlpha=blink;
       if(fr2>0){g.fillStyle=lg2; roundRect(gx,gy,Math.max(gh,gw*fr2),gh,gh/2); g.fill();}
-      g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui"; g.fillStyle="#ffd23f";
+      g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui"; g.fillStyle="#ffd23f";
       g.shadowColor="rgba(0,0,0,.5)"; g.shadowBlur=4;
-      g.fillText("フィーバー！ てんすう 2ばい",api.W/2,gy+gh+20);
+      g.fillText("フィーバー！ てんすう 2ばい",api.W/2,gy+gh+24);
       g.shadowBlur=0; g.globalAlpha=1;
     }else if(feverGauge>0){
       const lg2=g.createLinearGradient(gx,0,gx+gw,0);

@@ -141,7 +141,7 @@ function buildGlass(api){
     rings.push({x:cx0,y:cy0,r:pane.w*0.18,vr:9,life:1,col:t.glow,lw:6});
     rings.push({x:cx0,y:cy0,r:8,vr:6,life:1,col:"#ffffff",lw:4});
     floats.push({x:api.W/2,y:api.H*((isFinale||paneInStage+1>=PER_STAGE)?0.5:0.4),txt:rainbow?"にじいろ！":gold?"きんピカ！":"パリーン！",col:t.e,life:1,vy:-0.7,size:48,pop:0});
-    if(combo>=2)floats.push({x:api.W/2,y:api.H*0.4+40,txt:combo+"れんさ！",col:"#ffe27a",life:1,vy:-0.5,size:30,pop:0});
+    if(combo>=2)floats.push({x:api.W/2,y:api.H*0.4+((isFinale||paneInStage+1>=PER_STAGE)?10:40),txt:combo+"れんさ！",col:"#ffe27a",life:1,vy:-0.5,size:30,pop:0});
     // ① にじいろガラス撃破: 虹の輪が5色ぶわっと広がる大盤振る舞い(激レアの爽快ごほうび)
     if(rainbow){
       rbMsgT=1.4;
@@ -154,7 +154,7 @@ function buildGlass(api){
     if(isLucky){
       luckyMsgT=luckySeen?Math.max(luckyMsgT,0.7):1.6;luckySeen=true;
       burstSparks(cx0,pane.ty-8,8,6,pane.tint);
-      floats.push({x:api.W/2,y:api.H*0.4+80,txt:"ラッキー！",col:pane.tint.e,life:1,vy:-0.5,size:26,pop:0});
+      floats.push({x:api.W/2,y:((isFinale||paneInStage+1>=PER_STAGE)?api.H*0.5+70:api.H*0.4+80),txt:"ラッキー！",col:pane.tint.e,life:1,vy:-0.5,size:26,pop:0});
       api.tone(1046,0.12,"triangle",0.1);api.tone(1568,0.14,"triangle",0.08);
     }
     // スコア: 通常+1, コンボ/金/にじ/フィナーレ/ラッキーでボーナス

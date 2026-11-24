@@ -134,18 +134,18 @@ function drawBossHPBar(obj){
   const totHP=obj.sections.filter(s=>s.alive).reduce((s,sec)=>s+sec.hp,0);
   const ratio=totHP/totMax;
   ctx.save();
-  ctx.fillStyle='rgba(0,0,0,0.65)';ctx.fillRect(W*0.24,14,W*0.52,36);
-  ctx.fillStyle='#FFD700';ctx.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";ctx.textAlign='center';
+  ctx.fillStyle='rgba(0,0,0,0.65)';ctx.fillRect(W*0.24,14,W*0.52,40);
+  ctx.fillStyle='#FFD700';ctx.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";ctx.textAlign='center';
   ctx.lineWidth=4;ctx.lineJoin='round';ctx.strokeStyle='rgba(0,0,0,.6)';
   const bt='ボス: '+(BOSS_KANA[obj.bossType]||obj.bossName);
-  ctx.strokeText(bt,W/2,33);ctx.fillText(bt,W/2,33);
-  ctx.fillStyle='#222';ctx.fillRect(W*0.27,37,W*0.46,10);
+  ctx.strokeText(bt,W/2,37,W*0.48);ctx.fillText(bt,W/2,37,W*0.48);
+  ctx.fillStyle='#222';ctx.fillRect(W*0.27,41,W*0.46,10);
   const g=ctx.createLinearGradient(W*0.27,0,W*0.73,0);
   g.addColorStop(0,'#FF2200');g.addColorStop(0.5,'#FF8800');g.addColorStop(1,'#FFEE00');
-  ctx.fillStyle=g;ctx.fillRect(W*0.27,37,W*0.46*ratio,10);
+  ctx.fillStyle=g;ctx.fillRect(W*0.27,41,W*0.46*ratio,10);
   // Pulse when low
   if(ratio<0.3){ctx.globalAlpha=0.3+Math.abs(Math.sin(Date.now()*0.008))*0.4;
-    ctx.fillStyle='#FF0000';ctx.fillRect(W*0.27,37,W*0.46*ratio,10);}
+    ctx.fillStyle='#FF0000';ctx.fillRect(W*0.27,41,W*0.46*ratio,10);}
   ctx.restore();
 }
 function drawTokyoTower(obj,sx,gY){
@@ -1570,7 +1570,7 @@ function drawSnowman(obj){
   const sx=toS(obj.wx),gY=toSY(obj.groundY);if(sx>W+10||sx+obj.w<-10)return;
   const r=obj.hp/obj.maxHp,cx=sx+obj.w/2;
   ctx.save();ctx.globalAlpha=0.92+r*0.08;ctx.translate(obj.shakeDx,0);
-  [[0,20,24],[0,-13,18],[0,-36,12]].forEach(([dx,dy,rad])=>{ctx.fillStyle='#F0F8FF';ctx.beginPath();ctx.arc(cx+dx,gY+dy-16,rad,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#B0C8D8';ctx.lineWidth=1.5;ctx.stroke();});
+  [[0,20,24],[0,-13,18],[0,-36,12]].forEach(([dx,dy,rad])=>{ctx.fillStyle='#F0F8FF';ctx.beginPath();ctx.arc(cx+dx,gY+dy-16,rad,0,Math.PI*2);ctx.fill();ctx.strokeStyle='rgba(20,10,0,.55)';ctx.lineWidth=2.5;ctx.stroke();});
   ctx.fillStyle='#333';[-24,-14,-4].forEach(dy=>{ctx.beginPath();ctx.arc(cx,gY+dy-16,2.5,0,Math.PI*2);ctx.fill();});
   ctx.beginPath();ctx.arc(cx-5,gY-50,2.5,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(cx+5,gY-50,2.5,0,Math.PI*2);ctx.fill();
   ctx.fillStyle='#FF6600';ctx.beginPath();ctx.moveTo(cx,gY-47);ctx.lineTo(cx+10,gY-46);ctx.lineTo(cx,gY-44);ctx.closePath();ctx.fill();
@@ -1588,6 +1588,7 @@ function drawRocket(obj){
   const mg=ctx.createLinearGradient(cx-bw,gY-obj.h,cx+bw,gY-obj.h);
   mg.addColorStop(0,'#888');mg.addColorStop(0.3,'#EEE');mg.addColorStop(0.7,'#CCC');mg.addColorStop(1,'#666');
   ctx.fillStyle=mg;ctx.beginPath();ctx.roundRect(cx-bw,gY-obj.h*0.9,bw*2,obj.h*0.65,6);ctx.fill();
+  ctx.strokeStyle='rgba(20,10,0,.55)';ctx.lineWidth=2.5;ctx.stroke();
   // 先端コーン
   const cg=ctx.createLinearGradient(cx-bw,gY-obj.h*0.95,cx+bw,gY-obj.h*0.95);
   cg.addColorStop(0,'#CC1111');cg.addColorStop(0.4,'#FF3333');cg.addColorStop(1,'#AA0000');
@@ -1803,7 +1804,7 @@ function drawMegaBuilding(obj){
     ctx.fillStyle=sec.col;
     ctx.fillRect(sx+sec.shakeDx,sec.drawTopY,obj.w,sec.h);
     // Thin border for depth
-    ctx.strokeStyle='rgba(0,0,0,0.28)';ctx.lineWidth=1;
+    ctx.strokeStyle='rgba(20,10,0,.55)';ctx.lineWidth=2.5;
     ctx.strokeRect(sx+sec.shakeDx,sec.drawTopY,obj.w,sec.h);
     // Crack line when damaged
     if(r<0.55){
@@ -2129,13 +2130,13 @@ function initScene(keepScore){
     const cx=W/2;
     // 上部中央: ステージ + 目的地までのゲージ
     const stName=(STAGES[currentStage]&&STAGES[currentStage].name)||'';
-    ctx.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";ctx.textAlign='center';
+    ctx.font="800 20px 'Hiragino Maru Gothic ProN',system-ui";ctx.textAlign='center';
     ctx.lineWidth=5;ctx.lineJoin='round';ctx.strokeStyle='rgba(10,25,45,.65)';
     const head='ステージ '+(currentStage+1)+' / 5';
     if(!bossHudShown){   // ボス帯が出ている間は見出し+ゲージを消して2段以内にする
-    ctx.strokeText(head,cx,26);ctx.fillStyle='#fff';ctx.fillText(head,cx,26);
+    ctx.strokeText(head,cx,28);ctx.fillStyle='#fff';ctx.fillText(head,cx,28);
     // 進行ゲージ
-    const gw=Math.min(W*0.5,240),gx=cx-gw/2,gy=34;
+    const gw=Math.min(W*0.5,240),gx=cx-gw/2,gy=37;
     const sx0=STAGE_X[currentStage],slen=(STAGES[currentStage]&&STAGES[currentStage].len)||1;
     const prog=clamp((exWorldX-sx0)/slen,0,1);
     ctx.fillStyle='rgba(10,25,45,.45)';rrect(gx,gy,gw,7,3.5);ctx.fill();
@@ -2143,7 +2144,7 @@ function initScene(keepScore){
     }
     // コンボ(ボスHPバー表示中はその下(132px)へずらして重ならないようにする)
     if(comboCount>=2){
-      const comboY=bossHudShown?62:72;
+      const comboY=bossHudShown?84:72;
       ctx.font="900 22px 'Hiragino Maru Gothic ProN',system-ui";
       ctx.lineWidth=6;ctx.strokeStyle='rgba(255,255,255,.88)';   // 白縁: 桃色の雲の上でも読める
       const ct='コンボ x'+comboCount;
@@ -2160,11 +2161,11 @@ function initScene(keepScore){
       else{pg.addColorStop(0,'#ff6600');pg.addColorStop(1,'#ffd23f');}
       ctx.fillStyle=pg;rrect(px,py,pw*power,12,6);ctx.fill();
     }
-    ctx.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";ctx.textAlign='center';
+    ctx.font="800 20px 'Hiragino Maru Gothic ProN',system-ui";ctx.textAlign='center';
     ctx.lineWidth=4;ctx.strokeStyle='rgba(0,0,0,.55)';
     const plabel=feverActive?'フィーバー！ てんすう 3ばい':'パワー';
-    ctx.strokeText(plabel,cx,py-9);
-    ctx.fillStyle=feverActive?'#ffe14a':'#fff';ctx.fillText(plabel,cx,py-9);
+    ctx.strokeText(plabel,cx,py-10);
+    ctx.fillStyle=feverActive?'#ffe14a':'#fff';ctx.fillText(plabel,cx,py-10);
     // クリア バナー
     if(clearMsg._show){
       const t=clamp(stageClearTimer/160,0,1),pop=1+0.12*Math.sin(now01*9);

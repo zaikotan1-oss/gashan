@@ -55,7 +55,7 @@ function build_gummy(api){
   function pickKind(){
     // ① にじいろグミ: ステージ1から出る激レア(約14分の1)。いつ出るか分からない=ドキドキ発見。序盤から大小混在を体感させる。
     if(Math.random()<0.07)return "rainbow";
-    // ジャンボ: ステージ1から出る常設バリエーション。同じ形のまま1.6倍サイズ・HP1(すぐ壊れる)で「大小混在」を作る
+    // ジャンボ: ステージ1から出る常設バリエーション。同じ形のまま1.4倍サイズ・HP1(すぐ壊れる)で「大小混在」を作る
     if(Math.random()<0.08)return "jumbo";
     const bag=["gum","gum","donut","cookie"]; // ①stage1から丸(gum)一辺倒にしない: 輪っか(donut)とひび割れ円盤(cookie)を最初から混ぜる
     if(stage>=2)bag.push("jelly");          // hard jelly: 2 taps
@@ -79,7 +79,7 @@ function build_gummy(api){
     else if(kind==="gold"){color="#ffd23f";life=dur*0.6;size=0.7;} // 小さく速い
     else if(kind==="rainbow"){color=pick(GUM);life=dur*0.8;} // 色は毎フレーム虹色に切り替わる(update側)
     else if(kind==="cookie"){color="#e8b979";}
-    else if(kind==="jumbo"){color=pick(GUM);size=1.6;}       // 見た目は同じ形のまま特大サイズ・1発で壊れる
+    else if(kind==="jumbo"){color=pick(GUM);size=1.4;}       // 見た目は同じ形のまま特大サイズ・1発で壊れる
     moles.push({hi,x:holes[hi].x,baseY:holes[hi].y,up:0,state:"rise",
       kind,color,hp,life,squash:1,blink:0,bob:rnd(0,TAU),flash:0,wob:rnd(0,TAU),size});
     // にじいろグミ 出現の「きらーん」予告音(ドキドキ)
@@ -121,7 +121,7 @@ function build_gummy(api){
   // ② ラッキー色 命中: 頭上に小さな星のキラッ＋ちいさな祝福(気づけるヒント)
   function luckyStar(hx,hy){
     api.tone(1046,0.14,"triangle",0.11);api.tone(1568,0.16,"triangle",0.08);
-    floats.push({x:hx,y:hy,txt:"ラッキー！",life:1,vy:-0.9,col:luckyColor,size:24});
+    floats.push({x:hx,y:hy,txt:"ラッキー！",life:1,vy:-0.9,col:luckyColor,size:24,plate:true});
     for(let i=0;i<8;i++){const a=rnd(-TAU*0.5,0),s=rnd(2,5);
       sparks.push({x:hx,y:hy,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1.5,len:rnd(5,10),life:1,decay:rnd(0.05,0.08)});}
   }
@@ -455,9 +455,12 @@ function build_gummy(api){
       if(celebrate>0)celebrate=Math.max(0,celebrate-0.02*dt);
       // ---- floating combo numbers ----
       for(const f of floats){f.y+=f.vy*dt;f.life-=0.02*dt;
-        g.save();g.globalAlpha=Math.max(0,f.life);
+        g.save();g.globalAlpha=Math.max(0,Math.min(1,f.life*2)); // 残り半分までは はっきり見せ、最後だけ すっと消える
         g.font="900 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-        g.lineWidth=6;g.strokeStyle="rgba(120,40,90,.5)";g.strokeText(f.txt,f.x,f.y);
+        if(f.plate){ // 淡い空でも黄色/みずいろが読めるよう、文字の下に濃い色の背板
+          const tw=g.measureText(f.txt).width+f.size*0.8,th=f.size*1.3;
+          g.fillStyle="rgba(60,15,45,.55)";rr(f.x-tw/2,f.y-f.size*0.98,tw,th,th/2);g.fill();}
+        g.lineJoin="round";g.lineWidth=8;g.strokeStyle="rgba(60,15,45,.9)";g.strokeText(f.txt,f.x,f.y);
         g.fillStyle=f.col;g.fillText(f.txt,f.x,f.y);g.restore();}
       g.textAlign="left";floats=floats.filter(f=>f.life>0);
       // ---- impact flash (color bloom) ----

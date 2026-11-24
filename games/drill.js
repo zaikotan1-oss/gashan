@@ -434,7 +434,7 @@ function buildDrill(api){
       if(za>zoneShown){
         // ③ パーフェクトチェイン: 前のゾーンで コンボx5 まで繋げていたら +40 & 祝福(気づくと得する仕掛け)
         if(zoneChain){count+=40;api.setScore(count);
-          floats.push({x:api.W/2,y:api.H*0.62,txt:"パーフェクトチェイン！ ＋40",col:"#8affb0",life:1,vy:-0.9,size:28});
+          floats.push({x:api.W/2,y:(za>=ZONES.length-1&&!cleared)?api.H*0.78:api.H*0.62,txt:"パーフェクトチェイン！ ＋40",col:"#8affb0",life:1,vy:-0.9,size:28});
           api.tone(1318,0.16,"triangle",0.11);api.tone(1976,0.18,"triangle",0.07);
           for(let k=0;k<16;k++){const a=rnd(0,TAU),s=rnd(3,8);
             glints.push({x:api.W/2,y:drillY,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1,life:1,decay:0.02,size:rnd(6,12),col:"#c7ffcf"});}}
@@ -442,10 +442,9 @@ function buildDrill(api){
         zoneShown=za;stage=zi;
         if(za>=ZONES.length-1 && !cleared){
           cleared=true;
-          showBanner("クリア！おたから はっけん！","#ffd23f","ぜんぶ ほりきった！");banner.chest=true;
+          showBanner("クリア！おたから はっけん！","#ffd23f","ぜんぶ ほりきった！ ごほうび +100");banner.chest=true;
           // 軸5: 一周目クリアの記念ごほうび(二周目からは出さない=もう一回ほる楽しみ)
           count+=100;api.setScore(count);
-          floats.push({x:api.W/2,y:api.H*0.6,txt:"ぜんぶ ほった！ ごほうび +100",col:"#ffd23f",life:1,vy:-0.9,size:28});
           api.boom(0.65);api.shake(20);api.hitStop(5);
           api.slide(520,1320,0.5,0.3,"triangle");api.tone(1046,0.5,"sine",0.18);
           for(let k=0;k<60;k++){const a=rnd(0,TAU),s=rnd(4,14);
@@ -644,7 +643,7 @@ function buildDrill(api){
     const b=banner;const a=Math.min(1,b.life*1.6);
     const pop=b.t<0.25?ease(b.t/0.25):1; // quick pop-in
     const sc=0.6+0.4*pop+0.02*Math.sin(now/120);
-    g.save();g.globalAlpha=a;g.translate(api.W/2,api.H*0.42);g.scale(sc,sc);
+    g.save();g.globalAlpha=a;g.translate(api.W/2,b.chest?api.H*0.66:api.H*0.42);g.scale(sc,sc);
     g.textAlign="center";g.textBaseline="middle";
     g.font="900 40px 'Hiragino Maru Gothic ProN',system-ui";
     g.lineWidth=11;g.strokeStyle="rgba(0,0,0,.75)";g.strokeText(b.txt,0,0);

@@ -84,7 +84,7 @@ function buildDino(api){
     // 咆哮ファンファーレ
     api.tone(523,0.16,"triangle",0.25);api.tone(784,0.2,"triangle",0.22);api.tone(1046,0.24,"triangle",0.18);
     if(last){
-      finaleT=1;grow=1.0;banner={txt:"ぜんぶ こわした！ キングきょうりゅう！",sub:"もっと あそべるよ！",life:1,t:delayed?-20:0,big:true};
+      finaleT=1;grow=1.0;banner={txt:"ぜんぶ こわした！ キングきょうりゅう！",sub:"もっと あそべるよ！",life:1,t:delayed?-64:0,big:true};
       // 全画面紙吹雪を sparks で大量噴出
       for(let k=0;k<60;k++){const a=rnd(0,TAU),sp=rnd(3,12);sparks.push({x:cx,y:groundY-api.H*0.3,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-4,life:1,decay:rnd(0.012,0.025),hue:rnd(0,60)});}
       wash=1;washHue=46;
@@ -93,7 +93,7 @@ function buildDino(api){
       stage++;
       grow=Math.min(0.8,(grow||0)+0.16); // ステージごとに恐竜が少しずつ大きく
       stageHits=0;stageGoal=stageGoalFor(stage);
-      banner={txt:"ステージ クリア！",sub:"つぎは「"+stageDef().name+"」",life:1,t:delayed?-20:0,big:false};
+      banner={txt:"ステージ クリア！",sub:"つぎは「"+stageDef().name+"」",life:1,t:delayed?-64:0,big:false};
       wash=1;washHue=stage>=3?28:48;
     }
     comboKept=true; // 次ステージのノンストップ判定をリセット
@@ -195,7 +195,7 @@ function buildDino(api){
       sweepDir=o.x<cx?-1:1;o.hp=1;smash(o,true);n++;}
     api.setScore(count);
     for(let k=0;k<50;k++){const a=rnd(0,TAU),sp=rnd(5,14);sparks.push({x:cx,y:groundY-api.H*0.2,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-3,life:1,decay:rnd(0.015,0.03),hue:rnd(0,50)});}
-    if(stageHits>=stageGoal&&!banner)nextStage(true); // ブレス文字とクリアバナーが同時に出ないよう約0.3秒遅らせる
+    if(stageHits>=stageGoal&&!banner)nextStage(true); // ブレス文字とクリアバナーが同時に出ないよう約1秒遅らせる(ブレス文字が消えてから出す)
   }
   reset();
   return{
@@ -388,7 +388,7 @@ function buildDino(api){
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";g.shadowBlur=0;if(rbMsgT<0)rbMsgT=0;}
       // ② きょうのラッキー色 はっけん！ 中央の小ヒント(初回だけ・下側でクリア文字と重ねない)
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
-        g.save();g.translate(api.W/2,api.H*0.40);g.textAlign="center";g.textBaseline="middle";
+        g.save();g.translate(api.W/2,api.H*0.47);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 26px 'Hiragino Maru Gothic ProN',system-ui";
         const t2="きょうのラッキーいろは "+(COLNAME[luckyColor]||"")+"！";
         // 文字は読みやすい生成り色＋黒い丸背板。色名は左の丸(luckyColor)で示す(青空に青文字が埋もれない)

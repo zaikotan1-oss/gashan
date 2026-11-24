@@ -182,7 +182,7 @@ function buildCandyshoot(api){
       floats.push({x:t.x,y:fy,txt:"ゴールド！＋"+gain,life:1,vy:-0.9,col:"#ffd23f",size:34});fy-=34;
     }
     if(t.kind==="rainbow"){
-      rainbowBurst(t.x,t.y+t.dy);rbMsgT=1.5;
+      rainbowBurst(t.x,t.y+t.dy);rbMsgT=(feverT<=0&&fever+0.07>=1)?0.8:1.5;   // フィーバーと同時なら虹バナーは短く
       floats.push({x:t.x,y:fy,txt:"にじいろ！＋"+gain,life:1,vy:-0.9,col:"#ff6fae",size:38});fy-=34;
     }
     if(t.lucky){
@@ -212,11 +212,15 @@ function buildCandyshoot(api){
   }
   function startFever(){
     luckyMsgT=0;                      // フィーバー帯を優先(同じ高さのラッキー帯を消す)
+    // すでに出ている浮き文字(ゴールド！/にじいろ！等)をフィーバー文字の下へ逃がして重ねない
+    const feverBase=(clearT>0||endingT>0)?api.H*0.27:api.H*0.3;
+    const escY=(clearT>0||endingT>0)?api.H*0.62:api.H*0.40;
+    for(const f of floats){if(f.y>api.H*0.2&&f.y<api.H*0.44)f.y=escY;}
     feverT=10;fever=1;flash=1;flashHue="#ff7bb8";
     api.boom(0.7);api.shake(16);api.slide(220,1760,0.5,0.22,"square");
     [0,4,7,12,16].forEach((s,i)=>setTimeout(()=>api.tone(523*Math.pow(2,s/12),0.14,"triangle",0.12),i*60));
-    floats.push({x:api.W/2,y:api.H*0.3,txt:"フィーバー！！",life:1,vy:-0.3,col:"#ff2bff",size:46});
-    floats.push({x:api.W/2,y:api.H*0.3+44,txt:"とくてん 2ばい！",life:1,vy:-0.3,col:"#fff",size:28});
+    floats.push({x:api.W/2,y:feverBase,txt:"フィーバー！！",life:1,vy:-0.3,col:"#ff2bff",size:46,fv:0});
+    floats.push({x:api.W/2,y:feverBase+40,txt:"とくてん 2ばい！",life:1,vy:-0.3,col:"#fff",size:28,fv:40});
     for(let i=0;i<16;i++){const a=rnd(0,TAU),s2=rnd(3,9);
       shards.push({x:api.W/2,y:api.H*0.35,vx:Math.cos(a)*s2,vy:Math.sin(a)*s2-2,r:rnd(4,8),
         rot:rnd(0,TAU),vr:rnd(-0.3,0.3),life:1,decay:0.012,col:"hsl("+rint(0,360)+",95%,65%)",shape:rint(0,2)});}
@@ -238,7 +242,11 @@ function buildCandyshoot(api){
     }else{
       clearStage=stage;clearT=1.6;celebrate=1;flash=0.7;flashHue=sky()[3];
       // クリア文字の帯(画面の34〜56%)に重なる浮き文字は帯の上へ逃がす
-      for(const f of floats){if(f.y>api.H*0.30&&f.y<api.H*0.58)f.y=api.H*0.28;}
+      // (フィーバー文字は帯の上へ寄せ、ほかの浮き文字は帯の上へ縦に積んで逃がす=重ならない)
+      const fvUp=floats.some(f=>f.fv!==undefined);
+      const mv=floats.filter(f=>f.fv===undefined&&f.y>api.H*0.30&&f.y<api.H*0.58).sort((a,b)=>b.y-a.y);
+      mv.forEach((f,k)=>{f.y=(fvUp?api.H*0.19:api.H*0.28)-Math.min(k,fvUp?1:3)*30;});
+      for(const f of floats){if(f.fv!==undefined&&f.y>api.H*0.24)f.y=api.H*0.27+f.fv;}
       api.boom(0.5);api.shake(12);api.slide(523,784,0.3,0.2,"triangle");
       api.tone(660,0.25,"triangle",0.14);api.tone(988,0.3,"triangle",0.1);
       for(let i=0;i<22;i++){const a=rnd(0,TAU),s=rnd(3,9);

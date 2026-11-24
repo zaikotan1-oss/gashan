@@ -47,7 +47,7 @@ function buildChain(api){
     const balloon=!rainbow&&!crystal&&!block&&Math.random()<0.12;
     // bias spawns toward the お題色 so the goal is always reachable
     const col=(Math.random()<0.4)?targetCol:pick(COLORS);
-    orbs.push({x:rnd(r*2,api.W-r*2),y:rnd(api.H*0.16,api.H*0.9),
+    orbs.push({x:rnd(r*2,api.W-r*2),y:rnd(api.H*0.16,api.H*0.86),
       vx:rnd(-1,1)*orbSpeed,vy:rnd(-1,1)*orbSpeed,r,color:col,rainbow,crystal,block,balloon,dent:0,big,conn:false,pulse:rnd(0,TAU),
       spin:rnd(0,TAU),spinv:rnd(-0.04,0.04),born:0,sq:0});
   }
@@ -186,7 +186,9 @@ function buildChain(api){
     // big-chain extra punch (no hitStop here, detonate already added a small one)
     if(n>=6){api.boom(clamp(0.4+n*0.03,0.4,0.7));}
     if(n>=2){floats=floats.filter(f=>f.tag!=="chain");floats.push({tag:"chain",x:api.W/2,y:api.H*0.46,txt:n+"れんさ！"+(bonus?" +"+bonus:"")+((isTarget&&!(clearAnim<=0&&stageScore>=stageTarget))?" おだいクリア!":""),
-      col:isTarget?"#ffe27a":n>=8?"#ff3b3b":n>=4?"#ff8c42":"#ffd23f",life:1,vy:-0.3,size:isTarget?44:n>=6?52:38,born:0});}
+      col:isTarget?"#ffe27a":n>=8?"#ff3b3b":n>=4?"#ff8c42":"#ffd23f",
+      // 軸6: おだい色そろえ以外は字を白で塗り、色は光(shadow)だけで伝える=青緑の空の上でもくすまない
+      fill:isTarget?undefined:"#ffffff",life:1,vy:-0.3,size:isTarget?44:n>=6?52:38,born:0});}
     // ③ 軸3(c) maxQuietSec対策: 大きいチェインを割った直後で場が薄くなったときだけ、
     // spawnGapのタイマーを待たずに即補充する(判定半径・得点係数はそのまま)。
     // 「大きく減った直後だけ無音区間を切る」効果に絞るため、閾値を割った時だけ動く。
@@ -363,7 +365,7 @@ function buildChain(api){
         if(o.born<1)o.born=Math.min(1,o.born+0.08*dt);
         if(o.sq>0)o.sq=Math.max(0,o.sq-0.06*dt);
         if(o.x<o.r){o.x=o.r;o.vx*=-1;}if(o.x>api.W-o.r){o.x=api.W-o.r;o.vx*=-1;}
-        if(o.y<api.H*0.12+o.r){o.y=api.H*0.12+o.r;o.vy*=-1;}if(o.y>api.H-o.r){o.y=api.H-o.r;o.vy*=-1;}}
+        if(o.y<api.H*0.12+o.r){o.y=api.H*0.12+o.r;o.vy*=-1;}if(o.y>api.H-o.r-44){o.y=api.H-o.r-44;o.vy*=-1;}}   // 軸6: 下のヒント帯の裏にオーブが潜らない
       // (③ 歯ごたえ) 長押しだけでの自動連結はやめた。つなぐのは input の "move" で
       // 指が実際に未接続オーブへ触れたときだけ(上の input() 参照)。
       // draw bolts (additive glow)
@@ -472,7 +474,7 @@ function buildChain(api){
       }
       // floats
       for(const f of floats){if(f.born<1)f.born=Math.min(1,f.born+0.12*dt);
-        f.y+=f.vy*dt;f.life-=0.014*dt;g.globalAlpha=Math.min(1,Math.max(0,f.life*2.2));
+        f.y+=f.vy*dt;f.life-=0.014*dt;g.globalAlpha=Math.min(1,Math.max(0,f.life*4));
         const sc=ease?ease(f.born):f.born;const fs=f.size*(0.6+0.4*sc);
         g.save();g.translate(f.x,f.y);g.scale(1,1);
         g.font="800 "+fs+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
@@ -548,6 +550,8 @@ function buildChain(api){
       g.arc(o.x,o.y,pr,0,TAU);
     }
     g.fill();
+    // 軸6: 明るい地平線の帯の上でも輪郭で背景から浮くよう、暗いふちを1本入れる
+    g.lineWidth=Math.max(2,pr*0.14);g.strokeStyle="rgba(10,6,28,.55)";g.stroke();
     // にじいろオーブ: まわりを7色の光の弧が回る(激レアの合図)
     if(o.rainbow){g.save();g.globalCompositeOperation="lighter";g.lineWidth=Math.max(1.5,pr*0.12);
       for(let k=0;k<COLORS.length;k++){g.strokeStyle=COLORS[k];g.globalAlpha=0.6;
@@ -629,6 +633,7 @@ function buildChain(api){
     bg.addColorStop(0.55,dispCol);
     bg.addColorStop(1,darkenC(dispCol));
     g.fillStyle=bg;g.fill();
+    g.lineWidth=Math.max(2,pr*0.14);g.strokeStyle="rgba(10,6,28,.55)";g.stroke();
     g.lineWidth=Math.max(1,pr*0.08);g.strokeStyle="rgba(255,255,255,"+(lit?0.6:0.35)+")";g.stroke();
     // facet lines
     g.globalAlpha=0.4;g.strokeStyle="rgba(255,255,255,.8)";g.lineWidth=Math.max(1,pr*0.05);
@@ -668,6 +673,7 @@ function buildChain(api){
     g.fillStyle=bg;g.beginPath();
     if(g.roundRect)g.roundRect(-half,-half,half*2,half*2,Math.max(0,half*0.18));else g.rect(-half,-half,half*2,half*2);
     g.fill();
+    g.lineWidth=Math.max(2,pr*0.14);g.strokeStyle="rgba(10,6,28,.55)";g.stroke();
     g.lineWidth=Math.max(1,pr*0.08);g.strokeStyle="rgba(255,255,255,"+(lit?0.6:0.35)+")";g.stroke();
     // 板の継ぎ目 + 斜めの補強材(木箱らしさ)
     g.globalAlpha=0.4;g.strokeStyle="rgba(0,0,0,.35)";g.lineWidth=Math.max(1,pr*0.06);
@@ -702,6 +708,7 @@ function buildChain(api){
     bg.addColorStop(0.55,dispCol);
     bg.addColorStop(1,darkenC(dispCol));
     g.fillStyle=bg;g.beginPath();g.ellipse(0,0,rw,rh,0,0,TAU);g.fill();
+    g.lineWidth=Math.max(2,pr*0.14);g.strokeStyle="rgba(10,6,28,.55)";g.stroke();
     g.lineWidth=Math.max(1,pr*0.07);g.strokeStyle="rgba(255,255,255,"+(lit?0.6:0.4)+")";g.stroke();
     // むすび目(下)としっぽ(ふうせんらしさ・生き物らしさの目印)
     g.fillStyle=darkenC(dispCol);g.beginPath();

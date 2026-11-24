@@ -251,7 +251,7 @@ function buildDomino(api){
     api.slide(base,base*1.5,0.18,0.16,"triangle");
     api.tone(base*2,0.2,"sine",0.14);
     floats=floats.filter(f=>f.txt!=="おおれんさ！"&&f.txt!=="だいばくはつ！");
-    floats.push({x:api.W/2,y:api.H*0.3,txt:c>=10?"だいばくはつ！":"おおれんさ！",col:c>=10?"#ff3b3b":"#ff8c42",life:1.3,vy:-0.6,size:c>=10?64:52,pop:0});
+    floats.push({x:api.W/2,y:api.H*0.5,txt:c>=10?"だいばくはつ！":"おおれんさ！",col:c>=10?"#ff3b3b":"#ff8c42",life:1.3,vy:-0.6,size:c>=10?64:52,pop:0});
     // bonus bombs rain down (collapse back into the board for a positive loop)
     const n=c>=10?3:2;
     for(let i=0;i<n;i++){
@@ -478,7 +478,7 @@ function buildDomino(api){
       // end of chain -> show count
       const active=pending.length>0||bombs.some(b=>b.state==="lit");
       if(!active&&chain>0){
-        if(chain>=2)floats.push({x:api.W/2,y:api.H*0.4,txt:chain+"れんさ！",col:chain>=10?"#ff3b3b":chain>=5?"#ff8c42":"#ffd23f",life:1,vy:-0.7,size:chain>=8?56:42,pop:0});
+        if(chain>=2)floats.push({x:api.W/2,y:api.H*0.62,txt:chain+"れんさ！",col:chain>=10?"#ff3b3b":chain>=5?"#ff8c42":"#ffd23f",life:1,vy:-0.7,size:chain>=8?56:42,pop:0});
         chain=0;
       }
       // stage clear: all bombs cleared during this stage (and none mid-flight)
@@ -608,7 +608,7 @@ function buildDomino(api){
     g.save();g.globalAlpha=clamp(p*3,0,1)*0.5;g.fillStyle="rgba(10,8,18,1)";g.fillRect(0,0,api.W,api.H);g.restore();
     // title
     const pop=Math.min(1,p*4),sc=0.6+0.4*ease(pop);
-    g.save();g.translate(cx,cy-api.H*0.12);g.scale(sc,sc);g.textAlign="center";
+    g.save();g.translate(cx,api.H*0.2);g.scale(sc,sc);g.textAlign="center";
     const col=allClear?"#ffe27a":"#9bff9b";
     g.font="900 "+clamp(api.W*0.12,46,84)+"px 'Hiragino Maru Gothic ProN',system-ui";
     g.save();g.globalCompositeOperation="lighter";g.globalAlpha=0.5;g.shadowColor=col;g.shadowBlur=28;

@@ -49,9 +49,9 @@ function buildWrecking(api){
     o.born=0;
     let fresh=0;for(const f of floats)if((f.born||0)<12)fresh++;
     if(fresh>0){                       // すでに出ている“同じ噴出”の下へ小さく積む
-      o.y=Math.max(o.y,api.H*0.30)+fresh*20;
+      o.y=Math.max(o.y,api.H*0.30)+fresh*(o.big?34:20);
       o.x=lerp(o.x,api.W/2,0.55);
-      o.size=Math.max(16,Math.min(o.size,26)*0.82);
+      if(!o.big)o.size=Math.max(16,Math.min(o.size,26)*0.82);
       o.vy=-0.4;
     }
     floats[floats.length]=o;
@@ -333,7 +333,7 @@ function buildWrecking(api){
     if(!info)return;
     const bonus=info[1];count+=bonus;api.setScore(count);
     celebrate=Math.max(celebrate,2.4);flash=1;flashHue=info[2];
-    pushFloat({x:api.W/2,y:api.H*0.30,txt:"とっておき！",life:1.6,vy:-0.4,col:"#fff",size:40});
+    pushFloat({x:api.W/2,y:api.H*0.30,txt:"とっておき！",life:1.6,vy:-0.4,col:"#fff",size:40,big:true});
     pushFloat({x:api.W/2,y:api.H*0.30+46,txt:info[0]+" さいご！ +"+bonus,life:1.4,vy:-0.3,col:info[2],size:24});
     for(let k=0;k<9;k++)spark(api.W/2,api.H*0.34,COLORS[k%COLORS.length],4,9);
     api.boom(0.6);api.shake(20);tryHitStop(3);
@@ -644,7 +644,7 @@ function buildWrecking(api){
     setTimeout(()=>{
       count+=bonus;api.setScore(count);rec(n);
       const txt=n>=18?"パーフェクト！":n>=10?"だいせいこう！":"ドッカーン！";
-      pushFloat({x:api.W/2,y:api.H*0.66,txt:txt,life:1.2,vy:-0.5,col:n>=18?"#ff2bff":n>=10?"#ffe14a":"#ff8a3a",size:n>=18?44:36});
+      pushFloat({x:api.W/2,y:api.H*0.66,txt:txt,life:1.2,vy:-0.5,col:n>=18?"#ff2bff":n>=10?"#ffe14a":"#ff8a3a",size:n>=18?44:36,big:true});
       pushFloat({x:api.W/2,y:api.H*0.66+42,txt:"+"+bonus,life:1.1,vy:-0.4,col:"#fff",size:24});
       if(n>=10){celebrate=Math.max(celebrate,2.2);api.boom(0.6);}
     },all.length*16+200);
@@ -737,7 +737,10 @@ function buildWrecking(api){
       sg.addColorStop(0,"rgba(220,240,255,.5)");sg.addColorStop(0.35,"rgba(180,210,255,.16)");sg.addColorStop(1,"rgba(180,210,255,0)");
       g.fillStyle=sg;g.fillRect(0,0,api.W,groundY);
       g.globalCompositeOperation="lighter";
-      g.fillStyle="rgba(245,250,255,.9)";g.beginPath();g.arc(sx,sy,S*0.5,0,TAU);g.fill();
+      {const mr=Math.max(0,S*0.5);let mg=g.createRadialGradient(sx-mr*0.25,sy-mr*0.25,0,sx,sy,mr);
+        mg.addColorStop(0,"#fff");mg.addColorStop(1,"#cfe3ff");g.fillStyle=mg;g.beginPath();g.arc(sx,sy,mr,0,TAU);g.fill();
+        g.globalCompositeOperation="source-over";g.fillStyle="rgba(160,180,220,.35)";
+        [[-0.25,0.15,0.2],[0.2,-0.2,0.14],[0.18,0.3,0.1]].forEach(c=>{g.beginPath();g.arc(sx+mr*c[0],sy+mr*c[1],Math.max(0,mr*c[2]),0,TAU);g.fill();});}
       g.globalCompositeOperation="source-over";
       // twinkle stars (color-shifting) ※新要素追加ぶん アンビエントを間引いて総量一定に（22→16）/ 画像背景には星があるので描かない
       if(!imgBg) for(let i=0;i<16;i++){const px=((i*89+17)%100)/100*api.W,py=((i*53+9)%100)/100*groundY*0.7;
@@ -793,14 +796,14 @@ function buildWrecking(api){
       const hud=th.name+"  ステージ "+stage;
       g.strokeText(hud,api.W/2,26);g.fillStyle="#fff";g.fillText(hud,api.W/2,26);
       // 2段目: さいこう記録 と かくれ星ピップを 1行に まとめて中央そろえ（縦積みを解消）
-      {g.font="800 13px 'Hiragino Maru Gothic ProN',system-ui";
+      {g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
         const rt=bestBurst>0?("さいこう "+bestBurst+"こ"):"";
         const rtw=rt?g.measureText(rt).width:0;
-        const pipGap=17,pipsW=starCount>0?STAR_GOAL*pipGap:0;
-        const mid=(rt&&pipsW)?16:0,total=rtw+mid+pipsW;let cx=api.W/2-total/2;const yy=46;
+        const pipGap=22,pipsW=starCount>0?STAR_GOAL*pipGap:0;
+        const mid=(rt&&pipsW)?16:0,total=rtw+mid+pipsW;let cx=api.W/2-total/2;const yy=50;
         if(rt){g.textAlign="left";g.strokeText(rt,cx,yy);g.fillStyle="#ffe14a";g.fillText(rt,cx,yy);cx+=rtw+mid;}
         if(starCount>0){const filled=starCount%STAR_GOAL===0?STAR_GOAL:starCount%STAR_GOAL;
-          for(let i=0;i<STAR_GOAL;i++){g.save();g.translate(cx+i*pipGap+8,yy-4);starPath(6);
+          for(let i=0;i<STAR_GOAL;i++){g.save();g.translate(cx+i*pipGap+10,yy-6);starPath(9);
             if(i<filled){g.fillStyle="#ffe14a";g.fill();g.lineWidth=1.4;g.strokeStyle="#a8730a";g.stroke();}
             else{g.fillStyle="rgba(255,255,255,.16)";g.fill();}
             g.restore();}}}
@@ -961,7 +964,13 @@ function buildWrecking(api){
         if(clearTxt.indexOf("まち")>=0)drawTally(ba);}
     }
   };
-  function baseShadow(x,y,s){g.fillStyle="rgba(0,0,0,.3)";g.fillRect(x+3,y+4,s,s);}
+  // 影は物の形にそろえる(四角い箱が丸い物の後ろに見えない): cube/crate/ice=四角 rock=多角形 tire=接地だ円 face/toy/cake=まるい四角
+  function baseShadow(x,y,s,mode){g.fillStyle="rgba(0,0,0,.3)";
+    if(mode==="rock"){g.beginPath();g.moveTo(x+s*0.15+3,y+s*0.1+4);g.lineTo(x+s*0.85+3,y+s*0.06+4);g.lineTo(x+s*0.97+3,y+s*0.5+4);
+      g.lineTo(x+s*0.8+3,y+s*0.95+4);g.lineTo(x+s*0.2+3,y+s*0.92+4);g.lineTo(x+s*0.04+3,y+s*0.45+4);g.closePath();g.fill();}
+    else if(mode==="tire"){g.beginPath();g.ellipse(x+s*0.5,y+s*0.95,Math.max(0,s*0.42),Math.max(0,s*0.1),0,0,TAU);g.fill();}
+    else if(mode==="rr"){rrect(x+4,y+5,s-2,s-2,s*0.2);g.fill();}
+    else g.fillRect(x+3,y+4,s,s);}
   // 既存のカラフルなキューブ（つみき系の土台にも流用）
   function drawCube(b){const x=b.x,y=b.y,s=S;
     baseShadow(x,y,s);
@@ -983,7 +992,7 @@ function buildWrecking(api){
     g.fillStyle="rgba(0,0,0,.3)";const r=Math.max(2,s*0.05);
     [[x+s*0.2,y+s*0.2],[x+s*0.8,y+s*0.2],[x+s*0.2,y+s*0.8],[x+s*0.8,y+s*0.8]].forEach(p=>{g.beginPath();g.arc(p[0],p[1],r,0,TAU);g.fill();});}
   // いわ: ごつごつした不定形＋面のかげ＋斑点（灰色）
-  function drawRock(b){const x=b.x,y=b.y,s=S;baseShadow(x,y,s);
+  function drawRock(b){const x=b.x,y=b.y,s=S;baseShadow(x,y,s,"rock");
     let bg=g.createLinearGradient(x,y,x+s,y+s);
     bg.addColorStop(0,shade(b.color,28));bg.addColorStop(1,shade(b.color,-40));g.fillStyle=bg;
     g.beginPath();g.moveTo(x+s*0.15,y+s*0.1);g.lineTo(x+s*0.85,y+s*0.06);g.lineTo(x+s*0.97,y+s*0.5);
@@ -1010,7 +1019,7 @@ function buildWrecking(api){
     g.fillStyle="rgba(60,40,15,.7)";const nr=Math.max(1.5,s*0.05);
     [[x+s*0.14,y+s*0.14],[x+s*0.86,y+s*0.14],[x+s*0.14,y+s*0.86],[x+s*0.86,y+s*0.86]].forEach(p=>{g.beginPath();g.arc(p[0],p[1],nr,0,TAU);g.fill();});}
   // タイヤ: 黒いドーナツ＋トレッド＋銀のハブ
-  function drawTire(b){const x=b.x,y=b.y,s=S,cx=x+s/2,cy=y+s/2;baseShadow(x,y,s);
+  function drawTire(b){const x=b.x,y=b.y,s=S,cx=x+s/2,cy=y+s/2;baseShadow(x,y,s,"tire");
     g.fillStyle="#23262e";g.beginPath();g.arc(cx,cy,s*0.46,0,TAU);g.fill();
     g.strokeStyle="#0f1116";g.lineWidth=Math.max(2,s*0.09);g.beginPath();g.arc(cx,cy,s*0.4,0,TAU);g.stroke();
     g.strokeStyle="#3a3f48";g.lineWidth=Math.max(1,s*0.04);
@@ -1019,7 +1028,7 @@ function buildWrecking(api){
     g.fillStyle="#6f7580";g.beginPath();g.arc(cx,cy,s*0.09,0,TAU);g.fill();
     g.save();g.globalCompositeOperation="lighter";g.fillStyle="rgba(255,255,255,.2)";g.beginPath();g.arc(cx-s*0.14,cy-s*0.14,s*0.1,0,TAU);g.fill();g.restore();}
   // かお: まるいキューブに目・ほっぺ・口。react中は目をまるく口をおどろきに。
-  function drawFace(b){const x=b.x,y=b.y,s=S,cx=x+s/2,cy=y+s/2,react=b.react||0;baseShadow(x,y,s);
+  function drawFace(b){const x=b.x,y=b.y,s=S,cx=x+s/2,cy=y+s/2,react=b.react||0;baseShadow(x,y,s,"rr");
     let bg=g.createLinearGradient(x,y,x,y+s);bg.addColorStop(0,shade(b.color,35));bg.addColorStop(1,shade(b.color,-20));
     g.fillStyle=bg;rrect(x+1,y+1,s-2,s-2,s*0.22);g.fill();
     g.fillStyle="rgba(255,120,150,.5)";
@@ -1031,7 +1040,7 @@ function buildWrecking(api){
     if(react>0.3){g.beginPath();g.arc(cx,cy+s*0.22,s*0.1,0,TAU);g.fill();}
     else{g.beginPath();g.arc(cx,cy+s*0.14,s*0.14,0.15*Math.PI,0.85*Math.PI);g.stroke();}}
   // ケーキ: スポンジ＋クリーム＋フロスティング＋さくらんぼ＋トッピング
-  function drawCake(b){const x=b.x,y=b.y,s=S;baseShadow(x,y,s);
+  function drawCake(b){const x=b.x,y=b.y,s=S;baseShadow(x,y,s,"rr");
     let bg=g.createLinearGradient(x,y,x,y+s);bg.addColorStop(0,shade(b.color,20));bg.addColorStop(1,shade(b.color,-18));
     g.fillStyle=bg;g.fillRect(x,y+s*0.34,s,s*0.66);
     g.fillStyle="#f6c9a0";g.fillRect(x,y+s*0.56,s,s*0.05);
@@ -1042,7 +1051,7 @@ function buildWrecking(api){
     const dc=["#36c9ff","#ffd23f","#3fffb0","#b066ff"];
     for(let i=0;i<3;i++){g.fillStyle=dc[i];g.fillRect(x+s*(0.24+0.2*i),y+s*0.37,s*0.09,s*0.03);}}
   // つみき: ふちどりキューブに丸/星のスタンプ（文字は使わない）
-  function drawToy(b){const x=b.x,y=b.y,s=S,cx=x+s/2,cy=y+s/2;baseShadow(x,y,s);
+  function drawToy(b){const x=b.x,y=b.y,s=S,cx=x+s/2,cy=y+s/2;baseShadow(x,y,s,"rr");
     let bg=g.createLinearGradient(x,y,x,y+s);bg.addColorStop(0,shade(b.color,30));bg.addColorStop(1,shade(b.color,-22));
     g.fillStyle=bg;rrect(x+1,y+1,s-2,s-2,s*0.14);g.fill();
     g.fillStyle="rgba(255,255,255,.35)";rrect(x+s*0.16,y+s*0.16,s*0.68,s*0.68,s*0.1);g.fill();
@@ -1287,8 +1296,8 @@ function buildWrecking(api){
       else{g.beginPath();g.arc(0,0,10,0,TAU);g.fill();}
       g.restore();
       g.globalAlpha=a*(lit?1:0.4);g.fillStyle=lit?"#fff":"#9a9ab0";
-      g.font="800 12px 'Hiragino Maru Gothic ProN',system-ui";
-      g.fillText(labs[i]+(lit?" "+vals[i]:""),x,yy+28);}
+      g.font="800 15px 'Hiragino Maru Gothic ProN',system-ui";
+      g.fillText(labs[i]+(lit?" "+vals[i]:""),x,yy+32);}
     g.restore();g.shadowBlur=0;g.globalAlpha=1;g.globalCompositeOperation="source-over";g.textAlign="left";g.lineJoin="miter";
   }
   function rrect(x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);
@@ -1319,8 +1328,8 @@ function buildWrecking(api){
       // glossy top sheen
       g.save();rrect(x,y,fw,h,h/2);g.clip();g.fillStyle="rgba(255,255,255,.3)";
       g.fillRect(x,y+1,fw,h*0.35);g.restore();}
-    g.font="800 14px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-    g.lineWidth=4;g.lineJoin="round";g.strokeStyle="rgba(20,12,40,.6)";
+    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
+    g.lineWidth=5;g.lineJoin="round";g.strokeStyle="rgba(20,12,40,.6)";
     const label=armed?"MAX！ タップで ぜんかい":"パワー";
     g.save();if(armed){g.shadowBlur=10+5*Math.sin(tsec*8);g.shadowColor="#ffd23f";}
     g.strokeText(label,api.W/2,y-7);g.fillStyle=armed?"#fff":"#fff5d6";g.fillText(label,api.W/2,y-7);g.restore();

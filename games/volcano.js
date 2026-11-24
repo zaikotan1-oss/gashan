@@ -558,7 +558,7 @@ function buildVolcano(api){
       g.fillStyle=pg;roundRect(barX+1,uy-3,(pw-2)*frac,6,3);g.fill();}
     // れんさゲージ (combo) — 中央下段。軸6(見やすさ): コンボが無い間は描かず、常時HUDを「ステージ+進捗バー」の1段だけにして情報量を減らす
     const cw=130,cgx=api.W/2-cw/2,cy=50,cgy=cy+10;
-    if(combo>0){
+    if(combo>0&&!boss){
       const cmax=8,cf=clamp(combo/cmax,0,1);
       g.textAlign="center";g.font="800 13px 'Hiragino Maru Gothic ProN',system-ui";
       g.lineWidth=3.5;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText("れんさ",api.W/2,cy);

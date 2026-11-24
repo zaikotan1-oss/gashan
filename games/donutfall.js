@@ -171,18 +171,20 @@ function build_donutfall(api){
   }
   // B: フィーバータイム突入(10秒: 的が大量+全部1発+点2倍+虹色空)
   function startFever(){
+    luckyMsgT=0; // ラッキー色バナーと文字が重ならないよう消す
     fever=10;feverGauge=1;
     flash=1;flashHue="#ffd23f";
     api.boom(0.7);api.shake(18);
     api.slide(392,1568,0.5,0.3,"sawtooth");
     [0,4,7,12,16].forEach((semi,i)=>setTimeout(()=>api.tone(523*Math.pow(2,semi/12),0.2,"triangle",0.13),i*80));
-    floats.push({x:api.W/2,y:api.H*0.35,txt:"フィーバー タイム！",life:1.2,vy:-0.4,col:"#ff2bcf",size:44});
+    floats.push({x:api.W/2,y:api.H*0.40,txt:"フィーバー タイム！",life:1.2,vy:-0.15,col:"#ff2bcf",size:44});
     tryHitStop(4);
     for(let i=0;i<4;i++){spawn();sweets[sweets.length-1].y-=i*R*2.2;} // お菓子の雨スタート
     spawnT=6;
   }
   function checkStage(){
     if(stageKill<stageGoal||clearT>0)return;
+    floats=floats.filter(f=>f.txt!=="フィーバー タイム！"); // クリアの黒帯の下に文字を残さない
     clearStage=stage;clearT=1.6;flash=0.7;flashHue="#fff6c8";
     api.boom(0.5);api.shake(12);
     api.slide(523,784,0.3,0.2,"triangle");api.tone(660,0.25,"triangle",0.14);api.tone(988,0.3,"triangle",0.1);
@@ -222,7 +224,7 @@ function build_donutfall(api){
     api.boom(combo>=5?0.55:0.4);api.shake(6+Math.min(combo,8));
     if(s.type==="cake"){api.tone(1046,0.18,"triangle",0.14);api.tone(1318,0.2,"triangle",0.1);}
     if(combo>=3){flash=Math.min(1,0.45+combo*0.05);flashHue=s.col;tryHitStop(combo>=6?4:3);api.tone(220,0.2,"sawtooth",0.07);}
-    if(combo>1)floats.push({x:px,y:py-R*0.6,txt:"x"+combo,life:1,vy:-1.1,
+    if(combo>=5)floats.push({x:px,y:py-R*0.6,txt:"x"+combo,life:1,vy:-1.1,
       col:combo>=8?"#ff2bcf":combo>=5?"#ff5b8a":"#ffd23f",size:combo>=5?40:30});
     if(s.type==="gold")goldBurst(px,py);
     else if(s.type==="rainbow")rainbowBurst(px,py);
@@ -420,7 +422,7 @@ function build_donutfall(api){
         const pop=1+Math.max(0,luckyMsgT-1)*1.2;
         g.save();g.translate(api.W/2,api.H*0.29);g.scale(pop,pop);g.textAlign="center";
         g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 24px 'Hiragino Maru Gothic ProN',system-ui";
-        const t2="きょうのラッキー色は "+(COLNAME[luckyColor]||"")+"！";
+        const t2="きょうの ラッキーいろは "+(COLNAME[luckyColor]||"")+"！";
         g.shadowColor=luckyColor;g.shadowBlur=12;g.fillStyle="#fff";g.fillText(t2,0,0);
         g.shadowBlur=0;g.lineWidth=1.5;g.strokeStyle=luckyColor;g.strokeText(t2,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";if(luckyMsgT<0)luckyMsgT=0;}

@@ -2,6 +2,7 @@ function buildRobot(api){
   const g=api.g;
   api.preload(["bg.jpg","robot.png"]);   // 画像アセット(無ければ従来の手描きにフォールバック)。足(foot)は生成不良のため手描きのまま
   let imgRobot=false,robotImgS=0;        // 今フレーム、画像ロボを描いたか / その描画サイズ(踏み足の付け根を絵の腰に合わせる)
+  let forceFull=false;  // 倒れる/飛ぶ描画中は つぶれ(squash)を無視して全体を描く
   let hsCD=0;      // hitStop cooldown (節目限定・30f以上あける)
   function tryHitStop(f){if(hsCD<=0){api.hitStop(f);hsCD=32;}}
   let builds=[],feet=[],waves=[],dust=[],shards=[],floats=[],sparks=[],flash=0,timeT=0;
@@ -48,24 +49,27 @@ function buildRobot(api){
     let type="normal",hp=1,big=false,w=slotW*0.74,h=rnd(api.H*0.1,api.H*0.26*grow);
     // special building types appear from stage 2; rarer = juicier
     // 軸7: 四角いビル系(normal/tough/chain/gold/rainbow)が全ステージで約半分以下になるよう、帯をステージ別に割り当てる。
-    // 累積の境目 [rainbow, gold, tough, chain, tank, bus, stack, small, bigTank]（残りが normal）
-    const T=s>=3?[0.035,0.12,0.19,0.24,0.36,0.45,0.53,0.64,0.76]
-           :s>=2?[0.035,0.12,0.20,0.20,0.34,0.44,0.52,0.64,0.74]
-           :[0,0.10,0.10,0.10,0.36,0.44,0.50,0.62,0.62];
+    // 累積の境目 [rainbow, gold, tough, chain, tank, bus, stack, small, bigTank, house, rocket]（残りが normal=約0.25以下）
+    // ロケットはステージ3以降で増える=「新しい物が来た」変化(1・2面はちょっとだけ)
+    const T=s>=3?[0.035,0.09,0.15,0.19,0.29,0.37,0.43,0.52,0.57,0.67,0.78]
+           :s>=2?[0.035,0.10,0.17,0.22,0.32,0.40,0.46,0.56,0.62,0.72,0.78]
+           :[0,0.06,0.06,0.06,0.16,0.24,0.30,0.40,0.46,0.68,0.74];
     const r=Math.random();
     if(r<T[0]){type="rainbow";}        // ① 激レア にじいろビル: ステージ2以降ときどきだけ。踏むと虹の大盤振る舞い
     else if(r<T[1]){type="gold";}      // high-value sparkler (also in stage 1 for early sparkle)
     else if(r<T[2]){type="tough";hp=2;}  // needs 2 stomps
     else if(r<T[3]){type="chain";}       // tall, triggers chain collapse
     else if(r<T[4]){type="tank";w=slotW*0.5;h=rnd(api.H*0.14,api.H*0.20);}                    // 丸い給水タンク(小さめ・円形)
-    else if(r<T[5]){type="bus";w=slotW*1.5;h=rnd(api.H*0.07,api.H*0.09);}                     // 横長のバス(低い・幅広)
+    else if(r<T[5]){type="bus";w=slotW*1.25;h=rnd(api.H*0.07,api.H*0.09);}                     // 横長のバス(低い・幅広)
     else if(r<T[6]){type="stack";hp=3;w=slotW*0.62;h=rnd(api.H*0.16,api.H*0.24*grow);}        // 積みコンテナ(3段・上から1段ずつ崩れる)
     else if(r<T[7]){type="small";w=slotW*0.35;h=rnd(api.H*0.08,api.H*0.12);}                  // 小さな木箱(小型オブジェクト)
-    else if(r<T[8]){type="tank";big=true;w=slotW*0.62;h=rnd(api.H*0.16,api.H*0.22);}          // 大きい丸タンク(drawTankBody を再利用・色違い)
+    else if(r<T[8]){type="tank";big=true;w=slotW*0.62;h=rnd(api.H*0.26,api.H*0.30);}          // 大きいサイロ(丸屋根＋はしご・小さい給水タンクより背が高い)
+    else if(r<T[9]){type="house";w=slotW*0.62;h=rnd(api.H*0.10,api.H*0.15);}                  // おうち(三角屋根＋えんとつ・屋根だけポーンと飛ぶ)
+    else if(r<T[10]){type="rocket";w=slotW*0.32;h=rnd(api.H*0.24,api.H*0.30);}                // ロケット(細長い・ヒューンと飛んでいく)
     // 四角いビル系は幅をそろえない(細い・太いが混ざる)。slotW は超えない
     if(type==="normal"||type==="tough"||type==="chain"||type==="gold"||type==="rainbow")w=slotW*rnd(0.6,0.9);
-    const color=type==="gold"?"#ffd23f":type==="tank"?(big?pick(["#cfd8e6","#f2c98a","#a9d8b8","#f0a8a0"]):"#cfd8e6"):pick(COLORS);
-    return{x:(i+0.5)*slotW,w,baseH:h,h,color,state:"up",squash:1,respawnT:0,seed:rint(0,999),type,hp};
+    const color=type==="gold"?"#ffd23f":type==="tank"?(big?pick(["#cfd8e6","#e0563a","#3a8ee6","#43b97f"]):pick(["#cfd8e6","#f2c98a","#a9d8b8"])):pick(COLORS);
+    return{x:(i+0.5)*slotW,w,baseH:h,h,color,state:"up",squash:1,respawnT:0,seed:rint(0,999),type,hp,big,launchStart:null,tiltStart:null,tiltDir:1,bounceStart:null};
   }
   function reset(){builds=[];feet=[];waves=[];dust=[];shards=[];floats=[];sparks=[];flash=0;timeT=0;count=0;combo=0;comboT=0;comboMax=0;bodyBob=0;scoreShown=0;comboBar=0;hudPop=0;colorWash=0;clouds=[];
     stage=1;stageDone=0;stageNeed=stageQuota(1);stageBanner="";stageBannerT=0;finale=0;finaleT=0;rampage=0;rampageT=0;rampagePulse=0;
@@ -151,7 +155,7 @@ function buildRobot(api){
     else if(b.type==="stack")gain=3;     // 3段がんばった分のボーナス
     if(perfect)gain=Math.round(gain*2.4);   // 軸3: 通常命中とPERFECTの差をはっきりさせる(2倍→2.4倍。整数得点を保つためRound)
     // ② きょうのラッキー色: ふつう/でかビル/れんさビル/バス/木箱が今日の秘密の色なら +1 の隠しボーナス
-    const isLucky=(b.type==="normal"||b.type==="tough"||b.type==="chain"||b.type==="small"||b.type==="bus")&&b.color===luckyColor;
+    const isLucky=(b.type==="normal"||b.type==="tough"||b.type==="chain"||b.type==="small"||b.type==="bus"||b.type==="house")&&b.color===luckyColor;
     if(isLucky){gain+=1;if(!luckySeen){luckyMsgT=1.8;luckySeen=true;}}  // 初回だけ中央上で教える
     count+=gain;api.setScore(count);
     combo++;comboT=rampage?1.4:0.9;bodyBob=rampage?16:10;hudPop=1;
@@ -184,6 +188,19 @@ function buildRobot(api){
       b.bounceStart=timeT;
       for(let k=0;k<6;k++)shards.push({x:b.x+rnd(-b.w/2,b.w/2),y:groundY-rnd(2,10),vx:rnd(-9,9),vy:rnd(-5,-1),s:rnd(b.w*0.08,b.w*0.14),color:shade(b.color,-0.15),rot:rnd(0,TAU),vr:rnd(-0.6,0.6),life:1,decay:rnd(0.012,0.02)});
       addFloat({x:b.x,y:groundY-b.h-30,txt:"ベコッ！",life:0.8,vy:-1,col:"#ffd9a0",size:24,pop:1.4});
+    }else if(b.type==="house"){
+      // おうち: 屋根だけが三角のまま高く回りながらポーンと飛ぶ
+      shards.push({x:b.x,y:groundY-b.h*0.85,vx:rnd(-3,3),vy:rnd(-16,-11),s:b.w*0.8,color:shade(b.color,-0.3),rot:0,vr:rnd(-0.4,0.4),shape:"tri",life:1,decay:0.007});
+      for(let k=0;k<3;k++)shards.push({x:b.x+rnd(-b.w*0.3,b.w*0.3),y:groundY-b.h*0.8,vx:rnd(-6,6),vy:rnd(-14,-8),s:rnd(b.w*0.12,b.w*0.2),color:shade(b.color,-0.3),rot:rnd(0,TAU),vr:rnd(-0.5,0.5),shape:"tri",life:1,decay:rnd(0.01,0.016)});
+      addFloat({x:b.x,y:groundY-b.h-30,txt:"ポーン！",life:0.9,vy:-1,col:"#ffe9a8",size:26,pop:1.5});
+    }else if(b.type==="rocket"){
+      // ロケット: そのまま上へ飛んでいく(描画側で y を上げる)
+      b.launchStart=timeT;
+      for(let k=0;k<8;k++)sparks.push({x:b.x+rnd(-b.w*0.3,b.w*0.3),y:groundY-rnd(0,10),vx:rnd(-2.5,2.5),vy:rnd(1,4),life:1,decay:rnd(0.02,0.035),col:k%2?"#ffb347":"#fff4c2",r:rnd(2,4.5)});
+      addFloat({x:b.x,y:groundY-b.h-30,txt:"ヒューン！",life:0.9,vy:-1.6,col:"#bfe8ff",size:26,pop:1.5});
+    }else if(b.type==="chain"){
+      // れんさビル: 根元を軸に ぐらっと倒れる(描画側で回す)
+      b.tiltStart=timeT;b.tiltDir=Math.random()<0.5?-1:1;
     }
     if(perfect){
       api.tone(1320,0.1,"square",0.2);api.slide(700,1400,0.18,0.14,"sine");
@@ -378,6 +395,7 @@ function buildRobot(api){
         p.life-=p.decay*dt;g.save();g.globalAlpha=Math.max(0,p.life);g.translate(p.x,p.y);g.rotate(p.rot);
         g.fillStyle=p.color;
         if(p.shape==="circle"){g.beginPath();g.arc(0,0,Math.max(0,p.s/2),0,TAU);g.fill();}
+        else if(p.shape==="tri"){g.beginPath();g.moveTo(0,-p.s*0.45);g.lineTo(p.s*0.6,p.s*0.35);g.lineTo(-p.s*0.6,p.s*0.35);g.closePath();g.fill();g.lineWidth=2;g.strokeStyle="rgba(0,0,0,.4)";g.stroke();}
         else{g.fillRect(-p.s/2,-p.s/2,p.s,p.s);}
         g.restore();}
       shards=shards.filter(p=>p.life>0);
@@ -596,9 +614,29 @@ function buildRobot(api){
     g.fillStyle="#586474";roundRect(f.tx-fw/2,f.y,fw,fh*0.4,8);g.fill();
     g.fillStyle="#2c3340";for(let i=0;i<3;i++)g.fillRect(f.tx-fw*0.36+i*fw*0.28,f.y+fh*0.55,fw*0.16,fh*0.3);
   }
+  function rubble(b){g.fillStyle="#7a6a5a";g.fillRect(b.x-b.w/2,groundY-6,b.w,6);}
   function drawBuild(b){
+    if(b.state==="flat"){
+      if(b.type==="chain"&&b.tiltStart!=null){
+        // 根元を軸に倒れて、横たわったら すっと消える(隣を倒す「れんさ」が絵でも見える)
+        const t=timeT-b.tiltStart,p=clamp(t/0.3,0,1);
+        if(t>=0.75){rubble(b);return;}
+        g.save();g.globalAlpha=1-clamp((t-0.3)/0.45,0,1);
+        g.translate(b.x,groundY);g.rotate(b.tiltDir*ease(p)*Math.PI*0.48);g.translate(-b.x,-groundY);
+        forceFull=true;drawBuildInner(b);forceFull=false;g.restore();rubble(b);return;
+      }
+      if(b.type==="rocket"&&b.launchStart!=null){
+        const t=timeT-b.launchStart;
+        if(t>=1.4){rubble(b);return;}
+        g.save();g.translate(0,-(t*t*api.H*1.4+t*api.H*0.2));
+        forceFull=true;drawBuildInner(b);forceFull=false;g.restore();rubble(b);return;
+      }
+    }
+    drawBuildInner(b);
+  }
+  function drawBuildInner(b){
     // バス(前後に潰れて跳ねる)は「壊れた後もしばらく描画時にバウンドさせる」ため、squashを描画専用に上書きする
-    let squashDraw=b.squash;
+    let squashDraw=forceFull?1:b.squash;
     if(b.type==="bus"&&b.state==="flat"){
       const t=Math.max(0,timeT-(b.bounceStart||0));
       const bounce=Math.exp(-t*3.5)*Math.abs(Math.sin(t*16));
@@ -613,6 +651,8 @@ function buildRobot(api){
     else if(b.type==="bus"){drawBusBody(b,x,y,w,h);}
     else if(b.type==="stack"){drawStackBody(b,x,y,w,h);}
     else if(b.type==="small"){drawCrateBody(b,x,y,w,h);}
+    else if(b.type==="house"){drawHouseBody(b,x,y,w,h);}
+    else if(b.type==="rocket"){drawRocketBody(b,x,y,w,h);}
     else{
       // --- 従来の四角いビル(normal/gold/tough/chain/rainbow) ---
       g.fillStyle="rgba(0,0,0,.22)";g.fillRect(x+4,y+4,w,h);
@@ -629,16 +669,28 @@ function buildRobot(api){
       // rooftop trim
       g.fillStyle=shade(b.color,-0.25);g.fillRect(x,y,w,Math.min(5,h*0.1));
       // windows (lit ones glow)
-      const cols=3,rows=Math.max(1,Math.floor(h/22));
+      const cols=(b.seed%2?3:2),rows=Math.max(1,Math.floor(h/22));
       for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
         const on=((b.seed>>((r*cols+c)%16))&1);
-        const wx=x+w*(0.16+c*0.28),wy=y+10+r*22*squashDraw,ww=w*0.16,wh=Math.min(12,h*0.25);
+        const wx=cols===3?x+w*(0.16+c*0.28):x+w*(0.2+c*0.4),wy=y+10+r*22*squashDraw,ww=cols===3?w*0.16:w*0.22,wh=Math.min(12,h*0.25);
         if(on){g.shadowColor="rgba(255,225,140,.9)";g.shadowBlur=6;g.fillStyle="rgba(255,236,150,.92)";}
         else{g.shadowBlur=0;g.fillStyle="rgba(0,0,0,.28)";}
         g.fillRect(wx,wy,ww,wh);
       }
       g.shadowBlur=0;
       g.strokeStyle="rgba(0,0,0,.32)";g.lineWidth=3;g.strokeRect(x,y,w,h);
+      // 屋根のかたち(seed で4通り: アンテナ/給水タンク/三角屋根/平ら)。れんさ・にじいろは目印があるので足さない
+      if(b.state!=="flat"&&(b.type==="normal"||b.type==="tough"||b.type==="gold")){
+        const k=b.seed%4,cx0=x+w/2;
+        g.lineWidth=2;g.strokeStyle="rgba(0,0,0,.45)";
+        if(k===0){g.beginPath();g.moveTo(cx0,y);g.lineTo(cx0,y-20);g.stroke();
+          g.fillStyle="#ff6b6b";g.beginPath();g.arc(cx0,y-22,4,0,TAU);g.fill();g.stroke();}
+        else if(k===1){const tw2=w*0.34,th2=14;
+          g.beginPath();g.moveTo(cx0-tw2*0.35,y);g.lineTo(cx0-tw2*0.35,y-4);g.moveTo(cx0+tw2*0.35,y);g.lineTo(cx0+tw2*0.35,y-4);g.stroke();
+          g.fillStyle="#cfd8e6";g.fillRect(cx0-tw2/2,y-4-th2,tw2,th2);g.strokeRect(cx0-tw2/2,y-4-th2,tw2,th2);
+          g.fillStyle="#e8eef6";g.beginPath();g.ellipse(cx0,y-4-th2,tw2/2,3,0,0,TAU);g.fill();g.stroke();}
+        else if(k===2){g.fillStyle=shade(b.color,-0.3);g.beginPath();g.moveTo(x-3,y);g.lineTo(cx0,y-w*0.3);g.lineTo(x+w+3,y);g.closePath();g.fill();g.stroke();}
+      }
     }
     // --- special-type decoration ---
     if(b.type==="gold"){
@@ -671,6 +723,7 @@ function buildRobot(api){
   }
   // --- 軸7: 丸い給水タンク(g.arc/ellipseで胴を描く。四角いビルとはっきり違う輪郭) ---
   function drawTankBody(b,x,y,w,h){
+    if(b.big){drawSiloBody(b,x,y,w,h);return;}
     const cx=b.x,rx=Math.max(0,w/2),ry=Math.max(1,Math.min(rx*0.5,h*0.22));
     const bodyTop=y+ry,bodyBot=Math.max(bodyTop,groundY-ry*0.5);
     // legs
@@ -690,6 +743,58 @@ function buildRobot(api){
     g.strokeStyle="rgba(0,0,0,.22)";g.lineWidth=2;
     g.beginPath();g.ellipse(cx,y+h*0.55,rx,Math.max(0,ry*0.85),0,0,TAU);g.stroke();
     g.beginPath();g.moveTo(x,bodyTop);g.lineTo(x,bodyBot);g.moveTo(x+w,bodyTop);g.lineTo(x+w,bodyBot);g.stroke();
+  }
+  // --- 軸7: 大きいサイロ(丸い屋根＋はしご＋太い帯。小さい給水タンクと大小差を出す) ---
+  function drawSiloBody(b,x,y,w,h){
+    const cx=b.x,rx=Math.max(0,w/2),domeH=Math.max(1,Math.min(rx*0.8,h*0.22)),bodyTop=y+domeH,baseRy=Math.max(1,Math.min(rx*0.25,6));
+    g.fillStyle="rgba(0,0,0,.2)";g.beginPath();g.ellipse(cx+3,groundY-1,rx,Math.max(0,baseRy*0.6),0,0,TAU);g.fill();
+    let bg=g.createLinearGradient(x,y,x+w,y);
+    bg.addColorStop(0,shade(b.color,0.18));bg.addColorStop(0.5,b.color);bg.addColorStop(1,shade(b.color,-0.25));
+    g.fillStyle=bg;g.shadowColor="rgba(0,0,0,.4)";g.shadowBlur=6;
+    g.beginPath();g.moveTo(x,groundY-baseRy);g.lineTo(x,bodyTop);g.ellipse(cx,bodyTop,rx,domeH,0,Math.PI,0);g.lineTo(x+w,groundY-baseRy);g.ellipse(cx,groundY-baseRy,rx,baseRy,0,0,Math.PI);g.closePath();g.fill();
+    g.shadowBlur=0;
+    g.fillStyle="rgba(255,255,255,.2)";g.fillRect(x+w*0.1,bodyTop,w*0.14,Math.max(0,h-domeH-baseRy));
+    g.strokeStyle="rgba(0,0,0,.28)";g.lineWidth=2;
+    for(let i=1;i<=3;i++){const by=bodyTop+(h-domeH-baseRy)*i/4;g.beginPath();g.moveTo(x,by);g.lineTo(x+w,by);g.stroke();}
+    const lx=x+w*0.72;g.strokeStyle="rgba(40,44,54,.8)";g.lineWidth=2;
+    g.beginPath();g.moveTo(lx,bodyTop);g.lineTo(lx,groundY-baseRy);g.moveTo(lx+w*0.12,bodyTop);g.lineTo(lx+w*0.12,groundY-baseRy);
+    for(let yy=bodyTop+6;yy<groundY-baseRy-2;yy+=9){g.moveTo(lx,yy);g.lineTo(lx+w*0.12,yy);}
+    g.stroke();
+    g.fillStyle="#5a6678";g.fillRect(cx-2,y-5,4,7);
+    g.strokeStyle="rgba(0,0,0,.3)";g.beginPath();g.moveTo(x,bodyTop);g.lineTo(x,groundY-baseRy);g.moveTo(x+w,bodyTop);g.lineTo(x+w,groundY-baseRy);g.stroke();
+  }
+  // --- 軸7: おうち(四角い本体＋三角屋根＋えんとつ＋ドア。屋根は壊れると飛んでいくので、つぶれた後は描かない) ---
+  function drawHouseBody(b,x,y,w,h){
+    const flat=b.state==="flat",roofH=flat?0:h*0.38,bodyY=y+roofH,bodyH=h-roofH,cx=b.x;
+    g.fillStyle="rgba(0,0,0,.22)";g.fillRect(x+3,bodyY+3,w,bodyH);
+    let bg=g.createLinearGradient(x,bodyY,x+w,bodyY);
+    bg.addColorStop(0,shade(b.color,0.14));bg.addColorStop(0.5,b.color);bg.addColorStop(1,shade(b.color,-0.2));
+    g.fillStyle=bg;g.shadowColor="rgba(0,0,0,.4)";g.shadowBlur=6;g.fillRect(x,bodyY,w,bodyH);g.shadowBlur=0;
+    g.strokeStyle="rgba(0,0,0,.4)";g.lineWidth=2.5;g.strokeRect(x,bodyY,w,bodyH);
+    if(flat)return;
+    g.fillStyle="#8a5a4a";g.fillRect(x+w*0.68,y+roofH*0.1,w*0.14,roofH*0.7);g.strokeRect(x+w*0.68,y+roofH*0.1,w*0.14,roofH*0.7);
+    g.fillStyle=shade(b.color,-0.3);g.beginPath();g.moveTo(x-w*0.1,bodyY+1);g.lineTo(cx,y);g.lineTo(x+w*1.1,bodyY+1);g.closePath();g.fill();g.stroke();
+    g.fillStyle="rgba(255,236,150,.95)";g.fillRect(x+w*0.12,bodyY+bodyH*0.2,w*0.24,Math.max(0,bodyH*0.32));
+    g.strokeRect(x+w*0.12,bodyY+bodyH*0.2,w*0.24,Math.max(0,bodyH*0.32));
+    g.fillStyle="#5b3a24";g.fillRect(x+w*0.52,bodyY+bodyH*0.42,w*0.26,bodyH*0.58);g.strokeRect(x+w*0.52,bodyY+bodyH*0.42,w*0.26,bodyH*0.58);
+    g.fillStyle="#ffd23f";g.beginPath();g.arc(x+w*0.72,bodyY+bodyH*0.74,2,0,TAU);g.fill();
+  }
+  // --- 軸7: ロケット(細長い胴＋三角の先っぽ＋ひれ。壊れると飛んでいく) ---
+  function drawRocketBody(b,x,y,w,h){
+    const cx=b.x,noseH=Math.min(h*0.24,w*1.3),finTop=y+h*0.68,flying=b.state==="flat";
+    if(flying){
+      const fl=8+Math.random()*10;g.fillStyle="#ffb347";g.beginPath();g.moveTo(cx-w*0.25,groundY);g.lineTo(cx,groundY+fl+10);g.lineTo(cx+w*0.25,groundY);g.closePath();g.fill();
+    }
+    g.strokeStyle="rgba(0,0,0,.45)";g.lineWidth=2.5;
+    g.fillStyle=b.color;
+    g.beginPath();g.moveTo(x,finTop);g.lineTo(x-w*0.55,groundY);g.lineTo(x,groundY);g.closePath();g.fill();g.stroke();
+    g.beginPath();g.moveTo(x+w,finTop);g.lineTo(x+w+w*0.55,groundY);g.lineTo(x+w,groundY);g.closePath();g.fill();g.stroke();
+    let bg=g.createLinearGradient(x,y,x+w,y);bg.addColorStop(0,"#ffffff");bg.addColorStop(0.5,"#e4eaf3");bg.addColorStop(1,"#a9b4c6");
+    g.fillStyle=bg;g.shadowColor="rgba(0,0,0,.4)";g.shadowBlur=6;g.fillRect(x,y+noseH,w,Math.max(0,h-noseH));g.shadowBlur=0;
+    g.strokeRect(x,y+noseH,w,Math.max(0,h-noseH));
+    g.fillStyle=b.color;g.beginPath();g.moveTo(x-1,y+noseH);g.lineTo(cx,y);g.lineTo(x+w+1,y+noseH);g.closePath();g.fill();g.stroke();
+    g.fillStyle="#7adcff";g.beginPath();g.arc(cx,y+noseH+h*0.14,Math.max(0,w*0.26),0,TAU);g.fill();g.stroke();
+    g.fillStyle=b.color;g.fillRect(x,y+h*0.58,w,Math.max(0,h*0.05));
   }
   // --- 軸7: 横長のバス/トラック(g.arcで車輪を描く。窓帯は横一列) ---
   function drawBusBody(b,x,y,w,h){

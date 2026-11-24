@@ -47,7 +47,7 @@ function buildHammer(api){
   let cur={x:0,y:0,has:false,tx:0,ty:0};
   let trail=[];           // sparkle trail behind the hammer head
   let climax=0;           // full-screen color-wash flash on big hits
-  const TC=["#ff5b5b","#4db8ff","#ffd23f","#1f9d4f","#c78bff"];
+  const TC=["#ff5b5b","#4db8ff","#ffd23f","#3fe07a","#c78bff"];
   const TCNAME=["あか","あお","きいろ","みどり","むらさき"];
   // ⑤⑥⑦ 壊す物のバラエティ: ロボ以外の新シルエット(いわ=丸くて小さい/きばこ=四角/やぐら=積み箱で大きい)。
   // 型ごとの倍率テーブル(未掲載の型=1)。0.62〜1.58まで一目で分かる大小差をつける。
@@ -536,7 +536,7 @@ function buildHammer(api){
         if(!c.rest){c.vy+=0.5*dt;c.x+=c.vx*dt;c.y+=c.vy*dt;c.rot+=c.vr*dt;
           if(c.y>=groundY-2){c.y=groundY-2;c.vy*=-0.42;c.vx*=0.7;c.vr*=0.6;
             if(Math.abs(c.vy)<1.3){c.vy=0;c.rest=true;}}}
-        if(c.rest)c.life-=c.decay*1.6*dt;else c.life-=c.decay*0.35*dt;
+        if(c.rest)c.life-=c.decay*3.2*dt;else c.life-=c.decay*0.35*dt;
         g.save();g.globalAlpha=Math.max(0,c.life);g.translate(c.x,c.y);g.rotate(c.rot);
         const p=c.pts,s=c.s;
         g.beginPath();g.moveTo(p[0][0]*s,p[0][1]*s);
@@ -773,8 +773,10 @@ function buildHammer(api){
       g.restore();g.shadowBlur=0;}
     g.fillStyle="rgba(0,0,0,.22)";g.beginPath();g.ellipse(0,r*0.72,r*0.82,r*0.3,0,0,TAU);g.fill();
     // 画像ロボ: 白ベースのスプライトを体色で着色(ラッキー色/にじいろの色替えを画像でも維持)
-    const spr=api.tinted("robot.png",baseCol,0.88);
+    const spr=api.tinted("robot.png",baseCol,0.96);
     if(spr){
+      // 暗い背板: 草原と同色(みどり/あお)でも体の形が浮く
+      g.save();g.fillStyle="rgba(15,25,50,.38)";g.beginPath();g.ellipse(0,-r*0.05,Math.max(0,r*0.95),Math.max(0,r*1.08),0,0,TAU);g.fill();g.restore();
       // 白い縁取り(ふちどり)で草原や岩の色から切り離す
       // 暗い縁(雲や明るい背景の上でも輪郭が読めるように)→ 白い縁取り の2段
       g.save();g.shadowColor="rgba(30,40,80,.75)";g.shadowBlur=6;

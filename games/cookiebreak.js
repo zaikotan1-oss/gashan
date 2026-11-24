@@ -116,6 +116,12 @@ function build_cookiebreak(api){
       for(let k=o2.length-1;k>0;k--){const j=rint(0,k); const t=o2[k]; o2[k]=o2[j]; o2[j]=t;}
       for(const c of o2){ if(mergeBigIn(c,3)){ done[c]=1; break; } }
     }
+    else if(Math.random()<0.5){
+      // 軸7: ステージ1(最初の約23秒)でも半分の確率で縦3マスのソフトクリームを1個。3段そろった列だけが対象(足りなければ何もしない)
+      const o1=[]; for(let c=0;c<cols;c++)o1.push(c);
+      for(let k=o1.length-1;k>0;k--){const j=rint(0,k); const t=o1[k]; o1[k]=o1[j]; o1[j]=t;}
+      for(const c of o1){ if(mergeBigIn(c,3)){ done[c]=1; break; } }
+    }
     for(let c=0;c<cols;c++){
       if(done[c]) continue;
       if(Math.random()>=(stage>1?0.3:0.35)) continue;
@@ -336,10 +342,10 @@ function build_cookiebreak(api){
   }
   function doClear(){
     if(clearing)return; clearing=true;
+    feverBanner=0; luckyMsgT=0; rbMsgT=0;   // 軸6: 最後の1個でフィーバーが満タンになってもクリア文字と重ねない(フィーバー本体は持ち越す)
     clearNext=stage+1;
     // ③ ノンストップ クリア: コンボを一度も切らさず塔を割り切ったら +5 & 祝福(考えどころ=手を止めず一気に)
     if(comboKept){ count+=5; api.setScore(count); nonstopT=1.9;
-      floats.push({x:api.W/2,y:api.H*0.5,txt:"ノンストップ！ ＋5",life:1,vy:-0.6,col:"#7be08a",size:34});
       for(let i=0;i<16&&sparks.length<180;i++){const a=rnd(0,TAU),v=rnd(3,8);
         sparks.push({x:api.W/2,y:api.H*0.42,vx:Math.cos(a)*v,vy:Math.sin(a)*v-2,life:1,decay:rnd(0.012,0.02),s:rnd(2,5),col:"#7be08a"});}
       api.tone(1318,0.14,"triangle",0.1); setTimeout(()=>{try{api.tone(1976,0.16,"triangle",0.08);}catch(e){}},120);
@@ -523,7 +529,7 @@ function build_cookiebreak(api){
         const pop=1+Math.max(0,comboT-0.7)*1.2;
         g.save(); g.translate(api.W/2,Math.max(api.H*0.115,hudY+42)); g.scale(pop,pop);
         g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
-        g.globalAlpha=clamp(comboT,0,1);
+        g.globalAlpha=clamp(comboT*2.5,0,1);
         g.shadowColor="rgba(255,140,200,.8)"; g.shadowBlur=14;
         g.shadowBlur=0; g.lineWidth=7; g.lineJoin="round"; g.strokeStyle="rgba(90,30,60,.75)"; g.strokeText("コンボ x"+combo,0,0);
         g.fillStyle="#ffe0f4"; g.fillText("コンボ x"+combo,0,0);
@@ -641,9 +647,19 @@ function build_cookiebreak(api){
     const isTall=t.key==="icecream";                   // 軸7: 縦3マスのソフトクリーム
     const isGinger=t.key==="gingerbread";              // 軸7: ジンジャーマン(人型)
     const isDonut=t.key==="donut";                     // 軸7: ドーナツ(穴あき)
+    const isGoldBody=(t.key==="gold"||t.key==="rainbow");   // 軸7: ゴールド/にじいろは星形で別格に
+    const isCake=t.key==="cake";                       // 軸7: カップケーキは台形の紙カップの輪郭
+    function starPath(px,py,pw,ph){
+      const cx=px+pw/2, cy=py+ph/2;
+      for(let i=0;i<10;i++){const rr=Math.max(0,i%2===0?pw*0.5:pw*0.23),a=i/10*TAU-Math.PI/2;
+        if(i===0)g.moveTo(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr); else g.lineTo(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr);}
+      g.closePath();
+    }
     const isSmallMint=isRoundCandy;                    // 軸7: ちびアメ玉(0.7倍・マスの下に座る。当たり判定はマス全体のまま)
     function bodyPath(px,py,pw,ph,inset){
-      if(isChibi) g.ellipse(px+pw/2,py+ph*0.68,Math.max(0,pw*0.30),Math.max(0,ph*0.28),0,0,TAU);
+      if(isGoldBody){ g.beginPath(); starPath(px,py,pw,ph); }
+      else if(isCake){ g.beginPath(); g.moveTo(px+pw*0.05,py+ph*0.38); g.lineTo(px+pw*0.95,py+ph*0.38); g.lineTo(px+pw*0.83,py+ph*0.99); g.lineTo(px+pw*0.17,py+ph*0.99); g.closePath(); }
+      else if(isChibi) g.ellipse(px+pw/2,py+ph*0.68,Math.max(0,pw*0.30),Math.max(0,ph*0.28),0,0,TAU);
       else if(isJelly) g.ellipse(px+pw/2,py+ph/2,Math.max(0,pw*0.46),Math.max(0,ph*0.42),0,0,TAU);
       else if(isChocoBar) roundRect(px+inset,py+ph*0.12,Math.max(0,pw-2*inset),ph*0.76,pw*0.1);
       else if(isRoundCookie) g.arc(px+pw/2,py+ph/2,Math.max(0,pw*0.49),0,TAU);
@@ -699,7 +715,7 @@ function build_cookiebreak(api){
       rg2.addColorStop(0,"rgba(255,255,255,"+(0.45*pl).toFixed(2)+")"); rg2.addColorStop(1,"rgba(255,255,255,0)");
       g.fillStyle=rg2; g.beginPath(); g.arc(x+s/2,y+s/2,gr,0,TAU); g.fill();
       g.restore();
-      g.save(); roundRect(x+1,y+1,s-2,s-2,s*0.28); g.clip();
+      g.save(); g.beginPath(); starPath(x,y,s,s); g.clip();
       for(let i=0;i<RAINBOW.length;i++){ g.globalAlpha=0.55;
         g.fillStyle=RAINBOW[(i+Math.floor(tsec*4))%RAINBOW.length];
         g.fillRect(x+s*(i/RAINBOW.length),y,s/RAINBOW.length+1,s); }
@@ -753,11 +769,11 @@ function build_cookiebreak(api){
     } else if(t.key==="cake"){
       // 軸7対策: roundRectの上に絞りクリーム(ellipse)を足して『カップケーキ』の輪郭にする
       g.save();
-      let cg=g.createLinearGradient(x,y-s*0.24,x,y+s*0.1);
+      let cg=g.createLinearGradient(x,y-s*0.06,x,y+s*0.28);
       cg.addColorStop(0,"#ffffff"); cg.addColorStop(1,lighten(t.col,25));
       g.fillStyle=cg;
-      g.beginPath(); g.ellipse(x+s*0.5,y+s*0.05,Math.max(0,s*0.34),Math.max(0,s*0.22),0,0,TAU); g.fill();
-      g.beginPath(); g.ellipse(x+s*0.5,y-s*0.12,Math.max(0,s*0.2),Math.max(0,s*0.15),0,0,TAU); g.fill();
+      g.beginPath(); g.ellipse(x+s*0.5,y+s*0.23,Math.max(0,s*0.34),Math.max(0,s*0.22),0,0,TAU); g.fill();
+      g.beginPath(); g.ellipse(x+s*0.5,y+s*0.06,Math.max(0,s*0.2),Math.max(0,s*0.15),0,0,TAU); g.fill();
       g.restore();
       // sprinkles
       const cols=["#ff5b8a","#4db8ff","#7be08a","#ff8c42"];

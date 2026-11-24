@@ -508,10 +508,10 @@ function buildIcebreak(api){
       g.fillStyle=fever>0?"#ffe14a":"#bfeaff"; g.fillRect(0,0,fw,4);
       g.restore();
       // ---- HUD (top center: safe zone) ----
-      g.save(); g.font="800 20px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
-      g.lineWidth=5; g.lineJoin="round"; g.strokeStyle="rgba(10,30,60,.55)";
+      g.save(); g.font="800 28px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
+      g.lineWidth=6; g.lineJoin="round"; g.strokeStyle="rgba(10,30,60,.55)";
       const hud="ステージ "+stage+"   こおり "+totalCells();
-      g.strokeText(hud,api.W/2,32); g.fillStyle="#eafaff"; g.fillText(hud,api.W/2,32);
+      g.strokeText(hud,api.W/2,40); g.fillStyle="#eafaff"; g.fillText(hud,api.W/2,40);
       g.lineJoin="miter"; g.restore(); g.textAlign="left";
       // combo big text (top center, below HUD)
       if(combo>1){ const pop=1+Math.max(0,comboT-0.7)*1.2;
@@ -529,9 +529,9 @@ function buildIcebreak(api){
         g.fillStyle="#ffffff"; g.shadowColor=rc; g.shadowBlur=16; g.fillText("にじいろ！",0,0);
         g.shadowBlur=0; g.lineJoin="miter"; g.restore(); g.globalAlpha=1; g.textAlign="left"; g.textBaseline="alphabetic"; }
       // ② きょうのラッキー色 はっけん(初回だけ大きく教える・以降は小さく)
-      if(luckyMsgT>0){ const t2=luckyBig?("きょうのラッキー色は "+(GEMNAME[luckyColor]||"")+"！"):"ラッキー！";
+      if(luckyMsgT>0){ const t2=luckyBig?("きょうの ラッキーは "+(GEMNAME[luckyColor]||"")+"！"):"ラッキー！";
         g.save(); g.translate(api.W/2,api.H*0.29); g.textAlign="center"; g.textBaseline="middle";
-        g.globalAlpha=clamp(luckyMsgT*1.3,0,1); g.font="800 "+(luckyBig?23:26)+"px 'Hiragino Maru Gothic ProN',system-ui";
+        g.globalAlpha=clamp(luckyMsgT*1.3,0,1); g.font="800 "+(luckyBig?28:26)+"px 'Hiragino Maru Gothic ProN',system-ui";
         g.lineWidth=5; g.lineJoin="round"; g.strokeStyle="rgba(10,30,60,.5)"; g.strokeText(t2,0,0);
         g.fillStyle=luckyColor; g.fillText(t2,0,0);
         g.lineJoin="miter"; g.restore(); g.globalAlpha=1; g.textAlign="left"; g.textBaseline="alphabetic"; }

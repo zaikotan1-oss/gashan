@@ -29,7 +29,7 @@ function build_icicle(api){
     const margin=W*0.06;
     for(let i=0;i<n;i++){
       const x=margin+(W-margin*2)*(i+0.5)/n;
-      icicles.push({x,baseY:H*0.16,len:rnd(46,82),w:rnd(16,26),ready:true,regrow:0,wob:rnd(0,TAU)});
+      icicles.push({x,baseY:H*0.16,len:rnd(58,92),w:rnd(22,32),ready:true,regrow:0,wob:rnd(0,TAU)});
     }
   }
   function buildFlakes(){
@@ -59,7 +59,7 @@ function build_icicle(api){
     const startX=direct?(dIc?clamp(dIc.x-Math.sign(sp)*18,W*0.2,W*0.8):rnd(W*0.25,W*0.75)):(dir>0?-r-10:W+r+10);  // 直接出現(direct)は画面内、それ以外は従来どおり画面端
     // 出現位置(画面の端)の2r以内に生きた的がいたら今回は出さず、すぐ次に延ばす(端で雪だまが団子にならず、形の違いが読める)
     if(!direct&&walkers.some(w=>!w.dead&&Math.abs(w.x-startX)<2*Math.max(r,w.r))){spawnT=8;return false;}
-    walkers.push({x:startX,y:groundY,r,kind,sp,vx:0,rot:0,
+    walkers.push({x:startX,y:groundY+(kind==="gold"?10:(direct?0:rnd(-8,8))),r,kind,sp,vx:0,rot:0,
       hp:kind==="big"?2:1,maxhp:kind==="big"?2:1,bob:rnd(0,TAU),squash:1,dead:false,flash:0,
       col:kind==="hut"?"#8fb8d8":kind==="gold"?"#ffd23f":"#eef6ff",
       scarf:(kind==="blob"||kind==="big"||kind==="tower"||kind==="sled")?pick(SCARF).c:null});  // ② マフラーの色=ラッキー色の手がかり
@@ -323,12 +323,13 @@ function build_icicle(api){
         ic.wob+=0.05*dt;
         const grow=ic.ready?1:clamp(ic.regrow/regrowNeed,0,1);
         // 軸1(さわって分かるか)対策: ステージ1の最初の10秒だけ、準備完了のつららに薄い光の輪(pulse)を出して触る場所を誘導する(見た目のみ・当たり判定/計測ボットには無関係)
-        if(ic.ready&&stage===1&&tsec<10){
+        if(ic.ready){
           const pulse=0.5+0.5*Math.sin(tsec*4+ic.wob);
-          g.save();g.globalCompositeOperation="lighter";g.globalAlpha=0.22+0.22*pulse;
+          const early=stage===1&&tsec<10;
+          g.save();g.globalCompositeOperation="lighter";g.globalAlpha=early?0.22+0.22*pulse:0.10+0.08*pulse;   // 常時うすい背板(10秒後・ステージ2以降は控えめ)
           g.fillStyle="#eaf7ff";
           g.beginPath();g.arc(ic.x,ic.baseY+ic.len*grow*0.5,Math.max(0,ic.w*1.8+pulse*6),0,TAU);g.fill();
-          g.restore();g.globalAlpha=1;
+          g.restore();g.globalAlpha=1;g.globalCompositeOperation="source-over";
         }
         drawIcicle(ic.x,ic.baseY,ic.len*grow,ic.w*Math.max(0.25,grow),ic.ready,ic.wob);
       }
@@ -521,7 +522,7 @@ function build_icicle(api){
         g.font="800 24px 'Hiragino Maru Gothic ProN',system-ui";g.fillStyle="#fff";
         g.fillText("つぎは ステージ"+(clearStage>=STAGES?1:clearStage+1)+"！",0,42);
         g.restore();g.globalAlpha=1;g.textAlign="left";
-        if(clearT<=0){clearT=0;spawnT=20;}
+        if(clearT<=0){clearT=0;spawnT=8;}
       }
 
       // 白飛び防止: 加算(lighter)を必ず通常合成へ戻してフレームを終える(溜まり厳禁)
@@ -536,7 +537,10 @@ function build_icicle(api){
     const sway=ready?Math.sin(wob)*1.2:0;
     g.save();g.translate(x+sway,topY);
     // 画像つらら(太い根元が上・とがった先が下)。長さに合わせて正方形スプライトを中央描画。付け根と先端の星だけ重ねる
-    if(api.drawAsset("icicle.png",0,len*0.5,len*1.15,len*1.15,{center:true})){
+    g.shadowColor="rgba(234,247,255,.95)";g.shadowBlur=12;   // 白い縁取り: 紺の夜空の上でも青い結晶が浮いて見える
+    const okSpr=api.drawAsset("icicle.png",0,len*0.5,len*1.3,len*1.3,{center:true});
+    g.shadowBlur=0;
+    if(okSpr){
       g.fillStyle="#bfe3f7";g.beginPath();g.ellipse(0,0,Math.max(0,w*0.6),Math.max(0,w*0.28),0,0,TAU);g.fill();
       if(ready){
         g.save();g.globalCompositeOperation="lighter";
@@ -576,8 +580,8 @@ function build_icicle(api){
     g.save();g.translate(d.x,d.y-d.len);
     // 画像つらら(落下中): 少し光るぼかしを添えて描く
     if(api.asset("icicle.png").ready){
-      g.shadowColor="rgba(150,210,255,.7)";g.shadowBlur=8;
-      api.drawAsset("icicle.png",0,d.len*0.5,d.len*1.15,d.len*1.15,{center:true});
+      g.shadowColor="rgba(234,247,255,.95)";g.shadowBlur=12;
+      api.drawAsset("icicle.png",0,d.len*0.5,d.len*1.3,d.len*1.3,{center:true});
       g.shadowBlur=0;g.restore();return;
     }
     const grd=g.createLinearGradient(0,0,0,d.len);
@@ -608,6 +612,7 @@ function build_icicle(api){
     if(sprName&&api.asset(sprName).ready){
       const sz=wk.kind==="hut"?r*2.3:r*2.0, cy=wk.kind==="hut"?-r*0.87:-r*0.2;
       api.drawAsset(sprName,0,cy,sz,sz,{center:true,flip:wk.kind==="hut"&&wk.sp<0});
+      if(wk.kind==="gold"){g.strokeStyle="#fff";g.lineWidth=3;g.beginPath();g.arc(0,cy,Math.max(0,r*0.97),0,TAU);g.stroke();}   // 雪だまの上に乗っても輪郭が消えない
       if(wk.flash>0){g.globalAlpha=wk.flash*0.7;g.fillStyle="#fff";
         g.beginPath();g.arc(0,cy,Math.max(0,r*0.95),0,TAU);g.fill();g.globalAlpha=1;}
       g.restore();return;

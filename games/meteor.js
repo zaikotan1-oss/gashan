@@ -111,7 +111,7 @@ function buildMeteor(api){
           api.tone(220,0.1,"square",0.18);
           for(let k=rint(2,4);k>0;k--)shards.push({x:o.x+rnd(-o.w/2,o.w/2),y:groundY-rnd(0,o.h),vx:dir*rnd(2,6),vy:rnd(-7,-2),s:rnd(o.w*0.12,o.w*0.24),color:"#9aa3b8",rot:rnd(0,TAU),vr:rnd(-0.5,0.5),life:1,decay:rnd(0.01,0.018),pts:chunkPts()});
           {let near=0;for(const f of floats)if(f.txt==="がんじょう！"&&f.life>0.3&&Math.abs(f.x-o.x)<slotW*1.2)near++;
-            if(near<2)floats.push({x:o.x,y:groundY-o.h-10-30*near,txt:"がんじょう！",life:1,vy:-0.9,col:"#cfe0ff",size:24});}
+            if(near<1)floats.push({x:o.x,y:groundY-o.h-10,txt:"がんじょう！",life:1,vy:-0.9,col:"#cfe0ff",size:24});}
           continue;
         }
         o.state="fly";
@@ -160,7 +160,7 @@ function buildMeteor(api){
     const finalShot=lastShot&&standCount()===0;
     const fy=finalShot?groundY-60:groundY-100;
     let fx=x;if(finalShot&&Math.abs(x-api.W/2)<api.W*0.2)fx=x<api.W/2?api.W/2-api.W*0.2:api.W/2+api.W*0.2;
-    if(hitCount>=3)floats.push({x:fx,y:fy,txt:hitCount+"はかい！",life:1,vy:-1.1,col:hitCount>=6?"#ff3b3b":"#ff8c42",size:hitCount>=6?46:34});
+    if(hitCount>=3){floats=floats.filter(f=>!/^x\d/.test(f.txt)&&!/^\d+はかい！/.test(f.txt));floats.push({x:fx,y:fy,txt:hitCount+"はかい！",life:1,vy:-1.1,col:hitCount>=6?"#ff3b3b":"#ff8c42",size:hitCount>=6?46:34});}
     else if(combo>1){floats=floats.filter(f=>!/^x\d/.test(f.txt));floats.push({x:fx,y:fy,txt:"x"+combo,life:1,vy:-1.1,col:combo>=5?"#ff8c42":"#ffd23f",size:32});}
     // stage clear: every building/tree toppled
     if(clearT<=0&&standCount()===0)clearStage();
@@ -460,10 +460,11 @@ function buildMeteor(api){
       g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";}
     // ② きょうのラッキー色 ヒント(初回だけ大きく・以降は小さく)
     if(luckyMsgT>0&&clearT<=0&&rbMsgT<=0){g.save();g.translate(api.W/2,api.H*(clearT>0?0.34:0.28));g.textAlign="center";g.textBaseline="middle";
-      g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 "+clamp(api.W*0.038,18,26)+"px 'Hiragino Maru Gothic ProN',system-ui";
-      const t2="きょうのラッキーいろは "+(COLNAME[luckyColor]||"")+"！";
-      g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.45)";g.strokeText(t2,0,0);
-      g.fillStyle=luckyColor;g.fillText(t2,0,0);
+      g.globalAlpha=luckyMsgT>0.5?1:clamp(luckyMsgT*2,0,1);g.font="800 "+clamp(api.W*0.045,22,32)+"px 'Hiragino Maru Gothic ProN',system-ui";
+      const t1="きょうのラッキーいろは ",t3=(COLNAME[luckyColor]||"")+"！";
+      g.textAlign="left";const w1=g.measureText(t1).width,w3=g.measureText(t3).width,x0=-(w1+w3)/2;
+      g.lineWidth=8;g.lineJoin="round";g.strokeStyle="rgba(0,0,0,.8)";g.strokeText(t1,x0,0);g.strokeText(t3,x0+w1,0);
+      g.fillStyle="#fff7cf";g.fillText(t1,x0,0);g.fillStyle=shade(luckyColor,0.45);g.fillText(t3,x0+w1,0);
       g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";}
     // ③ パーフェクト！ ボーナス(クリア文字と重ねない下側)
     if(perfMsgT>0){const pop=1+Math.max(0,perfMsgT-1.3)*1.3;
