@@ -117,7 +117,7 @@ function buildAvalanche(api){
     if(rainbow)w=rnd(unit*1.2,unit*1.6);
     else if(gold)w=rnd(unit*1.1,unit*1.5);
     else if(big)w=rnd(unit*1.7,unit*2.3);
-    else if(small)w=rnd(unit*0.5,unit*0.7);
+    else if(small)w=rnd(unit*0.65,unit*0.85);
     else w=rnd(unit*0.8,unit*1.3);
     // レーンは的の少ないところを優先(どのレーンにも的がある=狙った所に必ず的がある)
     const cnt=new Array(LANE_N).fill(0);
@@ -647,7 +647,7 @@ function buildAvalanche(api){
       // ---- floating combo numbers ----
       if(combo>0){comboT-=0.016*dt;if(comboT<=0){combo=0;comboKept=false;}} // ③ 連鎖が切れたらノンストップ失敗
       for(const fl of floats){fl.y+=fl.vy*dt;fl.life-=0.018*dt;
-        g.globalAlpha=Math.max(0,fl.life);
+        g.globalAlpha=Math.min(1,Math.max(0,fl.life*2));
         g.font="800 "+fl.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.lineJoin="round";g.lineWidth=8;g.strokeStyle="rgba(30,40,70,.9)";g.strokeText(fl.txt,fl.x,fl.y);
         g.fillStyle=fl.col;g.fillText(fl.txt,fl.x,fl.y);}
@@ -682,11 +682,10 @@ function buildAvalanche(api){
         const pop=1+Math.max(0,comboT-0.7)*1.2;
         g.save();g.translate(api.W/2,api.H*0.17);g.scale(pop,pop);
         g.font="800 30px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-        g.globalAlpha=clamp(comboT,0,1);
-        g.shadowColor="rgba(80,160,255,.8)";g.shadowBlur=12;
-        g.fillStyle="#ffd23f";g.fillText("コンボ x"+combo,0,0);
-        g.shadowBlur=0;g.lineWidth=1.5;g.strokeStyle="rgba(255,255,255,.6)";
+        g.globalAlpha=clamp(comboT*2.5,0,1);
+        g.lineJoin="round";g.lineWidth=7;g.strokeStyle="rgba(30,40,70,.9)";
         g.strokeText("コンボ x"+combo,0,0);
+        g.fillStyle="#ffd23f";g.fillText("コンボ x"+combo,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";
       }
 
@@ -704,8 +703,8 @@ function buildAvalanche(api){
         g.save();g.translate(api.W/2,api.H*0.68);g.textAlign="center";
         g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
         const t2="きょうのラッキーいろは "+(COLNAME[luckyColor]||"")+"!";
-        g.lineWidth=5;g.strokeStyle="rgba(40,60,90,.5)";g.strokeText(t2,0,0);
-        g.fillStyle=luckyColor;g.fillText(t2,0,0);
+        g.lineJoin="round";g.lineWidth=8;g.strokeStyle="rgba(30,40,70,.9)";g.strokeText(t2,0,0);
+        g.fillStyle=tint(luckyColor,0.35);g.fillText(t2,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";if(luckyMsgT<0)luckyMsgT=0;}
       // ---- ③ ノンストップ ボーナス! バナー(クリア文字と重ねない下側) ----
       if(nonstopT>0){nonstopT-=0.014*dt;

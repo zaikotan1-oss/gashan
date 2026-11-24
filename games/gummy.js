@@ -32,7 +32,7 @@ function build_gummy(api){
   let sweets=[];
   function buildBg(){
     sweets=[];for(let i=0;i<9;i++)sweets.push({
-      x:rnd(0,api.W),y:rnd(api.H*0.05,api.H*0.42),s:rnd(0.7,1.5),
+      x:rnd(0,api.W),y:rnd(api.H*0.05,api.H*0.42),s:rnd(0.6,1.1),
       col:pick(GUM),ph:rnd(0,TAU),sp:rnd(0.02,0.06),amp:rnd(8,26),
       drift:rnd(0.03,0.1),kind:rint(0,2),tapped:false});
     motes=[];for(let i=0;i<24;i++)motes.push({x:rnd(0,api.W),y:rnd(0,api.H),r:rnd(0.8,2.4),sp:rnd(0.1,0.4),tw:rnd(0,TAU)});
@@ -157,7 +157,7 @@ function build_gummy(api){
     setTimeout(()=>api.tone(784,0.15,"triangle",0.15),100);
     setTimeout(()=>api.tone(988,0.15,"triangle",0.15),200);
     setTimeout(()=>api.tone(1318,0.25,"triangle",0.16),300);
-    floats.push({x:api.W/2,y:safeY(api.H*0.3),txt:"フィーバータイム！",life:1.4,vy:-0.4,col:"#ff2b9e",size:44});
+    floats.push({x:api.W/2,y:safeY((stageKill>=stageGoal&&!bossStage)?api.H*0.7:api.H*0.3),txt:"フィーバータイム！",life:1.4,vy:-0.4,col:"#ff2b9e",size:44});
     if(bits.length<120)for(let i=0;i<18;i++){const a=rnd(0,TAU),s=rnd(3,9);
       bits.push({x:api.W/2,y:api.H*0.4,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,r:rnd(4,8),
         rot:rnd(0,TAU),vr:rnd(-0.3,0.3),life:1,decay:rnd(0.012,0.02),col:pick(GUM),sq:rnd(0.5,1)});}
@@ -229,7 +229,7 @@ function build_gummy(api){
     if(combo>0&&combo%5===0&&hsCool<=0){api.hitStop(combo>=10?4:3);hsCool=45;}
     // ① にじいろグミ / ② ラッキー色 の特別演出
     if(m.kind==="rainbow")rainbowBurst(m.x,m.baseY-R*0.5);
-    if(isLucky)luckyStar(m.x,m.baseY-R*1.2);
+    if(isLucky)luckyStar(m.x+R*1.4,m.baseY-R*2.0);
     addFever(m.kind==="rainbow"?0.2:0.075);
     checkStage();
   }
@@ -307,7 +307,7 @@ function build_gummy(api){
       for(const s of sweets){
         s.ph+=s.sp*dt;s.x+=s.drift*dt;if(s.x>api.W+30){s.x=-30;s.tapped=false;} // 流れて戻ったら また光る
         const sy=s.y+Math.sin(s.ph)*s.amp,r=R*0.34*s.s;
-        g.save();g.translate(s.x,sy);g.globalAlpha=0.85;
+        g.save();g.translate(s.x,sy);g.globalAlpha=0.5;
         g.fillStyle=s.col;
         if(s.kind===0){ // candy circle with shine
           g.beginPath();g.arc(0,0,r,0,TAU);g.fill();
@@ -628,7 +628,7 @@ function build_gummy(api){
       ag.addColorStop(0,m.color);ag.addColorStop(0.5,"rgba(255,255,255,0)");ag.addColorStop(1,"rgba(255,255,255,0)");
       g.globalAlpha=gp;g.fillStyle=ag;g.beginPath();g.arc(0,-r*0.1,Math.max(0,r*1.9),0,TAU);g.fill();g.restore();g.globalCompositeOperation="source-over";g.globalAlpha=1;}
     // shadow
-    g.fillStyle="rgba(60,30,15,.22)";g.beginPath();g.ellipse(0,r*0.78,r*0.78,r*0.28,0,0,TAU);g.fill();
+    g.fillStyle="rgba(60,30,15,.35)";g.beginPath();g.ellipse(0,r*0.78,r*0.78,r*0.28,0,0,TAU);g.fill();
     // 画像: キンググミ(ボス)専用スプライト / きんいろキャンディ専用スプライト
     // → どちらも色が固定(色バリエーション不要)なので画像化に向く。他の色は従来どおり手描き。
     if(bossKind){
@@ -646,13 +646,15 @@ function build_gummy(api){
     if(m.flash>0){g.save();g.globalAlpha=m.flash*0.7;g.fillStyle="#fff";
       g.beginPath();rr(-r*0.72,-r,r*1.44,r*1.85,r*0.62);g.fill();g.restore();}
     // rim light
-    g.strokeStyle="rgba(255,255,255,.3)";g.lineWidth=2;g.beginPath();rr(-r*0.72,-r,r*1.44,r*1.85,r*0.62);g.stroke();
+    g.strokeStyle="rgba(90,30,60,.55)";g.lineWidth=3.5;g.beginPath();rr(-r*0.72,-r,r*1.44,r*1.85,r*0.62);g.stroke();
+    g.strokeStyle="rgba(255,255,255,.3)";g.lineWidth=1.2;g.beginPath();rr(-r*0.72,-r,r*1.44,r*1.85,r*0.62);g.stroke();
     // glossy top sheen
     g.fillStyle="rgba(255,255,255,.35)";g.beginPath();
     g.ellipse(-r*0.2,-r*0.55,r*0.4,r*0.2,-0.3,0,TAU);g.fill();
     // little nub ears (gummy-bear cuteness)
     g.fillStyle=grd;
-    g.beginPath();g.arc(-r*0.5,-r*0.95,r*0.22,0,TAU);g.arc(r*0.5,-r*0.95,r*0.22,0,TAU);g.fill();
+    g.beginPath();g.arc(-r*0.5,-r*0.95,r*0.22,0,TAU);g.arc(r*0.5,-r*0.95,r*0.22,0,TAU);
+    g.strokeStyle="rgba(90,30,60,.55)";g.lineWidth=3.5;g.stroke();g.fill();
     // eyes (blink when about to duck)
     const blinking=m.blink!==undefined&&m.blink!==999&&Math.floor(m.blink/40)%2===0;
     if(blinking){
@@ -676,7 +678,7 @@ function build_gummy(api){
   function drawJelly(m,x,y,sq,r){
     const wob=m.state==="up"?Math.sin(m.wob)*0.05:0;
     g.save();g.translate(x,y);g.scale((1+wob),sq*(1-wob*0.6));
-    g.fillStyle="rgba(60,30,15,.22)";g.beginPath();
+    g.fillStyle="rgba(60,30,15,.35)";g.beginPath();
     g.ellipse(0,Math.max(0,r*0.86),Math.max(0,r*0.82),Math.max(0,r*0.28),0,0,TAU);g.fill();
     const grd=g.createRadialGradient(-r*0.3,-r*0.6,Math.max(0,r*0.1),0,0,Math.max(0,r*1.4));
     grd.addColorStop(0,lighten(m.color,90));grd.addColorStop(0.5,lighten(m.color,25));grd.addColorStop(1,m.color);
@@ -688,7 +690,8 @@ function build_gummy(api){
       g.beginPath();g.moveTo(-r*0.1,-r*0.6);g.lineTo(r*0.06,-r*0.2);g.lineTo(-r*0.1,r*0.15);g.stroke();}
     if(m.flash>0){g.save();g.globalAlpha=m.flash*0.7;g.fillStyle="#fff";
       g.beginPath();rr(-r*0.75,-r,r*1.5,r*1.7,r*0.18);g.fill();g.restore();}
-    g.strokeStyle="rgba(255,255,255,.3)";g.lineWidth=2;g.beginPath();rr(-r*0.75,-r,r*1.5,r*1.7,r*0.18);g.stroke();
+    g.strokeStyle="rgba(90,30,60,.55)";g.lineWidth=3.5;g.beginPath();rr(-r*0.75,-r,r*1.5,r*1.7,r*0.18);g.stroke();
+    g.strokeStyle="rgba(255,255,255,.3)";g.lineWidth=1.2;g.beginPath();rr(-r*0.75,-r,r*1.5,r*1.7,r*0.18);g.stroke();
     g.fillStyle="rgba(255,255,255,.35)";g.beginPath();
     g.ellipse(-r*0.2,-r*0.55,Math.max(0,r*0.35),Math.max(0,r*0.16),-0.3,0,TAU);g.fill();
     const blinking=m.blink!==undefined&&m.blink!==999&&Math.floor(m.blink/40)%2===0;
@@ -710,7 +713,7 @@ function build_gummy(api){
     const wob=m.state==="up"?Math.sin(m.wob)*0.06:0;
     const outerR=Math.max(0,r*0.92),innerR=Math.max(0,r*0.4);
     g.save();g.translate(x,y);g.scale((1+wob),sq*(1-wob*0.6));
-    g.fillStyle="rgba(60,30,15,.22)";g.beginPath();
+    g.fillStyle="rgba(60,30,15,.35)";g.beginPath();
     g.ellipse(0,Math.max(0,r*0.72),Math.max(0,r*0.82),Math.max(0,r*0.28),0,0,TAU);g.fill();
     const grd=g.createRadialGradient(-r*0.25,-r*0.4,Math.max(0,r*0.1),0,0,Math.max(0,r*1.1));
     grd.addColorStop(0,lighten(m.color,90));grd.addColorStop(0.5,lighten(m.color,20));grd.addColorStop(1,m.color);
@@ -727,9 +730,11 @@ function build_gummy(api){
     g.stroke();
     if(m.flash>0){g.save();g.globalAlpha=m.flash*0.7;g.fillStyle="#fff";
       g.beginPath();g.arc(0,0,outerR,0,TAU);g.moveTo(innerR,0);g.arc(0,0,innerR,0,TAU,true);g.fill("evenodd");g.restore();}
-    g.strokeStyle="rgba(255,255,255,.3)";g.lineWidth=2;
+    g.strokeStyle="rgba(90,30,60,.55)";g.lineWidth=3.5;
     g.beginPath();g.arc(0,0,outerR,0,TAU);g.stroke();
     g.beginPath();g.arc(0,0,innerR,0,TAU);g.stroke();
+    g.strokeStyle="rgba(255,255,255,.3)";g.lineWidth=1.2;
+    g.beginPath();g.arc(0,0,outerR,0,TAU);g.stroke();
     // face on the lower ring
     const fy=r*0.62,blinking=m.blink!==undefined&&m.blink!==999&&Math.floor(m.blink/40)%2===0;
     if(blinking){
@@ -747,7 +752,7 @@ function build_gummy(api){
   function drawCookie(m,x,y,sq,r){
     const wob=m.state==="up"?Math.sin(m.wob)*0.06:0;
     g.save();g.translate(x,y);g.scale((1+wob),sq*(1-wob*0.6));
-    g.fillStyle="rgba(60,30,15,.22)";g.beginPath();
+    g.fillStyle="rgba(60,30,15,.35)";g.beginPath();
     g.ellipse(0,Math.max(0,r*0.65),Math.max(0,r*0.85),Math.max(0,r*0.26),0,0,TAU);g.fill();
     const grd=g.createRadialGradient(-r*0.2,-r*0.3,0,0,0,Math.max(0,r*1.05));
     grd.addColorStop(0,lighten(m.color,60));grd.addColorStop(0.55,lighten(m.color,10));grd.addColorStop(1,m.color);
@@ -759,7 +764,9 @@ function build_gummy(api){
     g.beginPath();g.moveTo(-r*0.3,-r*0.2);g.lineTo(-r*0.05,r*0.05);g.lineTo(r*0.25,-r*0.05);g.stroke();
     if(m.flash>0){g.save();g.globalAlpha=m.flash*0.7;g.fillStyle="#fff";
       g.beginPath();g.ellipse(0,0,Math.max(0,r*0.95),Math.max(0,r*0.72),0,0,TAU);g.fill();g.restore();}
-    g.strokeStyle="rgba(255,255,255,.3)";g.lineWidth=2;
+    g.strokeStyle="rgba(90,30,60,.55)";g.lineWidth=3.5;
+    g.beginPath();g.ellipse(0,0,Math.max(0,r*0.95),Math.max(0,r*0.72),0,0,TAU);g.stroke();
+    g.strokeStyle="rgba(255,255,255,.3)";g.lineWidth=1.2;
     g.beginPath();g.ellipse(0,0,Math.max(0,r*0.95),Math.max(0,r*0.72),0,0,TAU);g.stroke();
     const blinking=m.blink!==undefined&&m.blink!==999&&Math.floor(m.blink/40)%2===0;
     if(blinking){

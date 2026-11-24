@@ -121,7 +121,7 @@ function buildHammer(api){
     if(modifier==="slow")dur*=1.5;  // ゆっくりモード: 長く出ていて さらにやさしい
     const type=pickType();
     let color=pick(TC),hp=1,life=dur;
-    if(type==="big"){color="#7a8a99";hp=2;}        // grey tough bot
+    if(type==="big"){color="#3f5fa8";hp=2;}        // grey tough bot
     else if(type==="gold"){color="#ffd23f";life=dur*0.55;} // shiny + short-lived
     else if(type==="zap"){color="#2fd8f0";life=dur*1.3;}   // でんき: lingers so you can gather neighbors, then たてよこ連鎖
     else if(type==="bomb"){color="#ff4d6d";}       // do NOT hit (pink bomb)
@@ -586,10 +586,11 @@ function buildHammer(api){
         g.save();g.translate(bossUp?api.W*0.17:api.W/2,api.H*0.16);g.scale(pop,pop);
         g.font="800 32px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.globalAlpha=clamp(comboT,0,1);
+        // 軸6: 太い暗い縁を先に引いてから塗る(背景の雲や草に溶けない)
+        g.shadowBlur=0;g.lineJoin="round";g.lineWidth=6;g.strokeStyle="rgba(120,60,0,.85)";
+        g.strokeText("コンボ x"+combo,0,0);
         g.shadowColor="rgba(255,140,40,.8)";g.shadowBlur=14;
         g.fillStyle="#ffd23f";g.fillText("コンボ x"+combo,0,0);
-        g.shadowBlur=0;g.lineWidth=1.5;g.strokeStyle="rgba(255,255,255,.6)";
-        g.strokeText("コンボ x"+combo,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";
       }
       // 軸6: 3種のバナー(でんき/ボス教示/にじいろ/ラッキー)は同時に出ても重ならないよう縦に40pxずつずらして積む。
@@ -602,10 +603,10 @@ function buildHammer(api){
         if(!bannerHide){g.save();g.translate(api.W/2,slotY);slotY+=40;g.scale(pop,pop);
         g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.globalAlpha=clamp(zapMsgT*1.4,0,1);
+        g.shadowBlur=0;g.lineJoin="round";g.lineWidth=6;g.strokeStyle="rgba(0,70,110,.85)";
+        g.strokeText("でんき チェイン!",0,0);
         g.shadowColor="rgba(77,224,255,.9)";g.shadowBlur=16;
         g.fillStyle="#c8f6ff";g.fillText("でんき チェイン!",0,0);
-        g.shadowBlur=0;g.lineWidth=1.5;g.strokeStyle="rgba(40,120,160,.7)";
-        g.strokeText("でんき チェイン!",0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";}
         if(zapMsgT<0)zapMsgT=0;}
       // ボス弱点の教示: 「ピカッたら いまだ!」(center = HUD安全帯)
@@ -614,10 +615,10 @@ function buildHammer(api){
         if(!bannerHide){g.save();g.translate(api.W/2,slotY);slotY+=40;g.scale(pop,pop);
         g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.globalAlpha=clamp(bossMsgT*1.4,0,1);
+        g.shadowBlur=0;g.lineJoin="round";g.lineWidth=6;g.strokeStyle="rgba(110,70,0,.85)";
+        g.strokeText("ピカッたら いまだ!",0,0);
         g.shadowColor="rgba(255,220,60,.9)";g.shadowBlur=16;
         g.fillStyle="#ffe23f";g.fillText("ピカッたら いまだ!",0,0);
-        g.shadowBlur=0;g.lineWidth=1.5;g.strokeStyle="rgba(160,110,20,.7)";
-        g.strokeText("ピカッたら いまだ!",0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";}
         if(bossMsgT<0)bossMsgT=0;}
       // ① にじいろロボ! 発見バナー(虹色に色替わり)
@@ -625,9 +626,11 @@ function buildHammer(api){
         const pop=1+Math.max(0,rbMsgT-1)*1.4,col=TC[Math.floor(tGlobal*0.1)%TC.length];
         if(!bannerHide){g.save();g.translate(api.W/2,slotY);slotY+=40;g.scale(pop,pop);
         g.font="900 34px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-        g.globalAlpha=clamp(rbMsgT*1.4,0,1);g.shadowColor=col;g.shadowBlur=18;
+        g.globalAlpha=clamp(rbMsgT*1.4,0,1);
+        g.shadowBlur=0;g.lineJoin="round";g.lineWidth=7;g.strokeStyle="rgba(50,20,90,.9)";g.strokeText("にじいろロボ!",0,0);
+        g.lineWidth=3;g.strokeStyle=col;g.strokeText("にじいろロボ!",0,0);
+        g.shadowColor=col;g.shadowBlur=18;
         g.fillStyle="#ffffff";g.fillText("にじいろロボ!",0,0);
-        g.shadowBlur=0;g.lineWidth=2;g.strokeStyle=col;g.strokeText("にじいろロボ!",0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";}
         if(rbMsgT<0)rbMsgT=0;}
       // ② ラッキー! バナー(今日のラッキー色で)
@@ -643,11 +646,12 @@ function buildHammer(api){
       // ③ ノーミス ボーナス! バナー(ステージ突破の下側=クリア文字と重ねない)
       if(noMissT>0){noMissT-=0.014*dt;
         const pop=1+Math.max(0,noMissT-1.3)*1.4;
-        g.save();g.translate(api.W/2,api.H*0.62);g.scale(pop,pop);
+        g.save();g.translate(api.W/2,api.H*0.66);g.scale(pop,pop);
         g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-        g.globalAlpha=clamp(noMissT*1.3,0,1);g.shadowColor="rgba(123,224,138,.9)";g.shadowBlur=16;
+        g.globalAlpha=clamp(noMissT*1.3,0,1);
+        g.shadowBlur=0;g.lineJoin="round";g.lineWidth=6;g.strokeStyle="rgba(10,70,30,.92)";g.strokeText("ノーミス ボーナス!",0,0);
+        g.shadowColor="rgba(123,224,138,.9)";g.shadowBlur=16;
         g.fillStyle="#c7ffcf";g.fillText("ノーミス ボーナス!",0,0);
-        g.shadowBlur=0;g.lineWidth=1.5;g.strokeStyle="rgba(40,120,60,.7)";g.strokeText("ノーミス ボーナス!",0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";if(noMissT<0)noMissT=0;}
       // 必殺どっかん white screen-flash(まぶしすぎ防止に控えめ+早く引く)
       if(novaT>0){g.save();g.globalAlpha=Math.min(novaT,1)*0.4;g.fillStyle="#ffffff";

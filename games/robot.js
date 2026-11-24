@@ -68,9 +68,10 @@ function buildRobot(api){
   // ステージバナー/にじいろバナー中は、詰まらないよう最大3個まで(keep:true の特別な文字は除く)
   function addFloat(o){
     if((stageBannerT>0||rbMsgT>0)&&!o.keep&&floats.length>=3)return;
-    let n=0;
-    for(const f of floats){if(f.life>0&&Math.abs(f.x-o.x)<slotW*0.9&&Math.abs(f.y-o.y)<30)n++;}
-    o.y-=n*32;
+    // 近くの生き残り文字の大きさ(size)から間隔を作る: size40前後でも上下に重ならない
+    let off=0;
+    for(const f of floats){if(f.life>0&&Math.abs(f.x-o.x)<slotW*0.9&&Math.abs(f.y-(o.y-off))<60)off+=Math.max(34,((f.size||24)+(o.size||24))*0.55);}
+    o.y-=off;
     floats.push(o);
   }
   function stageQuota(s){return 8+(s-1)*4;} // 8,12,16,20,24 buildings per stage（7〜8歳向けに手応えを増やした）
@@ -192,7 +193,7 @@ function buildRobot(api){
       const ty=groundY-b.h-24;
       for(let k=0;k<5;k++){const a=-TAU*0.5*rnd(0.2,0.8),sp=rnd(2,5);
         sparks.push({x:b.x,y:ty,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1.5,life:1,decay:rnd(0.02,0.035),col:luckyColor,r:rnd(2,4)});}
-      addFloat({x:b.x+b.w*0.6,y:ty,txt:"ラッキー！",life:1,vy:-1.1,col:luckyColor,size:22,pop:1.5});
+      addFloat({x:b.x+b.w*0.6,y:ty,txt:"ラッキー！",life:1,vy:-1.1,col:luckyColor,fill:"#fff",size:26,pop:1.5});
     }
     if(combo>=4)addFloat({x:b.x,y:groundY-b.h-20,txt:"x"+combo,life:1,vy:-1.2,col:combo>=6?"#ff3b3b":combo>=3?"#ff8c42":"#ffd23f",size:combo>=4?42:30,pop:1.6});
     // --- chain collapse: tall chain-building topples its neighbours ---
@@ -373,7 +374,7 @@ function buildRobot(api){
         g.save();g.globalAlpha=Math.max(0,f.life);g.translate(f.x,f.y);g.scale(f.pop,f.pop);
         g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.shadowColor=f.col;g.shadowBlur=8;
-        g.lineWidth=8;g.strokeStyle="rgba(0,0,0,.75)";g.strokeText(f.txt,0,0);g.fillStyle=f.col;g.fillText(f.txt,0,0);
+        g.lineWidth=8;g.strokeStyle="rgba(0,0,0,.75)";g.strokeText(f.txt,0,0);g.fillStyle=f.fill||f.col;g.fillText(f.txt,0,0);
         g.restore();}
       g.globalAlpha=1;g.textAlign="left";floats=floats.filter(f=>f.life>0);
       // impact flash overlay
@@ -424,11 +425,15 @@ function buildRobot(api){
         g.restore();g.globalAlpha=1;g.shadowBlur=0;g.textAlign="left";g.textBaseline="alphabetic";if(rbMsgT<0)rbMsgT=0;}
       // ② きょうのラッキー色 はっけん！ 中央の小ヒント(初回だけ)
       if(luckyMsgT>0&&rbMsgT<=0&&stageBannerT<=0){luckyMsgT-=0.016*dt;
-        g.save();g.translate(api.W/2,api.H*0.3);g.textAlign="center";g.textBaseline="middle";
+        // ロボに重ならない上の空き(HUDの下)・暗い丸ボタンの上に白文字・色は丸で見せる=どの色でも読める
+        g.save();g.translate(api.W/2,api.H*0.105);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 23px 'Hiragino Maru Gothic ProN',system-ui";
         const t2="きょうの ラッキーいろは "+(COLNAME[luckyColor]||"")+"！";
-        g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText(t2,0,0);
-        g.fillStyle=luckyColor;g.fillText(t2,0,0);
+        const tw=g.measureText(t2).width,dotW=30;
+        g.fillStyle="rgba(20,16,34,.72)";roundRect(-(tw+dotW)/2-14,-18,tw+dotW+28,36,18);g.fill();
+        g.fillStyle=luckyColor;g.beginPath();g.arc(-(tw+dotW)/2+9,0,Math.max(0,9),0,TAU);g.fill();
+        g.lineWidth=2;g.strokeStyle="#fff";g.stroke();
+        g.textAlign="left";g.fillStyle="#fff";g.fillText(t2,-(tw+dotW)/2+dotW,0);g.textAlign="center";
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(luckyMsgT<0)luckyMsgT=0;}
       // ③ ノンストップ ボーナス！ バナー(ステージクリア文字の下=重ねない)
       if(nonstopT>0){nonstopT-=0.014*dt;

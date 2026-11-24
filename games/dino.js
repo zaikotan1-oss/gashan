@@ -153,7 +153,7 @@ function buildDino(api){
     arcs.push({dir:sweepDir,life:1});
     for(const o of objs){if(o.state!=="stand")continue;
       // 当たり判定=見えている物の幅+指の太さ(約8px)。ビルの間(約0.18スロット)を押すと空振り=ねらう遊びに(軸3)
-      const hw=count<=0?slotW*0.55:Math.max(slotW*0.32,o.w*0.5+slotW*0.07); // 最初の1回だけは隙間なし=最初の成功は必ず来る
+      const hw=count<=0?slotW*0.55:Math.max(slotW*0.30,o.w*0.5+slotW*0.02); // 最初の1回だけは隙間なし=最初の成功は必ず来る
       if(Math.abs(o.x-tapX)<hw){
         contact=true;
         // 硬いビル/お城は複数回ヒット
@@ -284,10 +284,10 @@ function buildDino(api){
           o.state="rise";o.rise=0;}}
         else if(o.state==="rise"){o.rise=Math.min(1,o.rise+0.05*dt);if(o.rise>=1)o.state="stand";}
         else if(o.state==="stand"){ // きん/にじいろは時間切れで消える(ねらう楽しさ)。ふつうのビルは消えない
-          if((o.type==="gold"||o.type==="rainbow")&&o.ttl>0&&(o.ttl-=dt)<=0){o.state="gone";o.respawnT=rnd(40,85);o.ttl=0;
+          if((o.type==="gold"||o.type==="rainbow")&&o.ttl>0&&(o.ttl-=dt)<=0){o.state="gone";o.respawnT=rnd(40,70);o.ttl=0;
             dust.push({x:o.x,y:groundY,r:slotW*0.2,vr:1.2,vx:0,life:1,decay:0.05});}}
         else if(o.state==="fly"){o.vy+=0.5*dt;o.x+=o.vx*dt;o.fy=(o.fy||0)+o.vy*dt;o.rot+=o.vr*dt;
-          if(groundY-o.h+o.fy>api.H+40||o.x<-o.w*2||o.x>api.W+o.w*2){o.state="gone";o.respawnT=rnd(40,85);o.fy=0;}}
+          if(groundY-o.h+o.fy>api.H+40||o.x<-o.w*2||o.x>api.W+o.w*2){o.state="gone";o.respawnT=rnd(40,70);o.fy=0;}}
         o.sway+=0.03*dt;
       }
       // draw objects behind dino
@@ -301,7 +301,7 @@ function buildDino(api){
       if(sweeping){sweepT+=0.08*dt;if(sweepT>=0.5&&!sweepHit){applyHits();sweepHit=true;bob=8;}
         if(sweepT>=1){sweeping=false;}}
       drawDino();
-      for(const o of objs)if(inFront(o))drawObj(o);
+      for(const o of objs)if(inFront(o))drawObj(o,true);
       // arcs (sweep trail, glowing)
       for(const a of arcs){a.life-=0.06*dt;const al=Math.max(0,a.life);
         g.save();g.globalAlpha=al*0.45;g.strokeStyle="#bfe9ff";g.lineWidth=16;g.lineCap="round";g.shadowColor="#7fd0ff";g.shadowBlur=24;
@@ -312,8 +312,10 @@ function buildDino(api){
       g.globalAlpha=1;arcs=arcs.filter(a=>a.life>0);
       // impact rings
       for(const rg of rings){rg.life-=0.05*dt;rg.r+=4*dt;const rl=Math.max(0,rg.life);
-        g.save();g.globalAlpha=rl*0.6;g.strokeStyle="#fff7d6";g.lineWidth=3+rl*3;
-        g.beginPath();g.arc(rg.x,rg.y,rg.r,0,TAU);g.stroke();g.restore();}
+        g.save();g.globalAlpha=rl*0.6;
+        g.strokeStyle="rgba(0,0,0,.35)";g.lineWidth=3+rl*3+3;g.beginPath();g.arc(rg.x,rg.y,Math.max(0,rg.r),0,TAU);g.stroke(); // 下線(明るい背景でも見える)
+        g.strokeStyle="#fff7d6";g.lineWidth=3+rl*3;
+        g.beginPath();g.arc(rg.x,rg.y,Math.max(0,rg.r),0,TAU);g.stroke();g.restore();}
       g.globalAlpha=1;rings=rings.filter(r=>r.life>0);
       // shards
       for(const p of shards){p.vy+=0.5*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.rot+=p.vr*dt;
@@ -323,6 +325,11 @@ function buildDino(api){
         g.fillStyle="rgba(255,255,255,.35)";g.fillRect(-p.s/2,-p.s/2,p.s*0.4,p.s*0.4);g.restore();}
       shards=shards.filter(p=>p.life>0);
       // sparks (glowing kira-kira)
+      // 明るい空・雲の上でも見えるよう、加算の前に source-over で薄い暗い下地を敷く
+      for(const sp of sparks){const sl0=Math.max(0,sp.life-sp.decay*dt);
+        g.globalAlpha=Math.min(1,sl0*1.2);g.fillStyle="rgba(40,20,0,.28)";
+        g.beginPath();g.arc(sp.x+sp.vx*dt,sp.y+(sp.vy+0.18*dt)*dt,Math.max(0,2+sl0*3+1.5),0,TAU);g.fill();}
+      g.globalAlpha=1;
       g.save();g.globalCompositeOperation="lighter";
       for(const sp of sparks){sp.vy+=0.18*dt;sp.x+=sp.vx*dt;sp.y+=sp.vy*dt;sp.life-=sp.decay*dt;
         const sl=Math.max(0,sp.life);g.globalAlpha=sl;
@@ -384,8 +391,12 @@ function buildDino(api){
         g.save();g.translate(api.W/2,api.H*0.40);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 26px 'Hiragino Maru Gothic ProN',system-ui";
         const t2="きょうのラッキーいろは "+(COLNAME[luckyColor]||"")+"！";
-        g.lineWidth=8;g.strokeStyle="rgba(0,0,0,.8)";g.strokeText(t2,0,0);
-        g.fillStyle=luckyColor;g.fillText(t2,0,0);
+        // 文字は読みやすい生成り色＋黒い丸背板。色名は左の丸(luckyColor)で示す(青空に青文字が埋もれない)
+        {const mw2=g.measureText(t2),tw2=(mw2&&mw2.width)||t2.length*26,pw2=tw2+24+30,ph2=40;
+          g.fillStyle="rgba(0,0,0,.45)";roundRect(-pw2/2,-ph2/2,pw2,ph2,ph2/2);g.fill();
+          g.fillStyle=luckyColor;g.beginPath();g.arc(-pw2/2+22,0,9,0,TAU);g.fill();
+          g.lineWidth=2;g.strokeStyle="#fffce8";g.stroke();
+          g.fillStyle="#fffce8";g.fillText(t2,12,1);}
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(luckyMsgT<0)luckyMsgT=0;}
       // 必殺ゲージ + ステージ進捗HUD
       drawHUD();
@@ -395,9 +406,9 @@ function buildDino(api){
       drawHint();
     }
   };
-  function drawObj(o){
+  function drawObj(o,front){
     if(o.state==="gone")return;
-    let yo=0,a=1;
+    let yo=0,a=front?0.85:1; // 恐竜の真正面の物は少し透かして、恐竜の頭が隠れきらないように
     if(o.state==="rise"){yo=(1-o.rise)*o.h;a=ease?ease(o.rise):o.rise;}
     else if(o.state==="stand"&&o.ttl>0&&o.ttl<60&&Math.floor(o.ttl/5)%2===0)a=0.4; // 消える直前の点滅(予告)
     g.save();g.globalAlpha=a;
@@ -518,12 +529,13 @@ function buildDino(api){
   }
   // ③ 街灯(lamp): 箱型ビルばかりにならないよう、丸い頭+細長い柱のシルエットを追加(軸7対策)
   function drawLamp(o,yo){
-    const x=o.x,topY=groundY-o.h+yo,poleW=Math.max(8,o.w*0.3);
+    const x=o.x,topY=groundY-o.h+yo,poleW=Math.max(12,o.w*0.45);
     // pole (縦長)
     g.fillStyle="rgba(0,0,0,.2)";g.fillRect(x-poleW/2+2,topY+o.h*0.16+2,poleW,o.h*0.84);
     let pg=g.createLinearGradient(x-poleW/2,0,x+poleW/2,0);
     pg.addColorStop(0,shade(o.color,0.5));pg.addColorStop(0.5,shade(o.color,0.75));pg.addColorStop(1,shade(o.color,0.45));
     g.fillStyle=pg;g.fillRect(x-poleW/2,topY+o.h*0.16,poleW,o.h*0.84);
+    g.lineWidth=2;g.strokeStyle="rgba(0,0,0,.45)";g.strokeRect(x-poleW/2,topY+o.h*0.16,poleW,o.h*0.84); // ビルと同じ輪郭
     // lamp head (まる)
     const headY=topY+o.h*0.1,headR=Math.max(4,o.w*0.5);
     g.fillStyle="rgba(0,0,0,.2)";g.beginPath();g.arc(x+2,headY+2,headR,0,TAU);g.fill();

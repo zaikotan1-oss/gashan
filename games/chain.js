@@ -228,8 +228,9 @@ function buildChain(api){
     // ③ 軸3(b)(c)対策: reset()と同じく、切り替え直後も薄くしない(13固定→orbCapまで満たす)。
     // ステージ切り替えは90秒中に何度も起きるので、ここが13のままだと毎回そこで無音区間が生まれる。
     orbs=[];for(let i=0;i<orbCap;i++)spawn();
-    floats.push({x:api.W/2,y:api.H*0.55,txt:"おだいの いろ: "+(COLNAME[targetCol]||""),
-      col:targetCol,life:1.2,vy:-0.3,size:34,born:0});
+    // 軸6: 字は白で塗り、お題色は光(shadow)だけで伝える=同色のオーブ・木箱の上でも必ず読める。れんさ表示と重ならない上寄りへ。
+    floats.push({x:api.W/2,y:api.H*0.34,txt:"おだいの いろ: "+(COLNAME[targetCol]||""),
+      col:targetCol,fill:"#ffffff",life:1.8,vy:-0.2,size:34,born:0});
   }
   function spawnStar(){
     const fromLeft=Math.random()<0.5, y=rnd(api.H*0.18,api.H*0.5);
@@ -427,26 +428,26 @@ function buildChain(api){
       // --- stage HUD: お題色 + ステージ番号 + すすみぐあいバー (top-CENTER = 衝突しない安全帯) ---
       {
         g.save();
-        g.font="800 20px 'Hiragino Maru Gothic ProN',system-ui";
+        g.font="800 26px 'Hiragino Maru Gothic ProN',system-ui";
         const lab="ステージ "+stage+(clearWon?"":"")+"  おだい:"+(COLNAME[targetCol]||"");
-        const lm=g.measureText(lab),lw=(lm&&lm.width)||lab.length*16;
-        const rowW=34+lw,hx=api.W/2-rowW/2,hy=8;
+        const lm=g.measureText(lab),lw=(lm&&lm.width)||lab.length*21;
+        const rowW=48+lw,hx=api.W/2-rowW/2,hy=8;
         // お題色 swatch
-        g.beginPath();g.arc(hx+14,hy+14,13,0,TAU);
+        g.beginPath();g.arc(hx+18,hy+14,18,0,TAU);
         g.fillStyle=targetCol;g.shadowColor=targetCol;g.shadowBlur=12;g.fill();g.shadowBlur=0;
         g.lineWidth=2;g.strokeStyle="rgba(255,255,255,.8)";g.stroke();
         // label
         g.textAlign="left";g.textBaseline="middle";
         g.lineWidth=4;g.strokeStyle="rgba(0,0,0,.5)";
-        g.strokeText(lab,hx+34,hy+14);
-        g.fillStyle="#eaf4ff";g.fillText(lab,hx+34,hy+14);
+        g.strokeText(lab,hx+48,hy+14);
+        g.fillStyle="#eaf4ff";g.fillText(lab,hx+48,hy+14);
         // progress bar toward stage clear (centered)
-        const bw=Math.min(api.W-28,200),bh=8,bxx=api.W/2-bw/2,byy=hy+30;
+        const bw=Math.min(api.W-28,Math.max(180,Math.min(api.W*0.3,320))),bh=16,bxx=api.W/2-bw/2,byy=hy+36;
         g.fillStyle="rgba(20,14,45,.6)";g.beginPath();
-        g.roundRect?g.roundRect(bxx,byy,bw,bh,4):g.rect(bxx,byy,bw,bh);g.fill();
+        g.roundRect?g.roundRect(bxx,byy,bw,bh,8):g.rect(bxx,byy,bw,bh);g.fill();g.lineWidth=2;g.strokeStyle="rgba(255,255,255,.7)";g.stroke();
         const prog=clamp(stageScore/stageTarget,0,1);
         g.fillStyle=targetCol;g.shadowColor=targetCol;g.shadowBlur=8;g.beginPath();
-        g.roundRect?g.roundRect(bxx,byy,bw*prog,bh,4):g.rect(bxx,byy,bw*prog,bh);g.fill();g.shadowBlur=0;
+        g.roundRect?g.roundRect(bxx,byy,Math.max(bh*0.5,bw*prog),bh,8):g.rect(bxx,byy,bw*prog,bh);g.fill();g.shadowBlur=0;
         g.restore();g.textAlign="left";g.textBaseline="alphabetic";
       }
       // chain counter
@@ -476,12 +477,12 @@ function buildChain(api){
         g.save();g.translate(f.x,f.y);g.scale(1,1);
         g.font="800 "+fs+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.lineWidth=8;g.strokeStyle="rgba(0,0,0,.7)";g.strokeText(f.txt,0,0);
-        g.shadowColor=f.col;g.shadowBlur=16;g.fillStyle=f.col;g.fillText(f.txt,0,0);g.shadowBlur=0;g.restore();}
+        g.shadowColor=f.col;g.shadowBlur=16;g.fillStyle=(f.fill||f.col);g.fillText(f.txt,0,0);g.shadowBlur=0;g.restore();}
       g.globalAlpha=1;g.textAlign="left";floats=floats.filter(f=>f.life>0);
       // ① にじいろチェイン！ バナー(虹色に色替わり)
       if(rbMsgT>0){rbMsgT-=0.016*dt;
         const col=COLORS[Math.floor(t*0.1)%COLORS.length],pop=1+Math.max(0,rbMsgT-0.9)*1.3;
-        g.save();g.translate(api.W/2,api.H*0.15);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
+        g.save();g.translate(api.W/2,api.H*0.2);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(rbMsgT*1.4,0,1);g.font="900 34px 'Hiragino Maru Gothic ProN',system-ui";
         g.lineWidth=7;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText("にじいろチェイン！",0,0);
         g.fillStyle=col;g.fillText("にじいろチェイン！",0,0);
@@ -489,7 +490,7 @@ function buildChain(api){
       // ② パーフェクト！ バナー
       if(perfMsgT>0){perfMsgT-=0.016*dt;
         const pop=1+Math.max(0,perfMsgT-0.9)*1.3;
-        g.save();g.translate(api.W/2,api.H*0.22);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
+        g.save();g.translate(api.W/2,api.H*0.27);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(perfMsgT*1.4,0,1);g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";
         g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText("パーフェクト！",0,0);
         g.shadowColor="#7be08a";g.shadowBlur=14;g.fillStyle="#c7ffcf";g.fillText("パーフェクト！",0,0);g.shadowBlur=0;

@@ -347,8 +347,11 @@ function build_icicle(api){
           if((wk.sp>0&&wk.x>W+wk.r+20)||(wk.sp<0&&wk.x<-wk.r-20))wk.dead=true;
         } else {wk.squash+=( -0.06*dt );if(wk.vx){wk.x+=wk.vx*dt;wk.rot=(wk.rot||0)+wk.vx*0.05*dt;}}
         if(wk.flash>0)wk.flash-=0.08*dt;
-        drawWalker(wk);
       }
+      // 描く順: 丸い雪だま→そり→タワー→でかだま→おうち→きんいろ→にじいろ(おうち・光る的が雪だまの後ろに隠れない)
+      {const pri={blob:0,sled:1,tower:2,big:3,hut:4,gold:5,rainbow:6};
+       const ordered=walkers.slice().sort((a,b)=>(pri[a.kind]||0)-(pri[b.kind]||0));
+       for(const wk of ordered)drawWalker(wk);}
       // remove walkers that died by squash collapse or walked off
       for(let i=walkers.length-1;i>=0;i--){
         const wk=walkers[i];
@@ -478,7 +481,7 @@ function build_icicle(api){
       // ② ラッキー! バナー(初回は「きょうのラッキー色は◯!」と教える)
       if(luckyMsgT>0&&clearT<=0){luckyMsgT-=0.016*dt;
         {
-        const pop=1+Math.max(0,luckyMsgT-1)*1.2,txt=luckyMsgT>1.1?("きょうのラッキー色は "+luckyName+"!"):("ラッキー! "+luckyName);
+        const pop=1+Math.max(0,luckyMsgT-1)*1.2,txt=luckyMsgT>1.1?("きょうの ラッキーいろ は "+luckyName+"!"):("ラッキー! "+luckyName);
         g.save();g.translate(W/2,H*0.50);g.scale(pop,pop);   // お祝い(H*0.30)・にじいろ(H*0.43)の下。クリア帯とは同時に出さない
         g.font="900 24px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.globalAlpha=clamp(luckyMsgT*1.4,0,1);g.lineJoin="round";
@@ -592,9 +595,9 @@ function build_icicle(api){
     const r=wk.r,bob=Math.sin(wk.bob)*r*0.06;
     const sq=clamp(wk.squash,0.2,1.4);
     g.save();g.translate(wk.x,wk.y+bob);
-    g.scale(1,sq);
+    g.scale(1.15,sq*1.15);   // 見た目だけ1.15倍(当たり判定 r は変えない)
     // shadow
-    g.fillStyle="rgba(60,100,140,.22)";g.beginPath();g.ellipse(0,r*0.05,r*0.95,r*0.28,0,0,TAU);g.fill();
+    g.fillStyle="rgba(60,100,140,.40)";g.beginPath();g.ellipse(0,r*0.05,r*0.95,r*0.28,0,0,TAU);g.fill();
     // 画像スプライト: おうち(hut) / きんいろだま(gold)。当たり判定 r に合わせて中央描画。
     // (ふつうの雪だま/でかだま/にじいろは マフラー色=ラッキー色の仕掛けがあるので手描きのまま)
     //  hut.png : 家の本体が画像幅の約82%・接地が高さの約92% → 幅 2.3r で家の半幅≒0.94r(当たり半幅0.95r)、
@@ -634,6 +637,7 @@ function build_icicle(api){
       const rg=g.createRadialGradient(-r*0.15,-r*0.5,Math.max(0,r*0.1),0,-r*0.3,Math.max(0,r*0.8));
       rg.addColorStop(0,"#ffffff");rg.addColorStop(0.6,wk.col);rg.addColorStop(1,"#cfe2f0");
       g.fillStyle=rg;g.beginPath();g.arc(0,-r*0.35,r*0.55,0,TAU);g.fill();
+      g.strokeStyle="rgba(50,90,140,.6)";g.lineWidth=2.5;g.stroke();
       if(wk.scarf){g.fillStyle=wk.scarf;g.beginPath();g.ellipse(0,r*0.02,r*0.42,r*0.13,0,0,TAU);g.fill();}
       const blinkS=Math.sin(wk.bob*0.5)>0.97?0.15:1;
       g.fillStyle="#26415a";
@@ -650,6 +654,7 @@ function build_icicle(api){
         const tg=g.createRadialGradient(-segR[i]*0.3,segY[i]-segR[i]*0.3,Math.max(0,segR[i]*0.1),0,segY[i],Math.max(0,segR[i]*1.2));
         tg.addColorStop(0,"#ffffff");tg.addColorStop(0.6,wk.col);tg.addColorStop(1,"#cfe2f0");
         g.fillStyle=tg;g.beginPath();g.arc(0,segY[i],Math.max(0,segR[i]),0,TAU);g.fill();
+        g.strokeStyle="rgba(50,90,140,.6)";g.lineWidth=2.5;g.stroke();
       }
       if(wk.scarf){g.fillStyle=wk.scarf;
         g.beginPath();g.ellipse(0,segY[0]-segR[0]*0.55,segR[0]*0.75,segR[0]*0.22,0,0,TAU);g.fill();}
@@ -670,6 +675,7 @@ function build_icicle(api){
       const grd=g.createRadialGradient(-r*0.3,-r*0.5,r*0.1,0,-r*0.2,r*1.2);
       grd.addColorStop(0,"#ffffff");grd.addColorStop(0.6,wk.col);grd.addColorStop(1,"#cfe2f0");
       g.fillStyle=grd;g.beginPath();g.arc(0,-r*0.2,r*0.9,0,TAU);g.fill();
+      g.strokeStyle="rgba(50,90,140,.6)";g.lineWidth=2.5;g.stroke();
       // ① にじいろだま: 体に虹のしま模様(クリップして球体になじませる)
       if(wk.kind==="rainbow"){
         const rc=["#ff5b5b","#ff8c42","#ffd23f","#7be08a","#5ad1ff","#c78bff"];
@@ -712,9 +718,12 @@ function build_icicle(api){
     const left=clamp(stageGoal-stageKill,0,stageGoal);
     const bw=Math.min(W*0.6,360),bh=16,bx=(W-bw)/2,by=H*0.045;
     g.save();g.textAlign="center";
-    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
+    g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
     g.fillStyle="#fff";g.shadowColor="rgba(0,0,0,.5)";g.shadowBlur=6;
-    g.fillText("ステージ "+stage+" / "+STAGES+"      あと "+left+" こ",W/2,by-8);
+    {const hudTxt="ステージ "+stage+" / "+STAGES+"      あと "+left+" こ";
+     const tw=g.measureText(hudTxt).width;
+     if(tw>W*0.94)g.font="800 "+Math.max(16,Math.floor(22*W*0.94/tw))+"px 'Hiragino Maru Gothic ProN',system-ui";
+     g.fillText(hudTxt,W/2,by-9);}
     g.shadowBlur=0;
     g.fillStyle="rgba(0,0,0,.3)";rrect(bx,by,bw,bh,bh/2);g.fill();
     const fr=clamp(stageKill/stageGoal,0,1);

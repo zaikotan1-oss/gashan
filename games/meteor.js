@@ -423,7 +423,7 @@ function buildMeteor(api){
     g.lineWidth=2;g.strokeStyle="rgba(255,210,140,.5)";rrect(sx,pad,sw,sh,sh*0.4);g.stroke();
     g.textAlign="center";g.fillStyle="#fff7e6";g.fillText(stxt,api.W/2,pad+sh*0.5+sfs*0.36);g.textAlign="left";
     // best combo (centered, just below the stage badge) only once it matters
-    if(bestCombo>=2){const cfs=clamp(api.W*0.035,14,20);
+    if(bestCombo>=2&&!(banT>0&&banner&&rbMsgT<=0)){const cfs=clamp(api.W*0.035,14,20);
       g.font="800 "+cfs+"px 'Hiragino Maru Gothic ProN',system-ui";
       const ct="さいこう x"+bestCombo,cy=pad+sh+cfs+6;
       g.textAlign="center";g.fillStyle="#ffd27a";g.lineWidth=4;g.strokeStyle="rgba(0,0,0,.4)";

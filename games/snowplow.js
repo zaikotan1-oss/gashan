@@ -387,7 +387,7 @@ function buildSnowplow(api){
         o.wob+=0.06*dt;
         if(!o.dead){
           o.x-=speed*dt;
-          const bladeStop=bladeX+o.w*0.4;     // 刃に届く位置(=ここまでは進める)
+          const bladeStop=bladeX+truckW*0.03-o.w*0.5;     // 刃に届く位置(=ここまでは進める)
           const jamStop=queueBack+o.w*0.75;   // 手前のオブジェクトに突っ込まない位置(渋滞)。軸3: 間隔を広めにして取り違えヒットを防ぐ
           const stopX=Math.max(bladeStop,jamStop);
           if(o.x<stopX)o.x=stopX;
@@ -538,7 +538,7 @@ function buildSnowplow(api){
         // 軸6: コンボ表示・ほめ言葉と重ならない(コンボ中は後ろにずらす)。濃い縁＋白い文字＋色玉で背景の赤い屋根にも埋もれない
         g.save();g.translate(api.W/2,api.H*0.56);g.textAlign="center";
         g.globalAlpha=clamp(luckyMsgT*2.5,0,1);g.font="800 32px 'Hiragino Maru Gothic ProN',system-ui";
-        const t2="きょうのラッキー色は "+(BLOCKNAME[luckyColor]||"")+"！";
+        const t2="きょうの ラッキーいろは "+(BLOCKNAME[luckyColor]||"")+"！";
         const tw2=g.measureText(t2).width,orbR=16,orbX=-tw2/2-orbR-8;
         g.shadowBlur=0;g.lineWidth=6;g.lineJoin="round";g.strokeStyle="rgba(10,42,58,.85)";g.strokeText(t2,12,0);
         g.fillStyle="#ffffff";g.fillText(t2,12,0);
@@ -586,11 +586,11 @@ function buildSnowplow(api){
       if(bw*fr>8){g.save();rrect(bx,by,bw*fr,bh,bh/2);g.clip();
         g.globalAlpha=0.5;g.fillStyle="#fff";g.fillRect(sxp,by,3,bh);g.restore();}
     }
-    g.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
+    g.font="800 20px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
     g.lineWidth=4;g.lineJoin="round";g.strokeStyle="rgba(10,42,58,.6)";
     const label=fever?"フィーバー ちゅう！ てん 2ばい！":"フィーバー";
     if(fever){g.shadowBlur=10+5*Math.sin(tsec*8);g.shadowColor="#ffd23f";}
-    g.strokeText(label,api.W/2,by-7);g.fillStyle=fever?"#fff":"#fff5d6";g.fillText(label,api.W/2,by-7);
+    g.strokeText(label,api.W/2,by-9);g.fillStyle=fever?"#fff":"#fff5d6";g.fillText(label,api.W/2,by-9);
     g.restore();g.textAlign="left";g.lineJoin="miter";
   }
 

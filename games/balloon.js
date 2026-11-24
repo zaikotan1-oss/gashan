@@ -119,7 +119,7 @@ function buildBalloon(api){
     // count toward the stage target colour
     if(targetLeft>0&&b.color===target){   // にじいろは的を進めない(連鎖の吸着には今まで通り加わる)
       targetLeft--;
-      floats.push({x:b.x,y:b.y-34,txt:"せいかい！",life:1,vy:-1.2,t:0,col:target,size:26});
+      if(!banner&&targetLeft>0)floats.push({x:b.x,y:b.y-34,txt:"せいかい！",life:1,vy:-1.2,t:0,col:target,size:26});
       if(targetLeft<=0)clearStage();
     }
     const big=waveN>=6;
@@ -204,7 +204,7 @@ function buildBalloon(api){
         confetti.push({x:api.W/2,y:api.H*0.52,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2.5,s:rnd(4,9),color:"#7be08a",rot:rnd(0,TAU),vr:rnd(-0.5,0.5),life:1,decay:rnd(0.01,0.02)});}}
     for(let k=50;k>0;k--){const a=rnd(0,TAU),s=rnd(3,11);
       confetti.push({x:api.W/2,y:api.H*0.45,vx:Math.cos(a)*s,vy:Math.sin(a)*s-3,s:rnd(5,11),color:pick(COLORS),rot:rnd(0,TAU),vr:rnd(-0.6,0.6),life:1,decay:rnd(0.008,0.016)});}
-    setTimeout2(nextStage,38);
+    setTimeout2(nextStage,56);
   }
   // tiny frame-based delay helper (no real timers; queued in frame loop)
   let queued=[];
@@ -452,7 +452,7 @@ function buildBalloon(api){
       // stage banner (big, brief)
       if(banner){banner.t+=dt;banner.life-=0.012*dt;
         const a=Math.max(0,Math.min(1,banner.life*1.3)),pop=1+Math.max(0,0.5-banner.t*0.045)*1.6;
-        g.save();g.globalAlpha=a;g.translate(api.W/2,api.H*0.32);g.scale(pop,pop);
+        g.save();g.globalAlpha=a;g.translate(api.W/2,api.H*0.46);g.scale(pop,pop);
         g.font="900 "+(banner.big?54:40)+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";g.textBaseline="middle";
         g.lineWidth=8;g.strokeStyle="rgba(0,0,0,.45)";g.strokeText(banner.txt,0,0);
         g.shadowColor=banner.col;g.shadowBlur=24;g.fillStyle=banner.col;g.fillText(banner.txt,0,0);
@@ -480,7 +480,7 @@ function buildBalloon(api){
       // ③ パーフェクト！ バナー(クリア文字の下=重ねない)
       if(perfectT>0){perfectT-=0.014*dt;
         const a=clamp(perfectT*1.3,0,1),pop=1+Math.max(0,perfectT-1.6)*1.5;
-        g.save();g.globalAlpha=a;g.translate(api.W/2,api.H*0.62);g.scale(pop,pop);
+        g.save();g.globalAlpha=a;g.translate(api.W/2,api.H*0.68);g.scale(pop,pop);
         g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";g.textBaseline="middle";
         g.lineWidth=6;g.strokeStyle="rgba(20,90,40,.6)";g.strokeText("パーフェクト！",0,0);
         g.shadowColor="rgba(123,224,138,.9)";g.shadowBlur=18;g.fillStyle="#c7ffcf";g.fillText("パーフェクト！",0,0);

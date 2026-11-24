@@ -174,7 +174,11 @@ function buildSlash(api){
       const rB=clamp(api.W*0.055,24,46),gap=Math.max(42,rB*2.2),n=rint(3,4);   // 軸6: 同じ半径・広めの間隔で重ならないように
       for(let i=0;i<n;i++)pushFruit(clamp(x+(i-(n-1)/2)*gap,api.W*0.1,api.W*0.9),0.4,false,undefined,rB*0.9);
     }else if(gim==="swarm"){
-      const n=rint(2,3);for(let i=0;i<n;i++)pushFruit(rnd(api.W*0.14,api.W*0.86));
+      const n=rint(2,3),xs=[],minGap=2*clamp(api.W*0.055,24,46);
+      // 軸6: 既に出した的から離れた x だけ採用(最大5回やり直し。数・当たり判定は変えない)
+      for(let i=0;i<n;i++){let x2=rnd(api.W*0.14,api.W*0.86);
+        for(let k=0;k<5&&xs.some(v=>Math.abs(v-x2)<minGap);k++)x2=rnd(api.W*0.14,api.W*0.86);
+        xs.push(x2);pushFruit(x2);}
     }else{
       // 4. ステージ1のうちから低確率(10%)で巨大フルーツを混ぜ、序盤から大小の対比を体験させる
       pushFruit(x,undefined,stage===0&&Math.random()<0.1);
@@ -259,7 +263,7 @@ function buildSlash(api){
       twinkles.push({x:o.x,y:o.y-o.r*1.2,r:clamp(api.W*0.03,10,16),life:1,col:"#fff2a0"});
       for(let k=6;k>0;k--){const a=-TAU/4+rnd(-0.7,0.7),s=rnd(2,5);
         sparks.push({x:o.x,y:o.y-o.r*0.5,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1,life:1,decay:rnd(0.03,0.05),len:rnd(6,12),col:luckyColor});}
-      floats.push({x:o.x,y:o.y-40,txt:"ラッキー！",life:1,vy:-1.1,col:luckyColor,size:30,scl:0});
+      floats.push({x:o.x,y:o.big?o.y-o.r-14-40:o.y-40,txt:"ラッキー！",life:1,vy:-1.1,col:luckyColor,size:30,scl:0});
       // 軸6(見やすさ)向け: にじいろメッセージ(rbMsgT)表示中は同時発火させず、1テンポ遅らせて文字の重なりを防ぐ
       if(!luckySeen&&rbMsgT<=0&&banner==null&&stageQuota-stageCut>3&&feverT<=0&&fever<0.8){luckyMsgT=1.9;luckySeen=true;}
     }
@@ -271,7 +275,11 @@ function buildSlash(api){
     // 4. 巨大フルーツ 命中: ひときわ大きい表示でボーナスに気づかせる
     if(o.big)floats.push({x:o.x,y:o.y-o.r-14,txt:"おおきい！",life:1,vy:-1.1,col:"#ffd23f",size:36,scl:0});
     if(combo>1){floats=floats.filter(f=>!/^x\d/.test(f.txt));   // 軸6: 古い「xN」を消してから新しいものだけ出す(重なって読めなくなるのを防ぐ)
-      floats.push({x:api.W/2,y:api.H*0.5,txt:"x"+combo,life:1,vy:-1.1,col:fever>0?"#ffd23f":combo>=6?"#ff3b3b":combo>=3?"#ff8c42":"#ffd23f",size:combo>=4?42:30,scl:0});}
+      // 軸6: ラッキー！/おおきい！/あんぜん！/にじいろ！ と同じ高さに重ならないよう、空いている高さへ逃がす
+      let cy=api.H*0.5;
+      for(const yy of [0.5,0.38,0.62,0.28,0.72]){cy=api.H*yy;
+        if(!floats.some(f=>f.life>0.3&&/^(ラッキー|おおきい|あんぜん|にじいろ|ながれ)/.test(f.txt)&&Math.abs(f.y-cy)<50&&Math.abs(f.x-api.W/2)<220))break;}
+      floats.push({x:api.W/2,y:cy,txt:"x"+combo,life:1,vy:-1.1,col:fever>0?"#ffd23f":combo>=6?"#ff3b3b":combo>=3?"#ff8c42":"#ffd23f",size:combo>=4?42:30,scl:0});}
   }
   // 2. 岩の欠片: いびつな向きへ3〜4個飛び散る(丸い果物のhalvesとは別の壊れ方)
   function spawnRockShards(o,ang){
@@ -773,7 +781,7 @@ function buildSlash(api){
   }
   // HUD: hearts top-left, stage badge top-center, fever bar top-right
   function drawHUD(now){
-    const m=clamp(api.W*0.03,10,18),hs=clamp(api.W*0.035,16,26);
+    const m=clamp(api.W*0.03,10,18),hs=clamp(api.W*0.04,20,30);
     // hearts（gバー(もどるボタン)の下に降ろして衝突回避）
     for(let i=0;i<3;i++){
       const hx=m+i*(hs*1.25),hy=62+hs*0.6,full=i<lives;
@@ -873,6 +881,10 @@ function buildSlash(api){
     const col=o.t==="rainbow"?RB_COLS[Math.floor((nowMs||0)*0.008)%RB_COLS.length]:o.skin;
     return api.tinted("fruit.png",col,o.t==="ice"?0.4:0.55);
   }
+  // 軸6(見やすさ): 安全な樽は緑の太い光輪で、茶色の危険な樽や桃色の背景と一目で見分ける
+  function safeRing(o){
+    g.save();g.strokeStyle="rgba(125,255,154,.85)";g.lineWidth=4;
+    g.beginPath();g.arc(0,0,Math.max(0,o.r+3),0,TAU);g.stroke();g.restore();}
   function drawWhole(o){
     g.save();g.translate(o.x,o.y);g.rotate(o.rot);
     // soft drop shadow
@@ -885,8 +897,8 @@ function buildSlash(api){
       // 樽画像は正方形内で幅0.89・高さ1.0 → 幅2.2r/高さ2.4r で描くと胴の見た目≒当たり判定の円(直径2r)
       if(o.t==="barrel_safe"){
         // 3. 安全な樽は画像も色替え(危険な樽の茶色と混同しないよう緑に着色)
-        const spr=api.tinted("barrel.png",o.skin,0.55);
-        if(spr){api.drawSrc(spr,0,0,o.r*2.2,o.r*2.4,{center:true});g.restore();return;}
+        const spr=api.tinted("barrel.png",o.skin,0.75);
+        if(spr){api.drawSrc(spr,0,0,o.r*2.2,o.r*2.4,{center:true});safeRing(o);g.restore();return;}
       }else if(api.drawAsset("barrel.png",0,0,o.r*2.2,o.r*2.4,{center:true})){g.restore();return;}
     }else{
       const spr=fruitSprite(o,lastNow);
@@ -905,6 +917,7 @@ function buildSlash(api){
       }
     }
     if(o.t==="barrel"||o.t==="barrel_safe"){
+      if(o.t==="barrel_safe")safeRing(o);
       const bg=g.createLinearGradient(-o.r*0.8,0,o.r*0.8,0);
       bg.addColorStop(0,o.skin);bg.addColorStop(0.45,o.flesh);bg.addColorStop(1,o.skin);
       g.fillStyle=bg;g.fillRect(-o.r*0.8,-o.r,o.r*1.6,o.r*2);
@@ -948,6 +961,7 @@ function buildSlash(api){
       const grd=g.createRadialGradient(-o.r*0.3,-o.r*0.3,Math.max(0.1,o.r*0.1),0,0,Math.max(0,o.r));
       grd.addColorStop(0,tint(o.skin,0.6));grd.addColorStop(0.6,o.skin);grd.addColorStop(1,shade(o.skin,-0.3));
       g.fillStyle=grd;g.beginPath();g.arc(0,0,Math.max(0,o.r),0,TAU);g.fill();
+      g.lineWidth=3;g.strokeStyle="rgba(20,20,26,.55)";g.stroke();
       g.globalCompositeOperation="lighter";g.strokeStyle="rgba(255,255,255,.9)";g.lineWidth=1.5;
       for(let i=0;i<4;i++){const a=o.rot+i*(TAU/4);
         g.beginPath();g.moveTo(Math.cos(a)*o.r*0.2,Math.sin(a)*o.r*0.2);g.lineTo(Math.cos(a)*o.r*1.3,Math.sin(a)*o.r*1.3);g.stroke();}
@@ -957,6 +971,7 @@ function buildSlash(api){
       const cols=["#ff5aa0","#ff9d2e","#ffe14d","#7dff9a","#5ad6ff","#c07dff"];
       for(let i=0;i<cols.length;i++){g.fillStyle=cols[i];
         g.beginPath();g.arc(0,0,o.r*(1-i/cols.length),0,TAU);g.fill();}
+      g.lineWidth=3;g.strokeStyle="rgba(20,20,26,.55)";g.beginPath();g.arc(0,0,Math.max(0,o.r),0,TAU);g.stroke();
       g.globalCompositeOperation="lighter";
       g.fillStyle="rgba(255,255,255,.5)";g.beginPath();g.arc(-o.r*0.32,-o.r*0.34,o.r*0.22,0,TAU);g.fill();
       g.globalCompositeOperation="source-over";
@@ -968,6 +983,8 @@ function buildSlash(api){
       grd.addColorStop(0,o.flesh);grd.addColorStop(0.55,o.skin);
       grd.addColorStop(1,shade(o.skin,-0.28));
       g.fillStyle=grd;g.beginPath();g.arc(0,0,o.r,0,TAU);g.fill();
+      // 軸6(見やすさ): 輪郭線(岩・だんごと同じ値)。重なった赤と緑が溶けず、明るい背景の前でも的が浮く
+      g.lineWidth=3;g.strokeStyle="rgba(20,20,26,.55)";g.stroke();
       // rim micro-glow
       g.globalCompositeOperation="lighter";
       g.strokeStyle="rgba(255,255,255,.12)";g.lineWidth=2;g.beginPath();g.arc(0,0,o.r-1,0,TAU);g.stroke();

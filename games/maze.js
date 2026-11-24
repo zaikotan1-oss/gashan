@@ -19,7 +19,7 @@ function buildMaze(api){
   let hsCD=0;                           // hitStop クールダウン(節目限定・30f以上あける)
   function tryHitStop(f){if(hsCD<=0){api.hitStop(f);hsCD=34;}}
   // 色ユーティリティ(でんきゅうの色を派生させる)
-  function _rgb(c){return [parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)];}
+  function _rgb(c){if(c.charAt(0)!=="#"){const m=c.match(/[\d.]+/g)||[0,0,0];return [+m[0],+m[1],+m[2]];}return [parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)];}
   function lighten(c,t){const p=_rgb(c);return "rgb("+p.map(v=>Math.round(v+(255-v)*t)).join(",")+")";}
   function darken(c,t){const p=_rgb(c);return "rgb("+p.map(v=>Math.round(v*(1-t))).join(",")+")";}
   function rgba(c,a){const p=_rgb(c);return "rgba("+p[0]+","+p[1]+","+p[2]+","+a+")";}

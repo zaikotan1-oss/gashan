@@ -11,6 +11,7 @@ function buildDomino(api){
   // stage / progression state
   const MAXSTAGE=5;
   let stage,stageBombs,banner,clearT,clearStars,clearChain,clearCount,allClear,clearPerfect,ambientT;
+  let totalStars=0,clearStarBonus=0;   // 軸5: この遊びの中で ためた ★の数・その面でもらった ほしボーナス(保存はしない)
   let clearDur=160,clearNeed=0,lapPerfectBefore=true;   // 軸5: クリア画面の長さ・★3まであと何れんさ・やりなおし用に一つ前の lapPerfect
   let lap=0,goldMode=false,lapPerfect=true,nextGold=false,hudStars=0,starPop=[0,0,0];   // 軸5: 2しゅうめ・きんいろ・HUDの★目標
   // per-stage warm/cool accent palette so the board "looks different" over time
@@ -26,7 +27,7 @@ function buildDomino(api){
   let shootStar,starTimer;                        // ④ ながれ星 ひみつ発見
   function layout(){baseConnR=clamp(api.W*0.10,55,120);applyConnR();}
   function applyConnR(){const sh=stage?stage:1;CONNR=baseConnR*clamp(1.0-sh*0.06,0.62,1);} // 7〜8歳向け: 吸着半径を狭め、面が進んでも広がりすぎないようにする
-  function reset(){bombs=[];pending=[];rings=[];shards=[];sparks=[];floats=[];glints=[];motes=[];crumbles=[];topples=[];lap=0;goldMode=false;lapPerfect=true;nextGold=false;hudStars=0;starPop=[0,0,0];bestChain=0;clearBest=0;clearNewRecord=false;count=0;total=0;chain=0;maxChain=0;flash=0;megaFlash=0;hintT=0;bgT=0;hitCd=0;
+  function reset(){bombs=[];pending=[];rings=[];shards=[];sparks=[];floats=[];glints=[];motes=[];crumbles=[];topples=[];lap=0;totalStars=0;clearStarBonus=0;goldMode=false;lapPerfect=true;nextGold=false;hudStars=0;starPop=[0,0,0];bestChain=0;clearBest=0;clearNewRecord=false;count=0;total=0;chain=0;maxChain=0;flash=0;megaFlash=0;hintT=0;bgT=0;hitCd=0;
     stage=1;banner=0;clearT=0;clearStars=0;allClear=false;clearPerfect=false;
     luckyHue=pick(LHUES);luckyName=HUENAME[luckyHue];luckyTaught=false;luckyMsgT=0;rbMsgT=0;
     shootStar=null;starTimer=rint(280,520);
@@ -80,7 +81,11 @@ function buildDomino(api){
     if(clearPerfect){count+=5;total+=5;api.setScore(total);}
     clearChain=maxChain;clearCount=count;
     // 星の条件は「その面の爆弾の数」に対する割合(1面6個でも・5面16個でも 3つ/2つに届く)
-    clearStars=maxChain>=Math.max(4,Math.ceil(stageBombs*0.7))?3:maxChain>=Math.max(3,Math.ceil(stageBombs*0.4))?2:1;
+    {const th=starTh();clearStars=maxChain>=th[2]?3:maxChain>=th[1]?2:1;}
+    // 軸5: ★にごほうび(★3=+3・★2=+1)。もらった ★は「ぜんぶで N」にたまる(保存はしない)
+    clearStarBonus=clearStars>=3?3:clearStars===2?1:0;
+    if(clearStarBonus>0){total+=clearStarBonus;api.setScore(total);}
+    totalStars+=clearStars;
     // さいこうれんさ(きろく): 前より伸びたら「しんきろく！」
     lapPerfectBefore=lapPerfect;
     clearNeed=Math.max(0,starTh()[2]-maxChain);
@@ -191,13 +196,14 @@ function buildDomino(api){
     if(isLucky)luckySparkle(b);
     // big-chain escalation: extra spectacle + a rain of bonus bombs
     // 軸5: 大連鎖の山は その面の爆弾の数に合わせる(1面6個なら 3連鎖と5連鎖)
-    const m1=Math.max(3,Math.ceil(stageBombs*0.4)),m2=Math.max(m1+1,Math.ceil(stageBombs*0.7));
+    const m1=Math.max(3,Math.ceil(stageBombs*0.4)),m2=Math.max(m1+1,starTh()[2]);
     if(chain===m1)megaChain(b,false);else if(chain===m2)megaChain(b,true);
     // 軸7: 積み木箱は「崩れる」: 段ごとに時間差でバラバラ崩れ落ちる
     if(b.type==="stack"){crumbles.push({x:b.x,y:b.y-b.r,delay:8},{x:b.x,y:b.y+b.r,delay:16},{x:b.x,y:b.y,delay:24});}
   }
   // HUDの★目標: 今の さいだいれんさ が 1/2/3つ目の条件に届いたら★を塗って小さく鳴らす
-  function starTh(){return[1,Math.max(3,Math.ceil(stageBombs*0.4)),Math.max(4,Math.ceil(stageBombs*0.7))];}
+  // 1面の★3は 4れんさ(1面の配置は 2〜4個の鎖までを保証しているので、まず1面で★3をとる体験が来る)。2面以降は割合のまま
+  function starTh(){return[1,Math.max(3,Math.ceil(stageBombs*0.4)),stage===1?4:Math.max(4,Math.ceil(stageBombs*0.7))];}
   function checkHudStars(){const th=starTh();let ns=0;for(let i=0;i<3;i++)if(maxChain>=th[i])ns=i+1;
     if(ns>hudStars){for(let i=hudStars;i<ns;i++)starPop[i]=1;hudStars=ns;api.tone(1046,0.12,"triangle",0.1);if(ns>=2)api.tone(1318,0.14,"triangle",0.08);}}
   // ドミノの列: 細長いタイル4枚が 順に 80度まで倒れる(板状の破片と小さい輪つき)
@@ -283,7 +289,7 @@ function buildDomino(api){
         // 軸5: ★3に届かなかった面は「もういちど」で同じ面をやりなおせる(押さなければ今まで通り自動で次の面へ)
         if(!allClear&&clearStars<3&&clearT<clearDur-20){const bt=clearBtn();
           if(px>=bt.x&&px<=bt.x+bt.w&&py>=bt.y&&py<=bt.y+bt.h){
-            clearT=0;lapPerfect=lapPerfectBefore;floats=[];api.tone(660,0.08,"triangle",0.1);api.tone(990,0.1,"triangle",0.08);startStage(stage);}}
+            clearT=0;lapPerfect=lapPerfectBefore;totalStars=Math.max(0,totalStars-clearStars);floats=[];api.tone(660,0.08,"triangle",0.1);api.tone(990,0.1,"triangle",0.08);startStage(stage);}}
         return;}
       // ④ ながれ星タップ: ばくだん判定より先に。空を横切る星をタップできたら小さなごほうび(減点なし)。
       if(shootStar&&Math.hypot(px-shootStar.x,py-shootStar.y)<Math.max(36,api.W*0.07)){
@@ -300,7 +306,8 @@ function buildDomino(api){
       // 上限をどれだけ下げても「外れれば増える」仕組みが残る限り0に落ちきらない(=常にクリア不能になり得る)ため、
       // 外れタップでは的を増やさないことにする。無反応タップ(音も無し)にしないよう、当たり音(900→1300上昇)とは
       // はっきり違う「すかっ」という下降2音を鳴らし、当たり/外れの違いも音で分かるようにする(軸2のsfxPerMin維持)。
-      else{api.tone(240,0.05,"triangle",0.07);api.tone(150,0.05,"sine",0.05);}
+      else{api.tone(240,0.05,"triangle",0.07);api.tone(150,0.05,"sine",0.05);
+        rings.push({x:px,y:py,r:4,max:26,life:0.6,col:"rgba(180,200,255,1)"});}   // 外れでも 指を置いた所に小さな波紋(的は増やさない)
     },
     frame(dt,now){
       bgT+=dt;if(hitCd>0)hitCd-=1; // 実フレーム基準で減算(凍結中もカウント)
@@ -633,11 +640,14 @@ function buildDomino(api){
     const l3=clearNewRecord?"しんきろく！ "+clearBest+"れんさ":"きろく "+clearBest+"れんさ";
     g.strokeText(l3,cx,ry+step*2);g.fillStyle=clearNewRecord?"#ff7ad9":"#c9b8ff";g.fillText(l3,cx,ry+step*2);
     // ③ パーフェクト(ワンチェイン)達成のごほうび表示
-    if(clearPerfect){const py2=ry+step*3;
+    // 軸5: ★のごほうび(ほし ＋3)と、この遊びでためた ★の数(ぜんぶで N)
+    {const l4=clearStarBonus>0?"ほし ＋"+clearStarBonus+"　ぜんぶで "+totalStars:"ほし ぜんぶで "+totalStars;
+      g.strokeText(l4,cx,ry+step*3);g.fillStyle="#ffd23f";g.fillText(l4,cx,ry+step*3);}
+    if(clearPerfect){const py2=ry+step*4;
       g.strokeText("パーフェクト！＋5",cx,py2);g.fillStyle="#9bff9b";g.fillText("パーフェクト！＋5",cx,py2);}
-    if(!allClear&&clearStars<3){const ly=ry+step*(clearPerfect?4:3),t4="あと "+clearNeed+"れんさで ★3！";
+    if(!allClear&&clearStars<3){const ly=ry+step*(clearPerfect?5:4),t4="あと "+clearNeed+"れんさで ★3！";
       g.strokeText(t4,cx,ly);g.fillStyle="#ffe27a";g.fillText(t4,cx,ly);}
-    if(allClear){const ny=ry+step*(clearPerfect?4:3),nt=nextGold?"つぎは きんいろの "+(lap+2)+"しゅうめ！":"つぎは "+(lap+2)+"しゅうめ！";
+    if(allClear){const ny=ry+step*(clearPerfect?5:4),nt=nextGold?"つぎは きんいろの "+(lap+2)+"しゅうめ！":"つぎは "+(lap+2)+"しゅうめ！";
       g.strokeText(nt,cx,ny);g.fillStyle=nextGold?"#ffd23f":"#ffffff";g.fillText(nt,cx,ny);}
     g.restore();g.textAlign="left";g.globalAlpha=1;
     // 軸5: 「もういちど」ボタン(★3に届かなかった時だけ・押すと同じ面を最初から)
@@ -657,7 +667,7 @@ function buildDomino(api){
   function clearBtn(){
     const step=clamp(api.W*0.06,30,44),ry=api.H*0.4+api.H*0.14;
     const w=Math.max(200,Math.min(api.W*0.5,260)),h=64;
-    const lines=clearPerfect?4:3;
+    const lines=clearPerfect?5:4;
     if(api.H<560&&api.W>=700){   // 背の低い横画面: 文字の右がわへ逃がす
       return{x:Math.min(api.W-w-12,api.W/2+200),y:clamp(ry+step,12,api.H-h-12),w,h};}
     const y=Math.min(ry+step*lines+16,api.H-h-12);

@@ -289,7 +289,8 @@ function build_cakesmash(api){
     api.boom(0.7);api.shake(18);hstop(6);
     api.slide(392,1568,0.6,0.25,"triangle");
     [0,4,7,12,16].forEach((s,i)=>setTimeout(()=>api.tone(523*Math.pow(2,s/12),0.15,"triangle",0.13),i*60));
-    const fy=rbMsgT>0.2?H*0.33:H*0.22;   // にじいろ中央バナー(H*0.24)と重ねない
+    let fy=rbMsgT>0.2?H*0.33:H*0.22;
+    if(rbMsgT<=0.2){const tt=topTier();if(tt)fy=Math.max(H*0.13,Math.min(fy,tt.y-tierH*2.2));}   // 段が高い(ステージ5〜)時は バナーを段の上へ逃がす   // にじいろ中央バナー(H*0.24)と重ねない
     floats.push({x:W/2,y:fy,txt:"あまあま フィーバー！",life:1,vy:-0.4,col:"#ff2bff",size:40});
     floats.push({x:W/2,y:fy+34,txt:"ぜんぶ 1ぱつ！ てんすう 2ばい！",life:1,vy:-0.4,col:"#fff",size:20});
   }
@@ -319,7 +320,7 @@ function build_cakesmash(api){
       stage++;
       flash=Math.min(1,flash+0.6);flashCol="#fff6c8";
       api.boom(0.4);api.shake(8);
-      floats.push({x:W/2,y:H*0.5,txt:"つぎの ケーキ！",life:1,vy:-0.8,col:"#ffd23f",size:30});
+      floats.push({x:W/2,y:H*0.34,txt:"つぎの ケーキ！",life:1,vy:-0.8,col:"#ffd23f",size:26});
       newCake();
     }else{
       clearTxt="ステージ"+stage+" クリア！";
@@ -408,7 +409,7 @@ function build_cakesmash(api){
         const fa=clamp(fever>FEVER_LEN-0.6?(FEVER_LEN-fever)/0.6:fever<1?fever:1,0,1);
         const hue=(tsec*90)%360;
         const rg2=g.createLinearGradient(0,0,0,H);
-        for(let i=0;i<=4;i++)rg2.addColorStop(i/4,"hsla("+((hue+i*60)%360)+",85%,78%,"+(0.5*fa)+")");
+        for(let i=0;i<=4;i++)rg2.addColorStop(i/4,"hsla("+((hue+i*60)%360)+",85%,68%,"+(0.28*fa)+")");
         g.fillStyle=rg2;g.fillRect(0,0,W,H);
       }
 
@@ -602,7 +603,7 @@ function build_cakesmash(api){
       for(const f of floats){f.y+=f.vy*dt;f.life-=0.018*dt;
         g.save();g.globalAlpha=Math.max(0,f.life);
         g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
-        g.lineWidth=6;g.strokeStyle="rgba(120,40,80,.5)";g.strokeText(f.txt,f.x,f.y);
+        g.lineWidth=7;g.lineJoin="round";g.strokeStyle="rgba(120,40,80,.9)";g.strokeText(f.txt,f.x,f.y);
         g.fillStyle=f.col;g.fillText(f.txt,f.x,f.y);g.restore();}
       g.globalAlpha=1;g.textAlign="left";
       floats=floats.filter(f=>f.life>0);

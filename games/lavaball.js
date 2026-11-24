@@ -225,9 +225,12 @@ function buildLavaball(api){
     if(o.type==="rainbow") rainbowBurst(o.x,o.y-o.r*0.3);   // A. 激レア撃破: 虹の大盤振る舞い
     if(isLucky) luckySparkle(o.x,o.y-o.r);                  // ② 頭上に星のキラッ
     if(o.type==="crystal"){ api.tone(1046,0.18,"triangle",0.14); api.tone(1318,0.2,"triangle",0.1); }
-    if(combo>1) pushFloat({x:o.x,y:o.y-o.r,txt:"x"+combo,life:1,vy:-1.0,
+    // ⑥ ゴールド/にじいろは「ゴールド！」「+点」「xN」が同時に出る。高さと横をずらして重ならないようにする
+    const bigRare=o.type==="gold"||o.type==="rainbow";
+    const sideX=clamp(o.x+o.r*1.8,40,api.W-40), sideXL=clamp(o.x-o.r*1.8,40,api.W-40);
+    if(combo>1) pushFloat({x:bigRare?sideX:o.x,y:bigRare?o.y-o.r*3.4:o.y-o.r,txt:"x"+combo,life:1,vy:-1.0,
       col:combo>=6?"#fff2c0":"#ffe08a",size:combo>=4?40:30});
-    if(gain>=4) pushFloat({x:o.x,y:o.y-o.r*2.1,txt:"+"+gain,life:1,vy:-0.8,
+    if(gain>=4) pushFloat({x:bigRare?sideXL:o.x,y:bigRare?o.y-o.r*1.4:o.y-o.r*2.1,txt:"+"+gain,life:1,vy:-0.8,
       col:o.type==="gold"?"#ffd23f":"#c78bff",size:o.type==="gold"?36:26});
     checkStage();
   }
@@ -240,7 +243,7 @@ function buildLavaball(api){
         col:"hsl("+(i*18)+",95%,60%)"});}
     rings.push({x,y,r:20,vr:26,life:1,decay:0.04,col:"#ffd23f"});
     [0,4,7,12].forEach((s,i)=>setTimeout(()=>api.tone(659.25*Math.pow(2,s/12),0.16,"triangle",0.15),i*70));
-    pushFloat({x,y:y-44,txt:"ゴールド！",life:1,vy:-0.8,col:"#ffd23f",size:34});
+    pushFloat({x,y:y-78,txt:"ゴールド！",life:1,vy:-0.8,col:"#ffd23f",size:34});
     flash=1;
   }
 
@@ -252,7 +255,7 @@ function buildLavaball(api){
       shards.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-rnd(2,5),r:rnd(3,8),
         rot:rnd(0,TAU),vr:rnd(-0.4,0.4),life:1,decay:rnd(0.008,0.015),col:"hsl("+(i*14)+",95%,62%)"});}
     for(let i=0;i<10;i++) ember(x+rnd(-ball.r*0.5,ball.r*0.5),y,true);
-    pushFloat({x,y:y-46,txt:"にじいろ！",life:1,vy:-0.8,col:"#ff5da2",size:34});
+    pushFloat({x,y:y-80,txt:"にじいろ！",life:1,vy:-0.8,col:"#ff5da2",size:34});
     api.boom(0.7); api.shake(16);
     api.slide(660,1320,0.5,0.22,"triangle"); api.tone(880,0.14,"triangle",0.12); api.tone(1320,0.16,"triangle",0.1);
     if(hitCd<=0){ api.hitStop(5); hitCd=32; }   // 節目限定＋クールダウン
@@ -532,7 +535,7 @@ function buildLavaball(api){
       // ---------- combo text (top center, safe zone) ----------
       if(combo>1){
         const pop=1+Math.max(0,comboT-0.7)*1.2;
-        g.save(); g.translate(api.W/2,api.H*0.14); g.scale(pop,pop);
+        g.save(); g.translate(api.W/2,api.H*0.19); g.scale(pop,pop);
         g.font="800 32px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
         g.globalAlpha=clamp(comboT,0,1); g.shadowColor="rgba(255,120,30,.9)"; g.shadowBlur=14;
         g.fillStyle="#ffd23f"; g.fillText("コンボ x"+combo,0,0);
@@ -546,13 +549,13 @@ function buildLavaball(api){
         // ⑥ 0.24Hだとコンボ/ラッキー/共通エンジンの祝福バナーと重なるので下寄りに逃がす
         g.save(); g.translate(api.W/2,api.H*0.7); g.scale(pop,pop); g.textAlign="center";
         g.globalAlpha=clamp(rbMsgT*1.4,0,1); g.font="900 34px 'Hiragino Maru Gothic ProN',system-ui";
-        g.shadowColor=col; g.shadowBlur=18; g.fillStyle="#fff"; g.fillText("にじいろいわ！",0,0);
-        g.shadowBlur=0; g.lineWidth=2; g.strokeStyle=col; g.strokeText("にじいろいわ！",0,0);
+        g.shadowColor=col; g.shadowBlur=18; g.fillStyle="#fff"; g.fillText("すごい！",0,0);
+        g.shadowBlur=0; g.lineWidth=2; g.strokeStyle=col; g.strokeText("すごい！",0,0);
         g.restore(); g.globalAlpha=1; g.textAlign="left"; if(rbMsgT<0)rbMsgT=0; }
       // ---------- ② きょうのラッキー色 ヒント(初回は色名つき・以後は短く) ----------
       if(luckyMsgT>0){ luckyMsgT-=0.016*dt;
         const pop=1+Math.max(0,luckyMsgT-0.8)*1.2;
-        g.save(); g.translate(api.W/2,api.H*0.32); g.scale(pop,pop); g.textAlign="center";
+        g.save(); g.translate(api.W/2,api.H*0.34); g.scale(pop,pop); g.textAlign="center";
         g.globalAlpha=clamp(luckyMsgT*1.4,0,1); g.font="900 23px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor=luckyColor; g.shadowBlur=14;
         const t2=luckyMsgT>1?("きょうの ラッキーいろは "+(CNAME[luckyColor]||"")+"！"):"ラッキー！";
@@ -568,10 +571,10 @@ function buildLavaball(api){
         g.shadowBlur=0; g.lineWidth=1.5; g.strokeStyle="rgba(40,120,60,.7)"; g.strokeText("パーフェクト！",0,0);
         g.restore(); g.globalAlpha=1; g.textAlign="left"; if(perfectT<0)perfectT=0; }
 
-      // ---------- B. フィーバー開始バナー(コンボ0.14H・ラッキー0.32Hの間) ----------
+      // ---------- B. フィーバー開始バナー(コンボ0.19H・ラッキー0.34Hの間) ----------
       if(feverBanner>0){ feverBanner-=0.016*dt;
         const pop=1+Math.max(0,feverBanner-1.4)*1.2, col="hsl("+((tsec*200)%360)+",95%,62%)";
-        g.save(); g.translate(api.W/2,api.H*0.21); g.scale(pop,pop); g.textAlign="center";
+        g.save(); g.translate(api.W/2,api.H*0.27); g.scale(pop,pop); g.textAlign="center";
         g.globalAlpha=clamp(feverBanner*1.5,0,1); g.font="900 40px 'Hiragino Maru Gothic ProN',system-ui";
         g.lineWidth=7; g.strokeStyle="rgba(40,8,6,.8)"; g.strokeText("フィーバー！ 2ばい！",0,0);
         g.shadowColor=col; g.shadowBlur=18; g.fillStyle="#fff"; g.fillText("フィーバー！ 2ばい！",0,0);
@@ -876,7 +879,7 @@ function buildLavaball(api){
     g.save(); g.lineCap="round";
     for(let lane=0;lane<2;lane++){
       const on=ball.rolling?(lane===ball.lane):false;
-      const a=pre?0.09+0.04*Math.sin(tsec*3+lane*1.6):(on?0.2:0.03);
+      const a=pre?0.09+0.04*Math.sin(tsec*3+lane*1.6):(on?0.12:0.03);
       const off=base+(lane?gap:0);
       const wBand=Math.max(24,base*0.85);
       g.strokeStyle="rgba(255,200,110,"+a+")"; g.lineWidth=wBand;

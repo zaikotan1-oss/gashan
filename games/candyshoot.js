@@ -376,27 +376,40 @@ function buildCandyshoot(api){
             starHit();if(!b.big)b.life=0;else b.r*=0.9;}
         }
         // draw bullet trail (additive sweet glow)
+        // 【軸6】明るい背景でも尾が見えるよう、先に暗めの円を通常合成で敷く
+        g.save();
+        for(let i=0;i<b.trail.length;i++){const tr=b.trail[i],a=i/b.trail.length;
+          g.globalAlpha=1;g.fillStyle="rgba(120,40,90,.18)";
+          g.beginPath();g.arc(tr.x,tr.y,Math.max(0,b.r*a),0,TAU);g.fill();}
+        g.restore();
         g.save();g.globalCompositeOperation="lighter";
         for(let i=0;i<b.trail.length;i++){const tr=b.trail[i],a=i/b.trail.length;
           g.globalAlpha=a*0.5;g.fillStyle=b.col;
-          g.beginPath();g.arc(tr.x,tr.y,b.r*a,0,TAU);g.fill();}
+          g.beginPath();g.arc(tr.x,tr.y,Math.max(0,b.r*a),0,TAU);g.fill();}
         g.restore();g.globalAlpha=1;
         // bullet itself: glossy candy ball
-        g.save();g.shadowColor=b.col;g.shadowBlur=12;
-        const bg=g.createRadialGradient(b.x-b.r*0.3,b.y-b.r*0.3,b.r*0.1,b.x,b.y,b.r);
+        // HUD得点の板と重なる右上では半透明にして読めなくならないようにする
+        const nearHud=b.x>api.W-80&&b.y<api.H*0.14;
+        g.save();if(nearHud)g.globalAlpha=0.5;
+        g.shadowColor="rgba(120,40,90,.5)";g.shadowBlur=12;
+        const bg=g.createRadialGradient(b.x-b.r*0.3,b.y-b.r*0.3,Math.max(0,b.r*0.1),b.x,b.y,Math.max(0.1,b.r));
         bg.addColorStop(0,"#fff");bg.addColorStop(0.5,b.col);bg.addColorStop(1,shade(b.col,-40));
-        g.fillStyle=bg;g.beginPath();g.arc(b.x,b.y,b.r,0,TAU);g.fill();g.restore();
+        g.fillStyle=bg;g.beginPath();g.arc(b.x,b.y,Math.max(0,b.r),0,TAU);g.fill();
+        g.shadowBlur=0;g.lineWidth=2.5;g.strokeStyle="rgba(255,255,255,.95)";g.stroke();
+        g.lineWidth=1;g.strokeStyle="rgba(120,40,90,.5)";g.beginPath();g.arc(b.x,b.y,Math.max(0,b.r+1.8),0,TAU);g.stroke();
+        g.restore();
         g.fillStyle="rgba(255,255,255,.8)";g.beginPath();g.arc(b.x-b.r*0.32,b.y-b.r*0.32,b.r*0.22,0,TAU);g.fill();
       }
       bullets=bullets.filter(b=>b.life>0);
       // ---- shards (candy crumbs) ----
       for(const s of shards){s.vy+=0.32*dt;s.x+=s.vx*dt;s.y+=s.vy*dt;s.rot+=s.vr*dt;s.life-=s.decay*dt;
         g.save();g.globalAlpha=Math.max(0,s.life);g.translate(s.x,s.y);g.rotate(s.rot);
-        g.shadowColor=s.col;g.shadowBlur=6;g.fillStyle=s.col;
+        g.shadowColor="rgba(120,40,90,.5)";g.shadowBlur=6;g.fillStyle=s.col;
         const rr=s.r*(0.6+s.life*0.4);
-        if(s.shape===0){g.beginPath();g.arc(0,0,rr,0,TAU);g.fill();}
-        else if(s.shape===1){g.fillRect(-rr*0.7,-rr*0.7,rr*1.4,rr*1.4);}
-        else{drawStarP(rr);}
+        g.lineWidth=1.5;g.lineJoin="round";g.strokeStyle="rgba(120,40,90,.5)";
+        if(s.shape===0){g.beginPath();g.arc(0,0,Math.max(0,rr),0,TAU);g.fill();g.stroke();}
+        else if(s.shape===1){g.fillRect(-rr*0.7,-rr*0.7,rr*1.4,rr*1.4);g.strokeRect(-rr*0.7,-rr*0.7,rr*1.4,rr*1.4);}
+        else{drawStarP(rr);g.stroke();}
         g.restore();}
       g.globalAlpha=1;g.shadowBlur=0;shards=shards.filter(s=>s.life>0&&s.y<api.H+40);
       // ---- rings ----
@@ -415,10 +428,15 @@ function buildCandyshoot(api){
       if(charging&&!paused){
         const dx=aimX-cannonX,dy=aimY-(cannonY-R*0.9),d=Math.max(1,Math.hypot(dx,dy));
         const ux=dx/d,uy=dy/d;
-        g.save();g.globalAlpha=0.5;g.fillStyle="rgba(255,255,255,.7)";
+        // 【軸6】白い雲の上でも消えないよう、濃い縁の円を下に敷いてから白い点を重ねる
+        g.save();
         for(let i=1;i<=6;i++){const dist=i*R*0.9*(1+charge);
-          g.globalAlpha=0.5*(1-i/8);
-          g.beginPath();g.arc(cannonX+ux*dist,(cannonY-R*0.9)+uy*dist,3+i*0.5,0,TAU);g.fill();}
+          const px=cannonX+ux*dist,py=(cannonY-R*0.9)+uy*dist,pr=3+i*0.5;
+          g.globalAlpha=0.9*(1-i/9);
+          g.fillStyle="rgba(120,40,90,.55)";
+          g.beginPath();g.arc(px,py,Math.max(0,pr+2),0,TAU);g.fill();
+          g.fillStyle="#fff";
+          g.beginPath();g.arc(px,py,Math.max(0,pr),0,TAU);g.fill();}
         g.restore();g.globalAlpha=1;
       }
       // ---- cannon (cute candy gun) ----
@@ -557,7 +575,8 @@ function buildCandyshoot(api){
     }
     // hit flash
     if(t.flash>0){g.globalAlpha=t.flash*0.7;g.fillStyle="#fff";g.beginPath();g.arc(0,0,r,0,TAU);g.fill();g.globalAlpha=1;}
-    // cute face
+    // cute face(顔だけは回さず、小さいお菓子でも崩れないようにする)
+    g.rotate(-t.spin);
     drawFace(r*0.5);
     g.restore();
   }
@@ -757,7 +776,9 @@ function buildCandyshoot(api){
       g.beginPath();g.arc(cannonX,cannonY,R*1.2,-Math.PI/2,-Math.PI/2+TAU*charge);g.stroke();
       g.restore();
       if(charge>0.6){
-        g.save();g.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
+        g.save();g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
+        g.lineJoin="round";g.lineWidth=5;g.strokeStyle="rgba(120,40,90,.85)";
+        g.strokeText("とくだい！",cannonX,cannonY-R*1.5);
         g.fillStyle="#fff";g.shadowColor="#ff6f91";g.shadowBlur=8;
         g.fillText("とくだい！",cannonX,cannonY-R*1.5);g.restore();g.textAlign="left";
       }

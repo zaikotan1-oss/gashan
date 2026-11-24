@@ -448,7 +448,7 @@ function buildJet(api){
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
         g.save();g.translate(api.W/2,api.H*0.28);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
-        const t2="きょうのラッキー色は "+(CNAME[luckyColor]||"")+"！";
+        const t2="きょうの ラッキーいろは "+(CNAME[luckyColor]||"")+"！";
         g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.4)";g.strokeText(t2,0,0);
         g.fillStyle=luckyColor;g.fillText(t2,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(luckyMsgT<0)luckyMsgT=0;}
@@ -625,10 +625,10 @@ function buildJet(api){
   }
   function drawJet(){
     const x=px,y=playerY;
-    g.save();g.translate(x,y);g.rotate(jetTilt);
+    g.save();g.translate(x,y);g.rotate(jetTilt);g.scale(1.4,1.4);
     const fl=12+thrustViz*38+Math.sin(tk*0.5)*5;
     // 背板: 明るい惑星や輪の上でもロケットが浮くように半透明の濃紺の丸を敷く
-    g.fillStyle="rgba(20,30,70,.3)";g.beginPath();g.arc(0,-2,Math.max(0,30),0,TAU);g.fill();
+    g.fillStyle="rgba(20,30,70,.45)";g.beginPath();g.arc(0,-2,Math.max(0,40),0,TAU);g.fill();
     // squash & stretch from vertical speed
     const stretch=clamp(1+vy*0.012,0.9,1.18),squash=1/Math.sqrt(stretch);
     // exhaust glow under nozzle
@@ -702,7 +702,7 @@ function buildJet(api){
     g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
     const ht=alt>=GATES[2].alt?"いんせきを よけよう！":"おしっぱなしで じょうしょう！ ゆびで ふうせんを ねらおう！";
     const hw=((g.measureText(ht)||{}).width||ht.length*10)+40,hh=38,hx=api.W/2-hw/2,hy=api.H-hh-12;
-    rrect(hx,hy,hw,hh,15);g.fillStyle="rgba(20,30,60,.5)";g.fill();
+    rrect(hx,hy,hw,hh,15);g.fillStyle="rgba(20,30,60,.72)";g.fill();
     rrect(hx,hy,hw,hh,15);g.strokeStyle="rgba(255,255,255,.5)";g.lineWidth=2;g.stroke();g.lineWidth=1;
     g.fillStyle="rgba(255,255,255,.95)";g.textBaseline="middle";g.fillText(ht,api.W/2,hy+hh/2+1);
     g.restore();

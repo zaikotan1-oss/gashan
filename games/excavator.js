@@ -28,7 +28,7 @@ function buildExcavator(api){
   // 7〜8歳向けの手応え: 壊す対象の体力を 25% 増し(操作・当たり判定はそのまま)
   const HPM=1.25;
   // 第3ラウンド改善(軸6余地): 地面の基準線(画面高さに対する割合)。getTerrainY()とUFOビームで共有。
-  const TERRAIN_BASE=0.72;
+  const TERRAIN_BASE=0.79;   // 第7ラウンド: 0.72→0.79(下の何も無い茶色の帯を減らし、標的と自機を大きく見せる。最大の起伏+100でも748<パワーバー790)
   // 画像背景のとき、面ごとの空色を薄く重ねて雰囲気を変える(1面は絵そのまま/最終面は夜)
   const STAGE_TINT=[0,0.30,0.30,0.42,0.62];
 
@@ -914,10 +914,16 @@ function spawnScene(){
   // ただしボス手前は軽い的(樽/車)だけ挟んで「近づく間も何か壊せる」空白を埋める。
   for(let bi=0;bi<5;bi++){
     const bossWX=bossWXFor(bi);
-    if(nextSpawnX>bossWX-250&&nextSpawnX<bossWX+400){
+    // 第7ラウンド: 小物(樽/車)はボス本体の手前(bossWX-110まで)に限り、足元に埋もれないようにする。
+    if(nextSpawnX>bossWX-250&&nextSpawnX<bossWX-110){
       worldObjs.push(mkBarrel(nextSpawnX));
       if(rng()<0.5)worldObjs.push(mkCar(nextSpawnX+90));
       nextSpawnX+=120+rng()*60;
+      return;
+    }
+    // ボス本体の足元(bossWX-110〜+400)は何も置かず飛ばす(撃破後の枝は >=bossWX+400 から始まるので無限ループにならない)。
+    if(nextSpawnX>=bossWX-110&&nextSpawnX<bossWX+400){
+      nextSpawnX=bossWX+400;
       return;
     }
     // ボス撃破直後: 完全な無スポーン区間を縮め、軽い的を2個(樽2個、片方は少し先)混ぜて得点の空白を埋める
@@ -1303,6 +1309,12 @@ function drawTerrain(){
   for(let sx=-5;sx<=W+5;sx+=8){ctx.lineTo(sx,toSY(getTerrainY(sx+camX)));}
   ctx.lineTo(W+5,H+5);ctx.closePath();
   ctx.fillStyle=stage.dCol;ctx.fill();
+  // 第7ラウンド: 地面の下半分を暗いグラデで奥行きっぽくして、何も無い一色の帯に見えないようにする
+  ctx.save();ctx.clip();
+  const gGrad=ctx.createLinearGradient(0,H*0.62,0,H);
+  gGrad.addColorStop(0,'rgba(0,0,0,0)');gGrad.addColorStop(1,'rgba(20,10,0,0.5)');
+  ctx.fillStyle=gGrad;ctx.fillRect(0,H*0.62,W,H*0.38+6);
+  ctx.restore();
   // Grass line
   ctx.beginPath();
   for(let sx=-5;sx<=W+5;sx+=8){
@@ -2137,7 +2149,7 @@ function initScene(keepScore){
       else{pg.addColorStop(0,'#ff6600');pg.addColorStop(1,'#ffd23f');}
       ctx.fillStyle=pg;rrect(px,py,pw*power,12,6);ctx.fill();
     }
-    ctx.font="800 13px 'Hiragino Maru Gothic ProN',system-ui";ctx.textAlign='center';
+    ctx.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";ctx.textAlign='center';
     ctx.lineWidth=4;ctx.strokeStyle='rgba(0,0,0,.55)';
     const plabel=feverActive?'フィーバー！ てんすう 3ばい':'パワー';
     ctx.strokeText(plabel,cx,py-9);

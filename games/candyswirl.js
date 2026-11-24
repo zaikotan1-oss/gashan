@@ -228,7 +228,7 @@ function build_candyswirl(api){
         for(let i=0;i<10;i++){const a=rnd(0,TAU),sp=rnd(2,6);
           shards.push({x:comet.x,y:comet.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1.5,r:rnd(3,6),
             rot:rnd(0,TAU),vr:rnd(-0.3,0.3),life:1,decay:rnd(0.016,0.026),col:i%2?"#ffd23f":"#fff7c2"});}
-        floats.push({x:comet.x,y:comet.y-14,txt:"ながれ星 +"+bonus,life:1,vy:-1,col:"#ffd23f",size:26});
+        floats.push({x:comet.x,y:comet.y-14,txt:"ながれぼし +"+bonus,life:1,vy:-1,col:"#ffd23f",size:26});
       }
     },
     frame(dt,now){
@@ -504,15 +504,15 @@ function build_candyswirl(api){
         g.shadowColor=luckyColor; g.shadowBlur=14;
         g.fillStyle="#fff7c2"; g.fillText(lmtxt,0,0); g.shadowBlur=0;
         g.restore(); g.globalAlpha=1; g.textAlign="left"; } if(luckyMsgT<0)luckyMsgT=0; }
-      // ④ ながれ星 キャッチ! バナー
+      // ④ ながれぼし キャッチ! バナー
       if(catchMsgT>0){ catchMsgT-=0.016*dt; if(clearT<=0){
         const pop=1+Math.max(0,catchMsgT-0.9)*1.3;
         g.save(); g.translate(api.W/2,api.H*0.36); g.scale(pop,pop);
         g.font="900 28px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
         g.globalAlpha=clamp(catchMsgT*1.4,0,1);
-        g.lineJoin="round"; g.lineWidth=7; g.strokeStyle="rgba(120,40,90,.85)"; g.shadowBlur=0; g.strokeText("ながれ星 キャッチ!",0,0);
+        g.lineJoin="round"; g.lineWidth=7; g.strokeStyle="rgba(120,40,90,.85)"; g.shadowBlur=0; g.strokeText("ながれぼし キャッチ!",0,0);
         g.shadowColor="rgba(255,210,60,.9)"; g.shadowBlur=16;
-        g.fillStyle="#ffd23f"; g.fillText("ながれ星 キャッチ!",0,0); g.shadowBlur=0;
+        g.fillStyle="#ffd23f"; g.fillText("ながれぼし キャッチ!",0,0); g.shadowBlur=0;
         g.restore(); g.globalAlpha=1; g.textAlign="left"; } if(catchMsgT<0)catchMsgT=0; }
       // フィーバー! バナー(クリア帯・他バナーと重ならない高さ H*0.28)
       if(feverBanner>0 && clearT<=0){
@@ -534,9 +534,9 @@ function build_candyswirl(api){
         g.save(); g.translate(api.W/2,api.H*0.60); g.scale(pop,pop);
         g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui"; g.textAlign="center";
         g.globalAlpha=clamp(nonstopT*1.3,0,1);
-        g.lineJoin="round"; g.lineWidth=7; g.strokeStyle="rgba(120,40,90,.85)"; g.shadowBlur=0; g.strokeText("ノンストップ ボーナス!",0,0);
+        g.lineJoin="round"; g.lineWidth=7; g.strokeStyle="rgba(120,40,90,.85)"; g.shadowBlur=0; g.strokeText("ずーっと つづいた! ボーナス!",0,0);
         g.shadowColor="rgba(255,210,60,.9)"; g.shadowBlur=16;
-        g.fillStyle="#ffe6a0"; g.fillText("ノンストップ ボーナス!",0,0); g.shadowBlur=0;
+        g.fillStyle="#ffe6a0"; g.fillText("ずーっと つづいた! ボーナス!",0,0); g.shadowBlur=0;
         g.restore(); g.globalAlpha=1; g.textAlign="left"; if(nonstopT<0)nonstopT=0; }
 
       // ---- HUD: stage + progress (top center safe band) ----
@@ -618,6 +618,7 @@ function build_candyswirl(api){
       const grd=g.createLinearGradient(-r,-r,r,r);
       grd.addColorStop(0,lighten(def.col,50)); grd.addColorStop(0.5,def.col); grd.addColorStop(1,shadec(def.col,-40));
       g.fillStyle=grd; rrect(-r*0.8,-r*0.8,r*1.6,r*1.6,r*0.25); g.fill();
+      g.strokeStyle="rgba(60,30,15,.6)"; g.lineWidth=4; rrect(-r*0.8,-r*0.8,r*1.6,r*1.6,r*0.25); g.stroke();
       g.strokeStyle="rgba(255,255,255,.25)"; g.lineWidth=2; rrect(-r*0.8,-r*0.8,r*1.6,r*1.6,r*0.25); g.stroke();
       // grid grooves
       g.strokeStyle="rgba(60,30,15,.5)"; g.lineWidth=2;

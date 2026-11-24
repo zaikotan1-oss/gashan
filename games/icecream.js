@@ -547,9 +547,10 @@ function build_icecream(api){
         const a=clamp(rbMsgT*1.4,0,1),pop=1+Math.max(0,rbMsgT-1)*1.4,col=RAINBOW[Math.floor(tsec*6)%RAINBOW.length];
         g.save();g.translate(api.W/2,bannerY1());g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";
         g.font="900 34px 'Hiragino Maru Gothic ProN',system-ui";
+        g.lineJoin="round";g.shadowBlur=0;g.lineWidth=8;g.strokeStyle="rgba(60,20,50,.7)";g.strokeText("にじいろアイス！",0,0);
         g.shadowColor=col;g.shadowBlur=18;g.fillStyle="#ffffff";g.fillText("にじいろアイス！",0,0);
         g.shadowBlur=0;g.lineWidth=2;g.strokeStyle=col;g.strokeText("にじいろアイス！",0,0);
-        g.restore();g.globalAlpha=1;g.textAlign="left";if(rbMsgT<0)rbMsgT=0;}
+        g.restore();g.globalAlpha=1;g.lineJoin="miter";g.textAlign="left";if(rbMsgT<0)rbMsgT=0;}
       // フィーバー！ はじまりバナー(にじいろバナーと重ならないよう、出ている間は一段下へ)
       if(feverBanner>0){
         const a=clamp(feverBanner*1.4,0,1),pop=1+Math.max(0,feverBanner-1.5)*1.2,col=RAINBOW[Math.floor(tsec*8)%RAINBOW.length];
@@ -562,17 +563,20 @@ function build_icecream(api){
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
         const a=clamp(luckyMsgT*1.5,0,1),pop=1+Math.max(0,luckyMsgT-1.2)*1.3;
         g.save();g.translate(api.W/2,bannerY2()+((feverBanner>0&&rbMsgT>0)?Math.max(api.H*0.06,34):0));g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";
-        g.font="900 24px 'Hiragino Maru Gothic ProN',system-ui";g.shadowColor=luckyColor;g.shadowBlur=14;
+        g.font="900 24px 'Hiragino Maru Gothic ProN',system-ui";
+        g.lineJoin="round";g.shadowBlur=0;g.lineWidth=7;g.strokeStyle="rgba(60,20,50,.7)";g.strokeText(luckyMsg,0,0);
+        g.shadowColor=luckyColor;g.shadowBlur=14;
         g.fillStyle="#fff7c2";g.fillText(luckyMsg,0,0);
-        g.restore();g.globalAlpha=1;g.textAlign="left";if(luckyMsgT<0)luckyMsgT=0;}
+        g.restore();g.globalAlpha=1;g.lineJoin="miter";g.textAlign="left";if(luckyMsgT<0)luckyMsgT=0;}
       // ③ ノンストップ ボーナス! バナー(ストライク文字と重ねないよう下側)
       if(perfectT>0){perfectT-=0.014*dt;
         const a=clamp(perfectT*1.3,0,1),pop=1+Math.max(0,perfectT-1.4)*1.4;
         g.save();g.translate(api.W/2,api.H*0.62);g.scale(pop,pop);g.globalAlpha=a;g.textAlign="center";
-        g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";g.shadowColor="rgba(123,224,138,.9)";g.shadowBlur=16;
+        g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";
+        g.lineJoin="round";g.shadowBlur=0;g.lineWidth=7;g.strokeStyle="rgba(40,90,50,.8)";g.strokeText("ノンストップ ボーナス！",0,0);
+        g.shadowColor="rgba(123,224,138,.9)";g.shadowBlur=16;
         g.fillStyle="#c7ffcf";g.fillText("ノンストップ ボーナス！",0,0);
-        g.shadowBlur=0;g.lineWidth=1.5;g.strokeStyle="rgba(40,120,60,.7)";g.strokeText("ノンストップ ボーナス！",0,0);
-        g.restore();g.globalAlpha=1;g.textAlign="left";if(perfectT<0)perfectT=0;}
+        g.restore();g.globalAlpha=1;g.lineJoin="miter";g.textAlign="left";if(perfectT<0)perfectT=0;}
       // 加算合成を確実に戻す(白飛び漏れ防止)
       g.globalCompositeOperation="source-over";g.globalAlpha=1;
     },
@@ -588,9 +592,11 @@ function build_icecream(api){
     const bw=Math.min(api.W*0.6,360),bh=16,bx=(api.W-bw)/2,by=api.H*0.05;
     g.save();g.textAlign="center";
     g.font="800 24px 'Hiragino Maru Gothic ProN',system-ui";
+    const hudTxt="ステージ "+stage+"      あと "+left+" こ";
+    g.lineJoin="round";g.lineWidth=5;g.strokeStyle="rgba(255,255,255,.85)";g.strokeText(hudTxt,api.W/2,by-10);
     g.fillStyle="#7a3a5e";g.shadowColor="rgba(255,255,255,.6)";g.shadowBlur=6;
-    g.fillText("ステージ "+stage+"      あと "+left+" こ",api.W/2,by-10);
-    g.shadowBlur=0;
+    g.fillText(hudTxt,api.W/2,by-10);
+    g.shadowBlur=0;g.lineJoin="miter";
     g.fillStyle="rgba(255,255,255,.7)";rr(bx,by,bw,bh,bh/2);g.fill();
     const fr=clamp(stageBroken/Math.max(1,stageGoal),0,1);
     if(fr>0){const gg=g.createLinearGradient(bx,0,bx+bw,0);

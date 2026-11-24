@@ -56,7 +56,7 @@ function build_gumball(api){
       col:pick(["#ffffff","#fff0f6","#eef6ff","#fff6e0"])});
     motes=[];for(let i=0;i<22;i++)motes.push({x:rnd(0,W),y:rnd(0,H),r:rnd(1,3),sp:rnd(0.08,0.4),tw:rnd(0,TAU),col:pick(CANDY)});
     drops=[];for(let i=0;i<6;i++)drops.push({x:rnd(0,W),y:rnd(H*0.06,H*0.36),s:rnd(0.7,1.3),ph:rnd(0,TAU),
-      kind:pick(["candy","donut","gummy"]),col:pick(CANDY),sp:rnd(0.01,0.03),amp:rnd(8,22)});
+      kind:pick(["donut","gummy"]),col:pick(CANDY),sp:rnd(0.01,0.03),amp:rnd(8,22)});
   }
   layout();
 
@@ -352,7 +352,7 @@ function build_gumball(api){
       for(const d of drops){
         d.ph+=d.sp*dt;d.x+=0.12*d.sp*dt*60;if(d.x>W+30)d.x=-30;
         const dy=d.y+Math.sin(d.ph)*d.amp;
-        g.save();g.globalAlpha=0.35;g.translate(d.x,dy);g.scale(d.s,d.s);
+        g.save();g.globalAlpha=0.14;g.translate(d.x,dy);g.scale(d.s*0.7,d.s*0.7);
         drawSweet(d.kind,d.col,unit*0.55,tsec);
         g.restore();
       }
@@ -448,9 +448,12 @@ function build_gumball(api){
           if(sparks.length<60&&Math.random()<0.12) spawnSparks(s.x,s.y+wob-s.r,"#ffe27a",1);
         }else{
           g.save();g.translate(s.x,s.y+wob);
-          g.fillStyle="rgba(0,0,0,.15)";g.beginPath();g.ellipse(0,s.r*0.85,s.r*0.8,s.r*0.22,0,0,TAU);g.fill();
+          g.fillStyle="rgba(0,0,0,.28)";g.beginPath();g.ellipse(0,s.r*0.85,s.r*0.8,s.r*0.22,0,0,TAU);g.fill();
           g.rotate(s.rot*0.2);
+          // 軸6: 暗い縁取りで標的を背景(白い雲など)から浮かせる
+          g.shadowColor="rgba(60,20,60,.85)";g.shadowBlur=unit*0.2;
           drawSweet(s.kind,s.col,s.r,tsec);
+          g.shadowBlur=0;
           g.restore();
         }
       }
@@ -807,10 +810,10 @@ function build_gumball(api){
       g.beginPath();g.arc(-s*0.12,-s*0.4,s*0.05,0,TAU);g.arc(s*0.12,-s*0.4,s*0.05,0,TAU);g.fill();
     }else if(kind==="cake"){
       // ショートケーキ(三角)
-      g.fillStyle="#fff4e0";
+      g.fillStyle="#ffe3c2";
       g.beginPath();g.moveTo(-s*0.6,s*0.5);g.lineTo(s*0.6,s*0.5);g.lineTo(s*0.5,-s*0.1);g.lineTo(-s*0.5,-s*0.1);g.closePath();g.fill();
       g.fillStyle=hexA(col,0.85);g.fillRect(-s*0.55,s*0.05,s*1.1,s*0.16); // ジャム層
-      g.fillStyle="#fff";
+      g.fillStyle="#ffd9e6";
       g.beginPath();g.moveTo(-s*0.5,-s*0.1);g.lineTo(s*0.5,-s*0.1);g.lineTo(0,-s*0.6);g.closePath();g.fill(); // クリーム
       g.fillStyle="#ff5b8a";g.beginPath();g.arc(0,-s*0.55,s*0.14,0,TAU);g.fill();   // いちご
       g.fillStyle="rgba(255,255,255,.7)";g.beginPath();g.arc(-s*0.04,-s*0.6,s*0.04,0,TAU);g.fill();
