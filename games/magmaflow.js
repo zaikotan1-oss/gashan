@@ -150,14 +150,14 @@ function build_magmaflow(api){
         blobs.push({x:p.x,y:p.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-3,r:rnd(3,9),
           life:1,decay:rnd(0.015,0.03),col:RAINBOW[i%RAINBOW.length]});}
       floats.push({x:clamp(p.x,80,api.W-80),y:Math.min(p.y+laneH*0.55,api.H-70),txt:"にじいろ ようがん！ +"+pts,life:1,vy:-0.9,col:"#ff7bd0",size:26});
-    }else if(fever>0){
-      floats.push({x:clamp(p.x,50,api.W-50),y:p.y-laneH*0.5,txt:"+"+pts,life:1,vy:-1,col:"#fff",size:20});
+    }else if(fever>0&&!lucky&&floats.filter(f=>f.plus).length<3){   // 軸6: ラッキーと重ねない・「+N」は同時3個まで・横にずらして上へ早く抜ける
+      floats.push({x:clamp(p.x,50,api.W-50)+rnd(-28,28),y:p.y-laneH*0.5,txt:"+"+pts,life:1,vy:-1.4,col:"#fff",size:20,plus:true});
     }
     if(lucky){ // ② ラッキー色命中: 頭上に小さな星のキラッ(気づけるヒント)+ 小さめ祝福
       api.tone(1046,0.12,"triangle",0.1);api.tone(1568,0.14,"triangle",0.08);
       for(let i=0;i<6;i++){const a=-TAU/4+rnd(-0.5,0.5),sp=rnd(1.5,3.5);
         embers.push({x:p.x,y:p.y-laneH*0.3,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1.5,r:rnd(1.6,3),life:1,decay:rnd(0.02,0.035)});}
-      floats.push({x:clamp(p.x,60,api.W-60),y:p.y-laneH*0.55,txt:"ラッキー！",life:1,vy:-0.9,col:luckyCol,size:22});
+      floats.push({x:clamp(p.x,70,api.W-70),y:p.y-laneH*0.95,txt:fever>0?"ラッキー！ +"+pts:"ラッキー！",life:1,vy:-0.9,col:luckyCol,size:22});   // 軸6: フィーバー中は点数も1行に(二重文字をなくす)
     }
     // fever gauge charges from eating; full gauge auto-triggers FEVER TIME
     if(fever<=0){feverGauge=Math.min(1,feverGauge+(gold?0.34:0.1));

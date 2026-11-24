@@ -53,8 +53,8 @@ function build_snowball(api){
     // place along the upper play area, avoid the safe HUD corners (y<56 near edges)
     let x=rnd(api.W*0.14,api.W*0.86);
     // 軸6: エンジンの「すごい！」バナー帯(H*0.24〜0.38)に砦を出さない
-    let y=rnd(api.H*0.20,api.H*0.55);
-    if(y>api.H*0.24&&y<api.H*0.38)y=Math.random()<0.5?rnd(api.H*0.20,api.H*0.24):rnd(api.H*0.40,api.H*0.55);
+    // 軸6: コンボ文字(0.20H)・にじいろバナー(0.27H)・ラッキー文字(0.33H)の帯(〜0.38H)には砦を出さない
+    let y=rnd(api.H*0.41,api.H*0.55);
     // 最初の1体は中央寄り・低めに出して、最初の1回を当てやすくする(軸3の最初の得点まで3秒以内)
     if(!firstHit&&forts.length===0&&!fever){x=rnd(api.W*0.36,api.W*0.64); y=rnd(api.H*0.42,api.H*0.52);}
     const gold=Math.random()<0.08;                 // rare golden fort (A)
@@ -127,14 +127,14 @@ function build_snowball(api){
   }
   // auto-aim + gravity-compensated shot: snap to the fort nearest to the tap
   // and solve the launch velocity so the ball passes exactly through it.
-  const MAGK=0.3;   // 最初の得点のあとの吸着の縁からの距離(U倍)
+  const MAGK=0.2;   // 最初の得点のあとの吸着の縁からの距離(U倍)
   function calcShot(tx,ty,p){
     let ax=tx, ay=ty, bd=1e9;
     // 軸3: 砦の「縁」からの距離で最寄りを選ぶ(小さい砦は狭く・大きい砦は広く吸着する)
     for(const f of forts){const d=Math.hypot(f.x-tx,f.y-ty)-f.r;
       if(d<bd){bd=d; ax=f.x; ay=f.y;}}
     // 吸着には縁からの距離上限を設ける。離れすぎたタップは生のタップ座標へ撃つ(=狙わない連打は外れる)。
-    const MAG=U*(!firstHit?3:((idleT<6)?MAGK:1.5));   // 最初の得点まで・6秒以上得点が無い時はやさしく広く拾い、得点が続く間は狭め
+    const MAG=U*(!firstHit?3:((idleT<4)?MAGK:1.5));   // 最初の得点まで・4秒以上得点が無い時はやさしく広く拾い、得点が続く間は狭め
     if(bd>MAG){ax=tx; ay=ty;}
     const sx=launchX, sy=launchY-U*0.6;
     const dx=ax-sx, dy=ay-sy;
@@ -146,7 +146,7 @@ function build_snowball(api){
   }
   function launch(tx,ty,p){
     const v=calcShot(tx,ty,p);
-    const r=U*(0.45+p*1.0);           // charge -> bigger (base is kid-friendly big)。軸3: 無チャージの即撃ちは判定を絞り、狙わない連打が伸びすぎないようにする
+    const r=U*(0.40+p*1.0);           // charge -> bigger (base is kid-friendly big)。軸3: 無チャージの即撃ちは判定を絞り、狙わない連打が伸びすぎないようにする
     balls.push({x:launchX,y:launchY-U*0.6,vx:v.vx,vy:v.vy,r,big:p>0.55,life:1});
     cannonA=Math.atan2(v.vy,v.vx); cannonRecoil=1;
     api.slide(p>0.55?260:360,120,0.14,0.22,"sine");
@@ -386,7 +386,7 @@ function build_snowball(api){
       if(forts.length===0&&clearT<=0&&!pendingRB)spawnFort();
       // 軸3: 7秒得点が無ければ砦を1体足す(全部外した時の無反応の穴埋め)
       idleT+=0.016*dt;
-      if(idleT>7&&clearT<=0&&!pendingRB&&forts.length<2){spawnFort(); idleT=3;}
+      if(idleT>6&&clearT<=0&&!pendingRB&&forts.length<2){spawnFort(); idleT=3;}
       // ① にじいろ とりで 接近予告: 出現位置で虹色がキラキラ集まる(次くるかも のドキドキ)
       if(pendingRB){pendingRB.t-=0.016*dt;
         const p=pendingRB, prog=clamp(1-p.t/0.75,0,1), pulse=0.5+0.5*Math.sin(tsec*14);

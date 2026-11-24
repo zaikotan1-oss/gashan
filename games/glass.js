@@ -130,8 +130,14 @@ function buildGlass(api){
     api.shake(isFinale?34:14+cAmp*2);tryHitStop(isFinale?10:7);flash=1;wash=1;washCol=t.glow;
     const cx0=pane.x+pane.w/2,cy0=pane.ty+pane.h/2;
     const cols=isFinale?16:10,rows=isFinale?13:8;
+    // 瓶・壺は輪郭の外(首の脇・肩の角)に欠片を出さない(輪郭の中のマスだけ)
+    let outline=null;
+    if(!isFinale&&(pane.kind==="bottle"||pane.kind==="vase")&&typeof g.isPointInPath==="function"){
+      try{(pane.kind==="bottle"?bottlePath:vasePath)(pane.x,pane.ty,pane.w,pane.h);outline=true;}catch(e){outline=null;}
+    }
     for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
       const cx=pane.x+pane.w*(c+0.5)/cols,cy=pane.ty+pane.h*(r+0.5)/rows;
+      if(outline){let inside=true;try{inside=g.isPointInPath(cx,cy);}catch(e){inside=true;}if(!inside)continue;}
       shards.push({x:cx,y:cy,vx:(cx-cx0)*0.06+rnd(-3,3),vy:rnd(-6,2)+(cy-cy0)*0.025,
         r:rnd(pane.w*0.03,pane.w*0.07),rot:rnd(0,TAU),vr:rnd(-0.5,0.5),life:1,decay:rnd(0.004,0.009),tint:t,tri:true});
     }
@@ -140,8 +146,8 @@ function buildGlass(api){
     burstSparks(cx0,cy0,46+cAmp*8,11,t);
     rings.push({x:cx0,y:cy0,r:pane.w*0.18,vr:9,life:1,col:t.glow,lw:6});
     rings.push({x:cx0,y:cy0,r:8,vr:6,life:1,col:"#ffffff",lw:4});
+    floats=floats.filter(f=>f.txt!=="パリーン！"&&f.txt!=="きんピカ！"&&f.txt!=="にじいろ！"&&f.txt!=="ラッキー！");
     floats.push({x:api.W/2,y:api.H*((isFinale||paneInStage+1>=PER_STAGE)?0.5:0.4),txt:rainbow?"にじいろ！":gold?"きんピカ！":"パリーン！",col:t.e,life:1,vy:-0.7,size:48,pop:0});
-    if(combo>=2)floats.push({x:api.W/2,y:api.H*0.4+((isFinale||paneInStage+1>=PER_STAGE)?10:40),txt:combo+"れんさ！",col:"#ffe27a",life:1,vy:-0.5,size:30,pop:0});
     // ① にじいろガラス撃破: 虹の輪が5色ぶわっと広がる大盤振る舞い(激レアの爽快ごほうび)
     if(rainbow){
       rbMsgT=1.4;
@@ -350,16 +356,16 @@ function buildGlass(api){
         g.translate(f.x,f.y);g.scale(sc,sc);
         g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.shadowColor=f.col;g.shadowBlur=20;
-        g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText(f.txt,0,0);
+        g.lineJoin="round";g.lineWidth=8;g.strokeStyle="rgba(0,0,0,.7)";g.strokeText(f.txt,0,0);
         g.fillStyle=f.col;g.fillText(f.txt,0,0);g.restore();}
       g.globalAlpha=1;g.textAlign="left";floats=floats.filter(f=>f.life>0);
       // combo counter (上部中央＝engine HUDのスコア/ミュートと衝突しない安全帯)
       if(combo>=2&&comboTimer>0){
         const cs=1+0.15*Math.sin(tms*0.3)+clamp(combo,0,8)*0.04;
-        g.save();g.textAlign="center";g.translate(api.W/2,54);g.scale(cs,cs);
+        g.save();g.textAlign="center";g.translate(api.W/2,40);g.scale(cs,cs);
         g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor="#ffd860";g.shadowBlur=16;
-        g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText(combo+" コンボ",0,0);
+        g.lineJoin="round";g.lineWidth=7;g.strokeStyle="rgba(0,0,0,.7)";g.strokeText(combo+" コンボ",0,0);
         g.fillStyle="#ffe27a";g.fillText(combo+" コンボ",0,0);g.restore();
         g.textAlign="left";
       }
@@ -505,7 +511,7 @@ function buildGlass(api){
     // hits indicator (cute round pips above pane)
     const left=Math.max(0,pane.need-pane.hits),gap=pane.need>8?15:20,startx=pane.x+w/2-(pane.need-1)*gap/2,py=pane.y-22;
     g.save();
-    for(let i=0;i<pane.need;i++){const px=startx+i*gap,alive=i<left;
+    if(settled)for(let i=0;i<pane.need;i++){const px=startx+i*gap,alive=i<left;
       const pls=alive?1+0.12*Math.sin(tms*0.12+i):1;
       g.save();g.translate(px,py);g.scale(pls,pls);
       if(alive){g.shadowColor=t.glow;g.shadowBlur=8;g.fillStyle=t.e;}

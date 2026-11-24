@@ -255,7 +255,7 @@ function build_cakesmash(api){
       api.tone(1046,0.14,"triangle",0.1);api.tone(1568,0.16,"triangle",0.08);
       for(let i=0;i<7;i++){const a=rnd(-TAU*0.5,0),s=rnd(2,6);
         sparks.push({x,y:y-tierH*0.4,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,len:rnd(6,12),life:1,decay:rnd(0.04,0.07)});}
-      if(fever>FEVER_LEN-1.5){/*フィーバー開始直後は中央の文言を出さない*/}
+      if(fever>FEVER_LEN-1.5||rbMsgT>0.2){/*フィーバー開始直後は中央の文言を出さない*/}
       else if(!luckySeen){luckyMsgT=1.8;luckySeen=true;}else luckyMsgT=Math.max(luckyMsgT,0.7);
       floats.push({x,y:y-tierH*1.8,txt:"ラッキー！ +"+pts,life:1,vy:-1,col:FRUIT[luckyColor],size:24});   // 「x n」(y-tierH)の上に縦に並べる
     }
@@ -290,7 +290,7 @@ function build_cakesmash(api){
     api.boom(0.7);api.shake(18);hstop(6);
     api.slide(392,1568,0.6,0.25,"triangle");
     [0,4,7,12,16].forEach((s,i)=>setTimeout(()=>api.tone(523*Math.pow(2,s/12),0.15,"triangle",0.13),i*60));
-    let fy=rbMsgT>0.2?H*0.33:H*0.22;
+    let fy=rbMsgT>0.2?H*0.37:H*0.22;
     if(rbMsgT<=0.2){const tt=topTier();if(tt)fy=Math.max(H*0.13,Math.min(fy,tt.y-tierH*2.2));}   // 段が高い(ステージ5〜)時は バナーを段の上へ逃がす   // にじいろ中央バナー(H*0.24)と重ねない
     floats.push({x:W/2,y:fy,txt:"あまあま フィーバー！",life:1,vy:-0.4,col:"#ff2bff",size:40});
     floats.push({x:W/2,y:fy+34,txt:"ぜんぶ 1ぱつ！ てんすう 2ばい！",life:1,vy:-0.4,col:"#fff",size:20});
@@ -644,7 +644,7 @@ function build_cakesmash(api){
         const pop=1+Math.max(0,rbMsgT-1)*1.3;
         const RBC=["#ff5da2","#ff8a3a","#ffd23f","#7be08a","#36c9ff","#b066ff"];
         const col=RBC[Math.floor(tsec*8)%RBC.length];
-        g.save();g.translate(W/2,H*0.24);g.scale(pop,pop);g.textAlign="center";
+        g.save();g.translate(W/2,H*0.30);g.scale(pop,pop);g.textAlign="center";
         g.globalAlpha=clamp(rbMsgT*1.4,0,1);g.font="900 38px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor=col;g.shadowBlur=18;g.fillStyle="#ffffff";g.fillText("にじいろケーキ！",0,0);
         g.shadowBlur=0;g.lineWidth=2;g.strokeStyle=col;g.strokeText("にじいろケーキ！",0,0);
@@ -673,15 +673,16 @@ function build_cakesmash(api){
       // ---- stage clear banner ----
       if(clearT>0){clearT-=0.016*dt;
         const a=clamp(clearT*1.4,0,1);
-        g.save();g.globalAlpha=a*0.4;g.fillStyle="#7a2a4a";g.fillRect(0,H*0.34,W,H*0.2);g.restore();
+        g.save();g.globalAlpha=a*0.6;g.fillStyle="#7a2a4a";g.fillRect(0,H*0.32,W,H*0.24);g.restore();
         const pop=1+Math.max(0,clearT-1.4)*1.8;
         g.save();g.translate(W/2,H*0.44);g.scale(pop,pop);g.globalAlpha=a;
         g.textAlign="center";g.font="900 44px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor="rgba(255,140,180,.9)";g.shadowBlur=20;g.fillStyle="#ffd23f";
-        g.fillText(clearTxt,0,0);
-        g.shadowBlur=0;g.lineWidth=2;g.strokeStyle="#fff";g.strokeText(clearTxt,0,0);
-        g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";g.fillStyle="#fff";
-        g.fillText(clearSub||"つぎは おおきい ケーキ！",0,42);
+        g.shadowBlur=0;g.lineJoin="round";g.lineWidth=8;g.strokeStyle="rgba(120,40,80,.95)";g.strokeText(clearTxt,0,0);
+        g.shadowBlur=20;g.fillText(clearTxt,0,0);g.shadowBlur=0;
+        g.font="800 26px 'Hiragino Maru Gothic ProN',system-ui";g.fillStyle="#fff";
+        g.lineWidth=6;g.strokeText(clearSub||"つぎは おおきい ケーキ！",0,46);
+        g.fillText(clearSub||"つぎは おおきい ケーキ！",0,46);
         g.restore();g.globalAlpha=1;g.textAlign="left";
         if(clearT<=0){clearT=0;newCake();}
       }
@@ -950,9 +951,10 @@ function build_cakesmash(api){
     const left=clamp(stageGoal-stageSmash,0,stageGoal);
     const bw=Math.min(W*0.6,360),bh=15,bx=(W-bw)/2,by=H*0.045;
     g.save();g.textAlign="center";
-    g.font="800 17px 'Hiragino Maru Gothic ProN',system-ui";
-    g.fillStyle="#7a2a4a";g.shadowColor="rgba(255,255,255,.6)";g.shadowBlur=5;
-    g.fillText("ステージ "+(clearT>0?stage-1:stage)+"      ケーキ あと "+left,W/2,by-8);
+    g.font="800 20px 'Hiragino Maru Gothic ProN',system-ui";
+    const hudTxt="ステージ "+(clearT>0?stage-1:stage)+"      ケーキ あと "+left;
+    g.lineJoin="round";g.lineWidth=4;g.strokeStyle="rgba(255,255,255,.85)";g.strokeText(hudTxt,W/2,by-10);
+    g.fillStyle="#7a2a4a";g.fillText(hudTxt,W/2,by-10);
     g.shadowBlur=0;
     g.fillStyle="rgba(120,40,80,.25)";roundRect(bx,by,bw,bh,bh/2);g.fill();
     const fr=clamp(stageSmash/stageGoal,0,1);

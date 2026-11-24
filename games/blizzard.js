@@ -55,8 +55,15 @@ function build_blizzard(api){
   // spawn a snow block somewhere on the field (avoid the engine HUD corners)
   function spawnSnow(px,py){
     if(snows.length>=24){ if(px===undefined)return; snows.shift(); } // 位置指定(保険の出現)のときは 古い雪玉をひとつ消して場所をあける
+    // 大きさ(r)は位置より先に決める(重なり避けに使う)
+    const szr=Math.random();
+    const r=szr<0.2?rnd(R*1.3,R*1.7):szr<0.4?rnd(R*0.45,R*0.65):rnd(R*0.7,R*1.05);
     let x=rnd(api.W*0.1,api.W*0.9), y=rnd(api.H*0.22,api.H*0.86);
     if(px!==undefined){x=clamp(px,R*1.2,api.W-R*1.2);y=clamp(py,api.H*0.22,api.H*0.86);}
+    else{ // 団子防止: 既存の雪玉と重ならない位置を最大6回まで引き直す
+      for(let t=0;t<6&&snows.some(o=>Math.hypot(x-o.x,y-o.y)<(r+o.r)*0.9);t++){
+        x=rnd(api.W*0.1,api.W*0.9);y=rnd(api.H*0.22,api.H*0.86);}
+    }
     // keep clear of top corners (engine chrome zone): y<70 near edges
     if(y<90){ x=clamp(x,140,api.W-140); }
     // ① にじいろブロック: 数%の激レア。虹色に脈打ち 一撃で大量得点＋ゲージが一気にたまる。
@@ -66,8 +73,6 @@ function build_blizzard(api){
     const type=rainbow?"rainbow":gold?"gold":(stage>=3&&Math.random()<0.22?"ice":"snow"); // ice = tougher, worth more
     const shape=type==="ice"?"cube":pickShape(type==="gold"||type==="rainbow");
     // 大きさのバラエティ(軸7): 大玉・小玉を混ぜて同じ大きさばかりにしない
-    const szr=Math.random();
-    const r=szr<0.2?rnd(R*1.3,R*1.7):szr<0.4?rnd(R*0.45,R*0.65):rnd(R*0.7,R*1.05);
     // ぼんぼり(ラッキー色の手がかり)は 顔のある丸/だるまのときだけ意味を持つ
     const hasPom=type==="snow"&&(shape==="round"||shape==="snowman");
     snows.push({x,y,vx:0,vy:0,dir:rnd(0,TAU),r,type,shape,
@@ -134,7 +139,7 @@ function build_blizzard(api){
   }
   // FEVER TIME: rainbow sky / everything 1-hit / double points / fast spawns
   function startFever(){
-    fever=FEVER_LEN;feverBanner=1.8;flash=1;
+    fever=FEVER_LEN;feverBanner=1.8;flash=1;if(luckyMsgT>0)luckyMsgT=0; // ラッキー告知とフィーバー文字を同じ高さで重ねない
     api.boom(0.7);api.shake(16);api.slide(300,1200,0.5,0.22,"sawtooth");
     [0,4,7,12,16].forEach((s,i)=>setTimeout(()=>api.tone(659*Math.pow(2,s/12),0.15,"triangle",0.12),i*80));
     floats.push({x:api.W/2,y:api.H*0.3,txt:"フィーバー スタート!",life:1,vy:-0.5,col:"#ffd23f",size:34});
@@ -185,7 +190,7 @@ function build_blizzard(api){
     api.tone(1318,0.12,"triangle",0.1);api.tone(1760,0.14,"triangle",0.08);api.tone(2093,0.16,"triangle",0.06);
     for(let k=0;k<14;k++){const a=rnd(0,TAU);
       glints.push({x:shootStar.x,y:shootStar.y,vx:Math.cos(a)*rnd(4,9),vy:Math.sin(a)*rnd(4,9),life:1,r:rnd(2,4.5)});}
-    floats.push({x:clamp(shootStar.x,api.W*0.2,api.W*0.8),y:shootStar.y+R,txt:"ながれ星 +3!",life:1,vy:-0.8,col:"#ffe89a",size:26});
+    floats.push({x:clamp(shootStar.x,api.W*0.2,api.W*0.8),y:shootStar.y+R,txt:"ながれぼし +3!",life:1,vy:-0.8,col:"#ffe89a",size:26});
   }
   return{
     resize:layout,
@@ -416,7 +421,7 @@ function build_blizzard(api){
           g.scale(pu,pu);
           g.save();g.globalCompositeOperation="lighter";
           const gg2=g.createRadialGradient(0,0,0,0,0,b.r*1.9);
-          gg2.addColorStop(0,"rgba(255,220,80,.55)");gg2.addColorStop(1,"rgba(255,200,60,0)");
+          gg2.addColorStop(0,"rgba(255,220,80,.35)");gg2.addColorStop(1,"rgba(255,200,60,0)");
           g.fillStyle=gg2;g.beginPath();g.arc(0,0,b.r*1.9,0,TAU);g.fill();g.restore();
           // 画像の キンいろ玉(顔つき、丸のときだけ)。無ければ従来の手描き玉+顔。丸以外の形は手描き専用。
           // 実測: 玉の直径は正方形の約0.82、玉の中心は上のひも分だけ下(+0.085)にある
@@ -431,6 +436,8 @@ function build_blizzard(api){
             g.fillStyle="rgba(255,255,255,.85)";
             g.beginPath();g.ellipse(-b.r*0.3,-b.r*0.35,b.r*0.25,b.r*0.16,-0.4,0,TAU);g.fill();
             }
+            // 縁取り: 背景の光に溶けないよう 通常合成で茶色の輪郭を1本
+            g.strokeStyle="rgba(150,80,0,.8)";g.lineWidth=3;g.beginPath();g.arc(0,0,Math.max(0,b.r*0.95),0,TAU);g.stroke();
           }else if(b.shape==="icicle"){ drawIcicle(b,"#ffe27a"); }
           else if(b.shape==="block"){ drawSnowBlock(b,"#ffe9a8"); }
           else{ drawSnowman(b,"#ffe9a8","#7a4a00"); }
@@ -462,6 +469,7 @@ function build_blizzard(api){
             const rg=g.createRadialGradient(-b.r*0.3,-b.r*0.35,b.r*0.1,0,0,b.r);
             rg.addColorStop(0,"#ffffff");rg.addColorStop(0.5,rainCol);rg.addColorStop(1,"hsl("+((hue+60)%360)+",90%,45%)");
             g.fillStyle=rg;g.beginPath();g.arc(0,0,b.r*0.95,0,TAU);g.fill();
+            g.strokeStyle="rgba(90,40,110,.7)";g.lineWidth=3;g.stroke();
             g.fillStyle="rgba(255,255,255,.85)";
             g.beginPath();g.ellipse(-b.r*0.3,-b.r*0.35,b.r*0.25,b.r*0.16,-0.4,0,TAU);g.fill();
           }
@@ -505,7 +513,7 @@ function build_blizzard(api){
         // ② ラッキー色ヒント: ゆきだるまの あたまの「ぼんぼり」(色つき)。今日のラッキー色を さがす手がかり。
         if(b.type==="snow"&&b.pom){
           g.fillStyle=b.pom;
-          g.beginPath();g.arc(0,-b.r*0.92,b.r*0.26,0,TAU);g.fill();
+          g.beginPath();g.arc(0,-b.r*0.92,Math.max(b.r*0.26,6),0,TAU);g.fill();
           g.fillStyle="rgba(255,255,255,.5)";
           g.beginPath();g.arc(-b.r*0.08,-b.r,b.r*0.1,0,TAU);g.fill();
         }
@@ -621,7 +629,7 @@ function build_blizzard(api){
       }
       // ① にじいろブロック! 発見バナー(虹色に色替わり・中央上=HUD安全帯)
       if(rbMsgT>0){rbMsgT-=0.016*dt;
-        const pop=1+Math.max(0,rbMsgT-1)*1.3,col=RAIN[Math.floor(tsec*8)%RAIN.length];
+        const pop=1+Math.max(0,rbMsgT-1)*0.5,col=RAIN[Math.floor(tsec*8)%RAIN.length];
         g.save();g.translate(api.W/2,api.H*0.22);g.scale(pop,pop);g.textAlign="center";
         g.globalAlpha=clamp(rbMsgT*1.4,0,1);g.font="900 34px 'Hiragino Maru Gothic ProN',system-ui";
         g.shadowColor=col;g.shadowBlur=18;g.fillStyle="#ffffff";g.fillText("にじいろブロック!",0,0);

@@ -2,7 +2,7 @@ function buildHammer(api){
   const g=api.g;
   api.preload(["bg.jpg","robot.png","hammer.png","boss.png"]);   // 画像アセット(無ければ従来の手描きにフォールバック)
   let holes=[],targets=[],stars=[],rings=[],sparks=[],arcs=[],chunks=[],groundY,R,spawnT=0,count=0,combo=0,comboT=0,elapsed=0,tGlobal=0;
-  let zapMsgT=0;   // "でんき チェイン!" teaching flash timer
+  let zapMsgT=0;   // "でんき ビリビリ!" teaching flash timer
   let bossMsgT=0;  // "ピカッたら いまだ!" boss weak-point teaching flash
   // 軸6対策: 共通エンジンの祝福バナー「やったね!」は画面中央やや上(だいたい api.H*0.22〜0.38)に出る。
   // ここに自分のテキストを置くと重なって読めなくなるので、危険帯に入るなら安全な位置(0.4)へ逃がす(jellypop.jsのfloatYと同じ考え方)。
@@ -42,7 +42,7 @@ function buildHammer(api){
     {id:"slow", name:"ゆっくり モード"},
     {id:"tough",name:"でかロボ たくさん"}
   ];
-  function rollModifier(){const m=pick(MODS);modifier=m.id;modName=m.name;modShowT=3;}
+  function rollModifier(){const m=pick(MODS);modifier=m.id;modName=m.name;modShowT=4;}
   // live cursor for follow-hammer + magic glow trail
   let cur={x:0,y:0,has:false,tx:0,ty:0};
   let trail=[];           // sparkle trail behind the hammer head
@@ -122,7 +122,7 @@ function buildHammer(api){
     if(modifier==="slow")dur*=1.5;  // ゆっくりモード: 長く出ていて さらにやさしい
     const type=pickType();
     let color=pick(TC),hp=1,life=dur;
-    if(type==="big"){color="#3f5fa8";hp=2;}        // grey tough bot
+    if(type==="big"){color="#7ea2ff";hp=2;}        // でかロボ: 明るい青(暗い背板・岩の上でシルエットが沈まない)
     else if(type==="gold"){color="#ffd23f";life=dur*0.55;} // shiny + short-lived
     else if(type==="zap"){color="#2fd8f0";life=dur*1.3;}   // でんき: lingers so you can gather neighbors, then たてよこ連鎖
     else if(type==="bomb"){color="#ff4d6d";}       // do NOT hit (pink bomb)
@@ -599,7 +599,8 @@ function buildHammer(api){
       // 軸6: 3種のバナー(でんき/ボス教示/にじいろ/ラッキー)は同時に出ても重ならないよう縦に40pxずつずらして積む。
       // クリア帯・エンディング中は描かない(タイマーだけ進める)。ボス戦はボス絵の下から始める。
       const bannerHide=clearT>0||endingT>0;
-      let slotY=(boss&&!boss.dead)?Math.max(api.H*0.46,boss.y+boss.r*1.35+18):api.H*0.46;
+      // 軸6: 通常もボス戦も、バナーは最下段の穴の下(花のある手前の空き帯)から積む。真ん中の的の体を隠さない。
+      let slotY=(boss&&!boss.dead)?Math.max(api.H*0.80,boss.y+boss.r*1.35+18):api.H*0.80;
       // でんき チェイン! banner (teaches the row/col chain across plays; center = HUD安全帯)
       if(zapMsgT>0){zapMsgT-=0.016*dt;
         const pop=1+Math.max(0,zapMsgT-0.8)*1.4;
@@ -607,9 +608,9 @@ function buildHammer(api){
         g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.globalAlpha=clamp(zapMsgT*1.4,0,1);
         g.shadowBlur=0;g.lineJoin="round";g.lineWidth=6;g.strokeStyle="rgba(0,70,110,.85)";
-        g.strokeText("でんき チェイン!",0,0);
+        g.strokeText("でんき ビリビリ!",0,0);
         g.shadowColor="rgba(77,224,255,.9)";g.shadowBlur=16;
-        g.fillStyle="#c8f6ff";g.fillText("でんき チェイン!",0,0);
+        g.fillStyle="#c8f6ff";g.fillText("でんき ビリビリ!",0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";}
         if(zapMsgT<0)zapMsgT=0;}
       // ボス弱点の教示: 「ピカッたら いまだ!」(center = HUD安全帯)
@@ -649,12 +650,12 @@ function buildHammer(api){
       // ③ ノーミス ボーナス! バナー(ステージ突破の下側=クリア文字と重ねない)
       if(noMissT>0){noMissT-=0.014*dt;
         const pop=1+Math.max(0,noMissT-1.3)*1.4;
-        g.save();g.translate(api.W/2,api.H*0.66);g.scale(pop,pop);
+        g.save();g.translate(api.W/2,api.H*0.62);g.scale(pop,pop);
         g.font="900 30px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.globalAlpha=clamp(noMissT*1.3,0,1);
-        g.shadowBlur=0;g.lineJoin="round";g.lineWidth=6;g.strokeStyle="rgba(10,70,30,.92)";g.strokeText("ノーミス ボーナス!",0,0);
+        g.shadowBlur=0;g.lineJoin="round";g.lineWidth=6;g.strokeStyle="rgba(10,70,30,.92)";g.strokeText("ぜんぶ よけた! ボーナス!",0,0);
         g.shadowColor="rgba(123,224,138,.9)";g.shadowBlur=16;
-        g.fillStyle="#c7ffcf";g.fillText("ノーミス ボーナス!",0,0);
+        g.fillStyle="#c7ffcf";g.fillText("ぜんぶ よけた! ボーナス!",0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";if(noMissT<0)noMissT=0;}
       // 必殺どっかん white screen-flash(まぶしすぎ防止に控えめ+早く引く)
       if(novaT>0){g.save();g.globalAlpha=Math.min(novaT,1)*0.4;g.fillStyle="#ffffff";
@@ -730,10 +731,15 @@ function buildHammer(api){
     }
     // 今回のモディファイア名を小さく表示（毎プレイの変化を見せる / top-center安全帯）
     // 常時HUDは2段(ステージ文字+ゲージ)だけ。モディファイア名はステージ開始から約3秒だけ16px・白+黒縁で出す。
-    if(modName&&modShowT>0&&!bossFight){g.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";
+    if(modName&&modShowT>0&&!bossFight){g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
       g.globalAlpha=clamp(modShowT*1.5,0,1);
-      g.lineWidth=4;g.lineJoin="round";g.strokeStyle="rgba(0,0,0,.7)";g.strokeText("きょうは "+modName,api.W/2,by+bh+22);
-      g.fillStyle="#fff";g.fillText("きょうは "+modName,api.W/2,by+bh+22);g.globalAlpha=1;}
+      g.lineWidth=5;g.lineJoin="round";g.strokeStyle="rgba(0,0,0,.7)";g.strokeText("きょうは "+modName,api.W/2,by+bh+28);
+      g.fillStyle="#fff";g.fillText("きょうは "+modName,api.W/2,by+bh+28);g.globalAlpha=1;}
+    // 画面右上の数字は「てん」だと分かるように、ゲージの右に「てん ◯」を常に出す(HUDは2段のまま・入りきらない狭い画面では出さない)
+    {const stxt="てん "+count;g.font="800 20px 'Hiragino Maru Gothic ProN',system-ui";
+      const sw=g.measureText(stxt).width,sx=bx+bw+12;
+      if(sx+sw<api.W-6){g.textAlign="left";g.lineWidth=5;g.lineJoin="round";g.strokeStyle="rgba(0,0,0,.65)";
+        g.strokeText(stxt,sx,by+bh-1);g.fillStyle="#ffe58a";g.fillText(stxt,sx,by+bh-1);}}
     g.restore();g.textAlign="left";
   }
   function drawBot(t,x,y,sq){const big=t.type==="big",gold=t.type==="gold",zap=t.type==="zap",rainbow=t.type==="rainbow";

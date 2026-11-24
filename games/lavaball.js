@@ -57,7 +57,20 @@ function buildLavaball(api){
   // ①③ 上段/下段レーンの見た目の間隔(タップの高さで選ぶ2本の坂)
   function laneGap(){ return clamp(api.W*0.13,55,95); }
   // floats はほぼ同じ位置に何個も積み重なると読めなくなるので、少しだけxをばらけさせる
-  function pushFloat(o){ o.x=(o.x||0)+rnd(-16,16); floats.push(o);
+  // 軸6: 浮き文字は上のHUD(ステージバー+フィーバーバー)の下に収める。同時に出る文字は縦にずらして重ねない
+  function floatMinY(size){ return api.H*0.108+(size||24)+6; }
+  function pushFloat(o){ o.x=clamp((o.x||0)+rnd(-16,16),50,Math.max(50,api.W-50));
+    o.y=Math.max(o.y,floatMinY(o.size));
+    // いま出ている文字と近すぎたら、下へずらして読めるようにする(最大3回)
+    for(let k=0;k<3;k++){
+      let hit=null;
+      for(const f of floats){ if(f.life<0.35) continue;
+        const wx=(Math.max(f.txt.length*f.size,o.txt.length*o.size))*0.5;
+        if(Math.abs(f.x-o.x)<wx && Math.abs(f.y-o.y)<(f.size+o.size)*0.6){ hit=f; break; } }
+      if(!hit) break;
+      o.y=hit.y+(hit.size+o.size)*0.62;
+    }
+    floats.push(o);
     if(floats.length>10) floats.splice(0,floats.length-10); }
 
   // 1つぶんの的を作る(種類ごとの大きさ・回数・点数)
@@ -129,11 +142,18 @@ function buildLavaball(api){
     // 道ごとに 左から右へ 等間隔に並べる(道が1こだけなら まんなか あたり)
     const placeLane=(arr,lane)=>{
       const m=arr.length;
+      const row=[];
       for(let i=0;i<m;i++){
         const u=m<=1?0.5+rnd(-0.18,0.18):i/(m-1);
         const x=lerp(x0,x1,u)+rnd(-api.W*0.02,api.W*0.02);
-        objs.push(mkObj(arr[i],x,lane));
+        row.push(mkObj(arr[i],x,lane));
       }
+      // 軸6: となりの的と重ならないように、間(半径の和の0.9倍)をあける。右にはみ出す時は左へ詰めて右はしで打ち切り
+      for(let i=1;i<m;i++){ const need=row[i-1].x+(row[i-1].r+row[i].r)*0.9; if(row[i].x<need) row[i].x=need; }
+      if(m>0&&row[m-1].x>x1) row[m-1].x=x1;
+      for(let i=m-2;i>=0;i--){ const lim=row[i+1].x-(row[i+1].r+row[i].r)*0.9; if(row[i].x>lim) row[i].x=lim; }
+      const xmin=startX+api.W*0.1;
+      for(const o of row){ o.x=Math.max(o.x,xmin); o.y=slopeYAt(o.x)-o.r-(lane?laneGap():0); objs.push(o); }
     };
     placeLane(richTypes,richLane);
     placeLane(poorTypes,1-richLane);
@@ -143,7 +163,7 @@ function buildLavaball(api){
       api.tone(1318,0.12,"triangle",0.1); }
     // A. にじいろいわ が並んだ瞬間の予告(見つけて!のワクワク)
     const rb=objs.find(o=>o.type==="rainbow");
-    if(rb){ pushFloat({x:rb.x,y:rb.y-rb.r*1.9-(gg?32:0),txt:"にじいろいわ！",life:1,vy:-0.5,col:"#ff5da2",size:26});
+    if(rb){ pushFloat({x:(gg&&Math.abs(gg.x-rb.x)<api.W*0.22)?rb.x+(rb.x>=gg.x?1:-1)*api.W*0.08:rb.x,y:rb.y-rb.r*1.9-(gg?32:0),txt:"にじいろいわ！",life:1,vy:-0.5,col:"#ff5da2",size:26});
       api.tone(1046,0.1,"triangle",0.1); api.tone(1568,0.12,"triangle",0.08); }
   }
   // 転がし終わりに呼ぶ: おいしい道が空になったら新しい行へ。ふつうの道が空の道で からぶり したら いわを2こ足す(固まらない)
@@ -527,7 +547,7 @@ function buildLavaball(api){
 
       // ---------- combo timeout + floats ----------
       if(combo>0){comboT-=0.016*dt;if(comboT<=0)combo=0;}
-      for(const f of floats){f.y+=f.vy*dt;f.life-=0.02*dt;
+      for(const f of floats){f.y=Math.max(f.y+f.vy*dt,floatMinY(f.size));f.life-=0.02*dt;
         g.save(); g.globalAlpha=Math.max(0,f.life); g.textAlign="center";
         g.font="800 "+f.size+"px 'Hiragino Maru Gothic ProN',system-ui";
         g.lineWidth=8; g.lineJoin="round"; g.strokeStyle="rgba(20,6,4,.9)"; g.strokeText(f.txt,f.x,f.y);

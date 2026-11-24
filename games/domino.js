@@ -148,7 +148,19 @@ function buildDomino(api){
   // 90%→55%まで悪化したため見送り、1.6のまま据え置く(CONNRは変えていない)。
   // 軸3(a)の「雑タップでもろくに狙わず得点できる」対策は、外れタップでの無限増殖を止めたこと自体で
   // scorePerTapが0.79〜0.86→約0.25〜0.30まで下がっており、この効果で十分と判断した。
-  function near(x,y){for(const b of bombs){if(Math.hypot(b.x-x,b.y-y)<b.r*1.6)return b;}return null;}
+  // 重なった所では「見えている中心がいちばん近い」爆弾を返す(配列の先頭ではなく b.r で割った距離が最小のもの)。範囲は 1.6r のまま
+  function near(x,y){let best=null,bd=1e9;for(const b of bombs){const d=Math.hypot(b.x-x,b.y-y)/Math.max(1,b.r);if(d<1.6&&d<bd){bd=d;best=b;}}return best;}
+  // 見やすさ: 後から足す爆弾(報酬・時限)が既存の爆弾と重ならない位置を最大20回さがす。駄目なら最後の候補をそのまま使う
+  function freeSpot(r,x0,x1,y0,y1){
+    let x=rnd(x0,x1),y=rnd(y0,y1);
+    for(let k=0;k<20;k++){
+      x=rnd(x0,x1);y=rnd(y0,y1);
+      let ok=true;
+      for(const o of bombs){if(Math.hypot(o.x-x,o.y-y)<(o.r+r)*1.3){ok=false;break;}}
+      if(ok)break;
+    }
+    return{x,y};
+  }
   function ignite(b,delay){if(b.state!=="idle")return;b.state="lit";b.t=delay||10;}
   function explode(b){
     b.state="boom";
@@ -255,7 +267,8 @@ function buildDomino(api){
     // bonus bombs rain down (collapse back into the board for a positive loop)
     const n=c>=10?3:2;
     for(let i=0;i<n;i++){
-      const nb=mkBomb(rnd(api.W*0.2,api.W*0.8),rnd(api.H*0.15,api.H*0.7),pick(c>=10?["color","big","color"]:["color","normal","color"]));
+      const nb=mkBomb(0,0,pick(c>=10?["color","big","color"]:["color","normal","color"]));
+      const sp=freeSpot(nb.r,api.W*0.2,api.W*0.8,api.H*0.15,api.H*0.7);nb.x=sp.x;nb.y=sp.y;
       nb.born=1.4;bombs.push(nb);
       glints.push({x:nb.x,y:nb.y,vx:0,vy:-1.5,life:1,decay:0.02,size:16,rot:0});
     }
@@ -365,7 +378,8 @@ function buildDomino(api){
       if(clearT<=0&&banner<=0&&bombs.length>0){
         ambientT-=dt;
         if(ambientT<=0){
-          const nb=mkBomb(rnd(api.W*0.2,api.W*0.8),rnd(api.H*0.2,api.H*0.75),"timed");
+          const nb=mkBomb(0,0,"timed");
+          const sp=freeSpot(nb.r,api.W*0.2,api.W*0.8,api.H*0.2,api.H*0.75);nb.x=sp.x;nb.y=sp.y;
           nb.armT=rnd(50,110);bombs.push(nb);
           ambientT=rint(200,300);
         }
@@ -807,6 +821,7 @@ function buildDomino(api){
       if(i===0)g.moveTo(px,py);else g.lineTo(px,py);
     }
     g.closePath();g.fill();
+    g.lineWidth=Math.max(2,r*0.08);g.strokeStyle="rgba(30,15,50,.75)";g.lineJoin="round";g.stroke();
   }
   // にじいろ(rainbow)ばくだん専用: 丸の色替えオーラだけだった(軸7)のを脱するため、雫(しずく)型シルエットで描く。
   function drawDropBomb(r,hue){
@@ -908,7 +923,7 @@ function buildDomino(api){
     g.save();g.globalAlpha=0.35;g.fillStyle="#000";g.beginPath();g.ellipse(0,b.r*(b.type==="stack"?1.62:b.type==="row"?0.95:b.type==="car"?0.85:useImg?1.32:1.05),Math.max(0,b.r*(b.type==="car"?1.25:b.type==="row"?1.15:0.85)),Math.max(0,b.r*0.3),0,0,TAU);g.fill();g.restore();
     // type cue: color bomb radiates a soft colored halo; big bomb a warm one
     if(b.type==="color"){g.save();g.globalCompositeOperation="lighter";
-      g.globalAlpha=0.16;g.fillStyle=hsl(b.hue,90,60);g.beginPath();g.arc(0,0,b.r*1.5,0,TAU);g.fill();g.restore();}
+      g.globalAlpha=0.10;g.fillStyle=hsl(b.hue,90,60);g.beginPath();g.arc(0,0,b.r*1.5,0,TAU);g.fill();g.restore();}
     // ① にじいろばくだん: 虹色に脈打つオーラ(=「なにか特別なのが居る」ドキドキの予告)
     const rbHue=goldMode?45:(bgT*3+b.x*0.7)%360;
     if(b.type==="rainbow"){g.save();g.globalCompositeOperation="lighter";

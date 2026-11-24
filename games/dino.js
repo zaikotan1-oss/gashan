@@ -408,7 +408,7 @@ function buildDino(api){
   };
   function drawObj(o,front){
     if(o.state==="gone")return;
-    let yo=0,a=front?0.92:1; // 恐竜の真正面の物は少し透かして、恐竜の頭が隠れきらないように
+    let yo=0,a=front?0.5:1; // 恐竜の真正面の物は少し透かして、恐竜の頭が隠れきらないように
     if(o.state==="rise"){yo=(1-o.rise)*o.h;a=ease?ease(o.rise):o.rise;}
     else if(o.state==="stand"&&o.ttl>0&&o.ttl<60&&Math.floor(o.ttl/5)%2===0)a=0.4; // 消える直前の点滅(予告)
     g.save();g.globalAlpha=a;

@@ -101,7 +101,13 @@ function buildVolcano(api){
     const sm=speedMul();
     // 軸3(歯ごたえ): 開始直後の数体だけ火口に近い高さへ寄せ、噴火の弾が届くまでの時間そのものを縮める
     // (firstScoreSecの外れ値=噴火が届く前に的が流れ去ってしまう試行を減らす)
-    const y=nearCrater?rnd(Math.max(api.H*0.1,craterY-r*3),craterY-r*1.5):rnd(api.H*0.12,craterY-r*1.5);
+    const pickY=()=>nearCrater?rnd(Math.max(api.H*0.1,craterY-r*3),craterY-r*1.5):rnd(api.H*0.12,craterY-r*1.5);
+    let y=pickY();
+    // 軸6(見やすさ): 画面端から入る時は、既存の的と重なって顔が隠れないよう y を最大4回引き直す
+    if(x0==null){const px=fromL?-r:api.W+r;
+      for(let k=0;k<4;k++){if(!flyers.some(o=>Math.hypot(o.x-px,o.y-y)<(r+o.r)*0.9))break;y=pickY();}}
+    else{
+      for(let k=0;k<4;k++){if(!flyers.some(o=>Math.hypot(o.x-x0,o.y-y)<(r+o.r)*0.9))break;y=pickY();}}
     flyers.push({x:x0!=null?x0:(fromL?-r:api.W+r),y,
       vx:(fromL?1:-1)*rnd(0.5,1.4)*(t==="ufo"?1.5:1)*sm*(big?0.72:1),t,r,color:pick(BCOL),bob:rnd(0,TAU),
       hp:(rare?1:(t==="blimp"?2:1))+(big?1:0),hitT:0,zig:rnd(0,TAU),rare:!!rare,offset:rnd(0,10),big});
@@ -512,23 +518,25 @@ function buildVolcano(api){
       // ① にじいろ！ げきは の中央バナー(虹色に色替わり)
       if(rbMsgT>0){rbMsgT-=0.016*dt;
         const pop=1+Math.max(0,rbMsgT-1)*1.3,col=RB[Math.floor(tick*0.12)%RB.length];
-        g.save();g.translate(api.W/2,api.H*0.34);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
+        g.save();g.translate(api.W/2,api.H*0.56);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(rbMsgT*1.4,0,1);g.font="900 34px 'Hiragino Maru Gothic ProN',system-ui";
         g.lineWidth=7;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText("にじいろ！",0,0);
         g.fillStyle=col;g.fillText("にじいろ！",0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(rbMsgT<0)rbMsgT=0;}
       // ② きょうのラッキー色 はっけん！ 中央の小ヒント(初回だけ)
       if(luckyMsgT>0){luckyMsgT-=0.016*dt;
-        g.save();g.translate(api.W/2,api.H*0.28);g.textAlign="center";g.textBaseline="middle";
+        g.save();g.translate(api.W/2,api.H*0.72);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(luckyMsgT*1.3,0,1);g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
-        const t2="きょうのラッキー色は "+(COLNAME[luckyColor]||"")+"！";
+        const t2="きょうのラッキーいろは "+(COLNAME[luckyColor]||"")+"！";
+        // 軸6: 的の帯の外(下段)へ出し、暗い背板を敷いて色文字が空に溶けないようにする
+        const tw2=g.measureText(t2).width+28;g.fillStyle="rgba(0,0,0,.45)";roundRect(-tw2/2,-18,tw2,36,14);g.fill();
         g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText(t2,0,0);
         g.fillStyle=luckyColor;g.fillText(t2,0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(luckyMsgT<0)luckyMsgT=0;}
       // ③ ノーミス！ バナー(ウェーブ/ステージ バナーと重ねない下段)
       if(noMissT>0){noMissT-=0.014*dt;
         const pop=1+Math.max(0,noMissT-1.2)*1.3;
-        g.save();g.translate(api.W/2,api.H*0.62);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
+        g.save();g.translate(api.W/2,api.H*0.64);g.scale(pop,pop);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(noMissT*1.3,0,1);g.font="900 28px 'Hiragino Maru Gothic ProN',system-ui";
         g.lineWidth=6;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText("ノーミス！",0,0);
         g.shadowColor="rgba(120,255,150,.8)";g.shadowBlur=14;g.fillStyle="#c7ffcf";g.fillText("ノーミス！",0,0);g.shadowBlur=0;
@@ -569,9 +577,12 @@ function buildVolcano(api){
     }
     // 軸6(見やすさ): ボーナスは「加算された瞬間だけ光る」一時表示にする(常時居座らせない=常時HUDは2段のまま)
     if(bonusFlashT>0){bonusFlashT-=0.016*dt;const a=clamp(bonusFlashT*1.3,0,1);
-      g.globalAlpha=a;g.font="800 12px 'Hiragino Maru Gothic ProN',system-ui";
-      g.lineWidth=3;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText("ボーナス x"+bonus,api.W/2,cgy+20);
-      g.fillStyle="#ffd23f";g.fillText("ボーナス x"+bonus,api.W/2,cgy+20);
+      g.globalAlpha=a;g.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";
+      // 軸6: 暗い細帯を敷いて赤紫の空に沈まないようにする(12px→16px)
+      const bt="ボーナス x"+bonus,bw=g.measureText(bt).width+24,by=cy+30;
+      g.fillStyle="rgba(0,0,0,.45)";roundRect(api.W/2-bw/2,by-12,bw,24,10);g.fill();
+      g.lineWidth=3;g.strokeStyle="rgba(0,0,0,.5)";g.strokeText(bt,api.W/2,by);
+      g.fillStyle="#ffd23f";g.fillText(bt,api.W/2,by);
       g.globalAlpha=1;if(bonusFlashT<0)bonusFlashT=0;}
     g.restore();g.textAlign="left";g.textBaseline="alphabetic";
   }

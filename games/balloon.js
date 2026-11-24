@@ -374,6 +374,20 @@ function buildBalloon(api){
       }
       g.restore();g.globalAlpha=1;g.shadowBlur=0;g.globalCompositeOperation="source-over";
       links=links.filter(ln=>ln.life>0);
+      // 下のヒント帯: ふうせんより先に描き、下から上がってくるふうせんが帯の上に乗って隠れないようにする
+      {
+      hintPulse+=0.05*dt;
+      // cute rounded HUD: hint pill (bottom)
+      g.save();const hint="うえの いろを タップ！ おなじ いろが れんさで われる！";
+      g.font="800 19px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";g.textBaseline="middle";
+      const mt=g.measureText(hint),tw2=(mt&&mt.width)||hint.length*11,pw=tw2+40,ph2=40,pulse=1+Math.sin(hintPulse)*0.02;
+      g.translate(api.W/2,api.H-30);g.scale(pulse,pulse);
+      roundRect(-pw/2,-ph2/2,pw,ph2,ph2/2);
+      g.fillStyle="rgba(60,90,140,.7)";g.shadowColor="rgba(0,0,0,.25)";g.shadowBlur=8;g.fill();
+      g.shadowBlur=0;g.lineWidth=2.5;g.strokeStyle="rgba(255,255,255,.6)";g.stroke();
+      g.fillStyle="#fff";g.shadowColor="rgba(80,120,180,.9)";g.shadowBlur=6;
+      g.fillText(hint,0,1);g.restore();g.textAlign="left";g.textBaseline="alphabetic";
+      }
       // draw balloons (sorted by y so lower in front)
       const order=balloons.slice().sort((a,b)=>a.y-b.y);
       for(const b of order)drawBalloon(b);
@@ -490,17 +504,6 @@ function buildBalloon(api){
         g.lineWidth=6;g.strokeStyle="rgba(20,90,40,.6)";g.strokeText("パーフェクト！",0,0);
         g.shadowColor="rgba(123,224,138,.9)";g.shadowBlur=18;g.fillStyle="#c7ffcf";g.fillText("パーフェクト！",0,0);
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(perfectT<0)perfectT=0;}
-      hintPulse+=0.05*dt;
-      // cute rounded HUD: hint pill (bottom)
-      g.save();const hint="うえの いろを タップ！ おなじ いろが れんさで われる！";
-      g.font="800 19px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";g.textBaseline="middle";
-      const mt=g.measureText(hint),tw2=(mt&&mt.width)||hint.length*11,pw=tw2+40,ph2=40,pulse=1+Math.sin(hintPulse)*0.02;
-      g.translate(api.W/2,api.H-30);g.scale(pulse,pulse);
-      roundRect(-pw/2,-ph2/2,pw,ph2,ph2/2);
-      g.fillStyle="rgba(60,90,140,.7)";g.shadowColor="rgba(0,0,0,.25)";g.shadowBlur=8;g.fill();
-      g.shadowBlur=0;g.lineWidth=2.5;g.strokeStyle="rgba(255,255,255,.6)";g.stroke();
-      g.fillStyle="#fff";g.shadowColor="rgba(80,120,180,.9)";g.shadowBlur=6;
-      g.fillText(hint,0,1);g.restore();g.textAlign="left";g.textBaseline="alphabetic";
       g.globalCompositeOperation="source-over";
     }
   };
@@ -511,8 +514,10 @@ function buildBalloon(api){
     if(b.shape==='long'){rx*=0.55;ry*=1.7;}
     rx=Math.max(0.5,rx);ry=Math.max(0.5,ry);
     g.save();g.translate(b.x,b.y);
+    // 輪郭(暗い外線＋白い内線の二重): 緑地・青地の背景でも ふうせんが浮いて見える
+    const outl=()=>{g.save();g.shadowBlur=0;g.lineJoin='round';g.lineWidth=Math.max(3,b.r*0.08);g.strokeStyle='rgba(20,40,70,.55)';g.stroke();g.lineWidth=Math.max(1.5,b.r*0.04);g.strokeStyle='rgba(255,255,255,.9)';g.stroke();g.restore();};
     // soft drop shadow under body
-    g.save();g.globalAlpha=0.18;g.fillStyle="#1a3a5a";
+    g.save();g.globalAlpha=0.32;g.fillStyle="#1a3a5a";
     g.beginPath();g.ellipse(b.r*0.12,b.r*0.16,rx,ry,0,0,TAU);g.fill();g.restore();
     // string (gentle curve)
     g.strokeStyle="rgba(40,60,90,.35)";g.lineWidth=1.5;g.beginPath();g.moveTo(0,ry*0.95);
@@ -532,23 +537,23 @@ function buildBalloon(api){
       grd.addColorStop(0.75,"hsl("+((hue+90)%360)+",85%,60%)");
       grd.addColorStop(1,"hsl("+((hue+180)%360)+",80%,55%)");
       g.save();g.shadowColor="hsl("+hue+",90%,65%)";g.shadowBlur=16;g.fillStyle=grd;
-      g.beginPath();g.ellipse(0,0,rx,ry,0,0,TAU);g.fill();g.restore();
+      g.beginPath();g.ellipse(0,0,rx,ry,0,0,TAU);g.fill();outl();g.restore();
     } else {
       grd=g.createRadialGradient(-rx*0.35,-ry*0.4,b.r*0.1,0,0,b.r*1.05);
       grd.addColorStop(0,lightenC(b.color,90));grd.addColorStop(0.45,lightenC(b.color,30));
       grd.addColorStop(1,b.color);
-      g.save();g.shadowColor=b.color;g.shadowBlur=b.boss>0?18:10;g.fillStyle=grd;
+      g.save();g.shadowColor="rgba(255,255,255,.9)";g.shadowBlur=b.boss>0?18:12;g.fillStyle=grd;
       if(b.shape==='long'){
         // 動物風船らしい二段ふくらみ(軸7向け): 丸いだけの輪郭差を出すため下の大玉+上の小玉+くびれの陰で表現
         const loY=ry*0.30,loRx=Math.max(0.5,rx*1.05),loRy=Math.max(0.5,ry*0.62);
         const hiY=-ry*0.55,hiRx=Math.max(0.5,rx*0.72),hiRy=Math.max(0.5,ry*0.42);
-        g.beginPath();g.ellipse(0,loY,loRx,loRy,0,0,TAU);g.fill();
-        g.beginPath();g.ellipse(0,hiY,hiRx,hiRy,0,0,TAU);g.fill();
+        g.beginPath();g.ellipse(0,loY,loRx,loRy,0,0,TAU);g.fill();outl();
+        g.beginPath();g.ellipse(0,hiY,hiRx,hiRy,0,0,TAU);g.fill();outl();
         // どうぶつの耳(軸7向け): ねこ(三角)とうさぎ(長い耳)を風船ごとに出し分ける
         if((b.an||0)<0.5){
-          for(const sg of[-1,1]){g.beginPath();g.moveTo(sg*hiRx*0.95,hiY-hiRy*0.15);g.lineTo(sg*hiRx*0.75,hiY-hiRy*1.45);g.lineTo(sg*hiRx*0.12,hiY-hiRy*0.85);g.closePath();g.fill();}
+          for(const sg of[-1,1]){g.beginPath();g.moveTo(sg*hiRx*0.95,hiY-hiRy*0.15);g.lineTo(sg*hiRx*0.75,hiY-hiRy*1.45);g.lineTo(sg*hiRx*0.12,hiY-hiRy*0.85);g.closePath();g.fill();outl();}
         } else {
-          for(const sg of[-1,1]){g.beginPath();g.ellipse(sg*hiRx*0.5,hiY-hiRy*1.25,Math.max(0.5,hiRx*0.26),Math.max(0.5,hiRy*0.85),sg*0.18,0,TAU);g.fill();}
+          for(const sg of[-1,1]){g.beginPath();g.ellipse(sg*hiRx*0.5,hiY-hiRy*1.25,Math.max(0.5,hiRx*0.26),Math.max(0.5,hiRy*0.85),sg*0.18,0,TAU);g.fill();outl();}
         }
         g.save();g.globalAlpha=0.3;g.strokeStyle="rgba(30,50,80,.6)";g.lineWidth=Math.max(1,rx*0.14);
         g.beginPath();g.ellipse(0,-ry*0.05,Math.max(0.5,rx*0.42),Math.max(0.5,ry*0.15),0,0,TAU);g.stroke();g.restore();
@@ -558,7 +563,7 @@ function buildBalloon(api){
         g.bezierCurveTo(rx*0.75,-ry,rx*1.35,ry*0.15,rx,ry*0.62);
         g.bezierCurveTo(rx*0.7,ry*1.05,-rx*0.7,ry*1.05,-rx,ry*0.62);
         g.bezierCurveTo(-rx*1.35,ry*0.15,-rx*0.75,-ry,0,-ry);
-        g.closePath();g.fill();
+        g.closePath();g.fill();outl();
         g.save();g.globalAlpha=0.7;g.fillStyle="#fff";g.beginPath();g.moveTo(rx*0.12,ry*0.05);
         g.quadraticCurveTo(rx*0.42,ry*0.42,rx*0.12,ry*0.55);g.quadraticCurveTo(-rx*0.18,ry*0.42,rx*0.12,ry*0.05);g.fill();g.restore();
       } else if(b.shape==='heart'){
@@ -567,9 +572,9 @@ function buildBalloon(api){
         g.beginPath();g.moveTo(0,hh*0.62);
         g.bezierCurveTo(hw*1.35,hh*0.05,hw*0.85,-hh*1.05,0,-hh*0.28);
         g.bezierCurveTo(-hw*0.85,-hh*1.05,-hw*1.35,hh*0.05,0,hh*0.62);
-        g.closePath();g.fill();
+        g.closePath();g.fill();outl();
       } else {
-        g.beginPath();g.ellipse(0,0,rx,ry,0,0,TAU);g.fill();
+        g.beginPath();g.ellipse(0,0,rx,ry,0,0,TAU);g.fill();outl();
       }
       g.restore();
       // どうぶつの顔(軸7向け): 目2つ+はな+口。ghost(空気が抜けて飛ぶ)も同じ絵なので飛び回る動物に見える
@@ -589,7 +594,7 @@ function buildBalloon(api){
         let g2=g.createRadialGradient(-r2*0.35,oy-ry2*0.4,b.r*0.05,0,oy,r2*1.05);
         g2.addColorStop(0,lightenC(b.color,90));g2.addColorStop(0.45,lightenC(b.color,30));g2.addColorStop(1,b.color);
         g.save();g.shadowColor=b.color;g.shadowBlur=8;g.fillStyle=g2;
-        g.beginPath();g.ellipse(0,oy,r2,ry2,0,0,TAU);g.fill();g.restore();
+        g.beginPath();g.ellipse(0,oy,r2,ry2,0,0,TAU);g.fill();outl();g.restore();
         g.strokeStyle="rgba(40,60,90,.35)";g.lineWidth=1.2;g.beginPath();
         g.moveTo(0,oy+ry2*0.9);g.lineTo(0,-ry*0.95);g.stroke();
       }

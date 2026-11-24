@@ -83,7 +83,13 @@ function build_donutfall(api){
     else if(type==="gold"){col="#ffd23f";r=R*1.08;}
     else if(type==="rainbow"){col=pick(PAL);r=R*1.14;} // 描画側で毎フレーム虹色に色替わり
     else if(type==="mini"){col=pick(PAL);r=R*0.6;}     // ⑦ 小さい一口サイズ(大きいcake/gold/rainbowの逆側)
-    sweets.push({x:stage<=1?clamp(api.W*rnd(0.16,0.84),r*1.2,api.W-r*1.2):rnd(r*1.2,api.W-r*1.2),y:-r*1.4,
+    const pickX=()=>stage<=1?clamp(api.W*rnd(0.16,0.84),r*1.2,api.W-r*1.2):rnd(r*1.2,api.W-r*1.2);
+    let nx=pickX();
+    // 第10ラウンド: フィーバー中だけ、上の方にいる的と近すぎたら最大4回引き直す(団子状に重なって見づらいのを減らす。密度は据え置き)
+    if(fever>0){for(let t=0;t<4;t++){
+      if(!sweets.some(o=>!o.dead&&o.y<R*3&&Math.hypot(o.x-nx,o.y-(-r*1.4))<R*1.8))break;
+      nx=pickX();}}
+    sweets.push({x:nx,y:-r*1.4,
       vy:fallSpeed()*rnd(0.85,1.15)*(type==="gold"||type==="rainbow"?0.66:1),
       vx:rnd(-0.4,0.4),type,col,hp,r,rot:rnd(0,TAU),vr:rnd(-0.04,0.04),
       wob:rnd(0,TAU),flash:0,dead:false});
@@ -163,7 +169,7 @@ function build_donutfall(api){
   // ② ラッキー色 命中: きらっと小さめの祝福(白飛びしないよう控えめ)
   function luckySparkle(x,y){
     api.tone(1046,0.14,"triangle",0.1);api.tone(1568,0.16,"triangle",0.08);
-    floats.push({x,y:y-R*0.9,txt:"ラッキー！",life:0.8,vy:-1,col:luckyColor,size:26});
+    floats.push({x,y:y-R*1.6,txt:"ラッキー！",life:0.8,vy:-1,col:luckyColor,size:26});
     for(let i=0;i<9;i++){const a=rnd(0,TAU),sp=rnd(2,6);
       shards.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-2,r:rnd(3,6),
         rot:rnd(0,TAU),vr:rnd(-0.3,0.3),life:1,decay:rnd(0.02,0.03),col:luckyColor,shape:i%2});}
@@ -224,11 +230,12 @@ function build_donutfall(api){
     api.boom(combo>=5?0.55:0.4);api.shake(6+Math.min(combo,8));
     if(s.type==="cake"){api.tone(1046,0.18,"triangle",0.14);api.tone(1318,0.2,"triangle",0.1);}
     if(combo>=3){flash=Math.min(1,0.45+combo*0.05);flashHue=s.col;tryHitStop(combo>=6?4:3);api.tone(220,0.2,"sawtooth",0.07);}
-    if(combo>=5)floats.push({x:px,y:py-R*0.6,txt:"x"+combo,life:1,vy:-1.1,
+    // 第10ラウンド: 上部中央の『コンボ xN』と重複するので、5の倍数のときだけ・ラッキー同時なら出さない(数字の重なり対策)
+    if(combo>=5&&combo%5===0&&!isLucky)floats.push({x:px,y:py-R*0.6,txt:"x"+combo,life:1,vy:-1.1,
       col:combo>=8?"#ff2bcf":combo>=5?"#ff5b8a":"#ffd23f",size:combo>=5?40:30});
     if(s.type==="gold")goldBurst(px,py);
     else if(s.type==="rainbow")rainbowBurst(px,py);
-    else if(fever>0)floats.push({x:px,y:py-R*1.1,txt:"+"+gain,life:0.8,vy:-1.3,col:"#fff",size:22});
+    else if(fever>0)floats.push({x:px,y:py-R*2.3,txt:"+"+gain,life:0.8,vy:-1.3,col:"#fff",size:22});
     if(isLucky)luckySparkle(px,py);
     // フィーバーゲージ: たたくたび少しずつたまる。ゴールド/にじいろはドカンとたまる
     if(fever<=0){feverGauge=Math.min(1,feverGauge+(s.type==="gold"||s.type==="rainbow"?0.22:0.08));
@@ -291,8 +298,12 @@ function build_donutfall(api){
         const fa=Math.min(1,fever*2)*Math.min(1,(10-fever)*3);
         const hue=(tsec*140)%360;
         g.save();g.globalCompositeOperation="lighter";
-        g.globalAlpha=0.2*fa;g.fillStyle="hsl("+Math.round(hue)+",90%,70%)";g.fillRect(0,0,api.W,api.H);
-        g.globalAlpha=0.14*fa;g.fillStyle="hsl("+Math.round((hue+120)%360)+",90%,70%)";g.fillRect(0,0,api.W,api.H*0.55);
+        g.globalAlpha=0.12*fa;g.fillStyle="hsl("+Math.round(hue)+",90%,70%)";g.fillRect(0,0,api.W,api.H);
+        // 第10ラウンド: 上半分の2枚目は透明へ消えるグラデにして継ぎ目(H*0.55の横線)をなくし、白飛びも抑える
+        const fg=g.createLinearGradient(0,0,0,api.H*0.55);
+        fg.addColorStop(0,"hsla("+Math.round((hue+120)%360)+",90%,70%,"+(0.14*fa).toFixed(3)+")");
+        fg.addColorStop(1,"hsla("+Math.round((hue+120)%360)+",90%,70%,0)");
+        g.globalAlpha=1;g.fillStyle=fg;g.fillRect(0,0,api.W,api.H*0.55);
         g.restore();g.globalCompositeOperation="source-over";
       }
       // soft sun glow
@@ -494,14 +505,14 @@ function build_donutfall(api){
       g.fillStyle=pg;rrect(x,y,Math.max(h,w*fr),h,h/2);g.fill();
     }
     g.strokeStyle="rgba(255,255,255,.8)";g.lineWidth=2;rrect(x,y,w,h,h/2);g.stroke();
-    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
+    g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
     g.lineWidth=5;g.lineJoin="round";g.strokeStyle="rgba(255,255,255,.95)";
     g.shadowColor="rgba(255,255,255,.7)";g.shadowBlur=6;
     if(fever>0){const pu=1+0.08*Math.sin(tsec*10);
-      g.save();g.translate(api.W/2,y-10);g.scale(pu,pu);
+      g.save();g.translate(api.W/2,y-14);g.scale(pu,pu);
       g.strokeText("フィーバー！ てん 2ばい！",0,0);
       g.fillStyle="#ff2bcf";g.fillText("フィーバー！ てん 2ばい！",0,0);g.restore();}
-    else{g.strokeText("フィーバーゲージ",api.W/2,y-10);g.fillStyle="#7a3b5a";g.fillText("フィーバーゲージ",api.W/2,y-10);}
+    else{g.strokeText("フィーバーゲージ",api.W/2,y-14);g.fillStyle="#7a3b5a";g.fillText("フィーバーゲージ",api.W/2,y-14);}
     g.restore();g.textAlign="left";
   }
 
@@ -511,7 +522,10 @@ function build_donutfall(api){
     // shadow(回転の外で描く=傾いた灰色の楕円に見えない)
     g.fillStyle="rgba(120,80,100,.22)";g.beginPath();g.ellipse(0,r*0.95,r*0.7,r*0.22,0,0,TAU);g.fill();
     // 第4ラウンド: 白い縁取り+薄い外周影で、雲の上の淡色ドーナツ・白い飴も背景から浮かせる
-    g.save();g.strokeStyle="rgba(255,255,255,.9)";g.lineWidth=3;g.shadowColor="rgba(90,50,90,.35)";g.shadowBlur=8;
+    // 第10ラウンド: 白輪の外側にHUD文字色系の濃い輪をもう1本(白い空・雲に溶けない)。当たり判定(HIT_K)は変えない
+    g.save();g.strokeStyle="rgba(122,59,90,.55)";g.lineWidth=2;
+    g.beginPath();g.arc(0,0,Math.max(0,r*1.0+2),0,TAU);g.stroke();
+    g.strokeStyle="rgba(255,255,255,.9)";g.lineWidth=3;g.shadowColor="rgba(90,50,90,.35)";g.shadowBlur=8;
     g.beginPath();g.arc(0,0,Math.max(0,r*1.0),0,TAU);g.stroke();g.restore();
     g.rotate(s.rot*0.4);
     // A: ゴールドは後光+回転する光のレイで一目でわかる

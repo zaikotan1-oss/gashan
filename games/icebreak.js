@@ -207,7 +207,7 @@ function buildIcebreak(api){
     // 取り残し救済: 4秒間 得点が増えていなければ、どこをタップしても最寄りの氷に作用する(投げ出し防止)
     // ステージのはじめは(まだ1個も割れていない間・最大3.5秒)吸着OK: 最初の1発は必ず割れる
     const quiet=tsec-lastScoreT, rescue=quiet>=4 || (!stageScored&&tsec-stageStartT<3.5);
-    const capR=(rescue||remaining<=5)?Infinity:remaining<=14?S*2.2:S*0.9;
+    const capR=(rescue||remaining<=5)?Infinity:remaining<=14?S*2.2:S*0.75;
     // 歯ごたえ(a): 氷の塊のバウンディングボックスから明らかに離れたタップ(空・地面・画面端など)は、
     // capRの吸着に関わらず必ず外れにする(空や地面を叩いても割れてしまう問題の対策)。
     // ただし塊のすぐ外側の「惜しい」タップまで殺すと無反応が伸びすぎるので、余白は広めに取る。

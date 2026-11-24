@@ -229,6 +229,17 @@ function build_icicle(api){
         if(d<bd){bd=d;best=ic;}
       }
       const pickR=stage===1?Math.max(W*0.30,170):Math.max(W*0.20,110);
+      // 軸3(b): ステージ1の最初の1発(まだ1点も取っていない間)だけ「いま歩いている的」を見て、その少し先のつららを落とす=最初のタップがすぐ当たる。2発目以降は従来どおり(空振りも残る)。
+      if(stage===1&&count===0){
+        let fw=null,fd=1e9;
+        for(const wk of walkers){if(wk.dead||wk.x<wk.r||wk.x>W-wk.r)continue;
+          const dx=Math.abs(wk.x-x);if(dx<fd){fd=dx;fw=wk;}}
+        if(fw){
+          const aim=fw.x+fw.sp*30;let fb=null,fbd=1e9;
+          for(const ic of icicles){if(!ic.ready)continue;const dd=Math.abs(ic.x-aim);if(dd<fbd){fbd=dd;fb=ic;}}
+          if(fb){dropIcicle(fb);return;}
+        }
+      }
       if(best&&bd<pickR){
         // ステージ2以降: タップ位置のX付近(±60px)に歩く的が1体もいない時は落とさない(叱らず、低い音だけ)。
         // 的の近くをタップした時は、その的の少し先(落ちる間に進む分)にいちばん近いつららを落とす=的を見て狙った子が報われる。
@@ -326,9 +337,9 @@ function build_icicle(api){
         if(ic.ready){
           const pulse=0.5+0.5*Math.sin(tsec*4+ic.wob);
           const early=stage===1&&tsec<10;
-          g.save();g.globalCompositeOperation="lighter";g.globalAlpha=early?0.22+0.22*pulse:0.10+0.08*pulse;   // 常時うすい背板(10秒後・ステージ2以降は控えめ)
+          g.save();g.globalCompositeOperation="lighter";g.globalAlpha=early?0.22+0.22*pulse:0.07+0.05*pulse;   // 常時うすい背板(10秒後・ステージ2以降は控えめ)
           g.fillStyle="#eaf7ff";
-          g.beginPath();g.arc(ic.x,ic.baseY+ic.len*grow*0.5,Math.max(0,ic.w*1.8+pulse*6),0,TAU);g.fill();
+          g.beginPath();g.arc(ic.x,ic.baseY+ic.len*grow*0.5,Math.max(0,early?ic.w*1.8+pulse*6:ic.w*1.35+pulse*4),0,TAU);g.fill();
           g.restore();g.globalAlpha=1;g.globalCompositeOperation="source-over";
         }
         drawIcicle(ic.x,ic.baseY,ic.len*grow,ic.w*Math.max(0.25,grow),ic.ready,ic.wob);
@@ -373,7 +384,7 @@ function build_icicle(api){
 
       // ---------- falling drops: collision + ground ----------
       for(const d of drops){
-        d.vy+=0.55*dt;d.y+=d.vy*dt;
+        d.vy+=(stage===1?0.7:0.55)*dt;d.y+=d.vy*dt;
         // hit a walker?
         let hit=false;
         for(const wk of walkers){
@@ -457,7 +468,7 @@ function build_icicle(api){
       if(combo>1){
         const pop=1+Math.max(0,comboT-0.7)*1.2;
         const ctx2="コンボ x"+combo;
-        g.save();g.translate(W/2,H*0.30);g.scale(pop,pop);   // つららの先端(最長≒H*0.26)の下へ出す=つららを隠さない
+        g.save();g.translate(Math.max(W*0.17,95),H*0.42);g.scale(pop,pop);   // 左の空き地へ(中央のお祝い帯 H*0.30・にじいろ H*0.43・ラッキー H*0.50・クリア帯と重ねない)
         g.font="800 32px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.globalAlpha=clamp(comboT,0,1);
         g.lineJoin="round";g.lineWidth=6;g.strokeStyle="rgba(8,24,52,.85)";g.strokeText(ctx2,0,0);   // 黒縁を先に描いて背景から浮かせる
@@ -471,7 +482,7 @@ function build_icicle(api){
       if(rbMsgT>0&&clearT<=0){rbMsgT-=0.016*dt;   // クリア帯の間は止めて、帯が消えてから見せる
         {
         const pop=1+Math.max(0,rbMsgT-1)*1.4,rcol=["#ff5b5b","#ffd23f","#7be08a","#5ad1ff","#c78bff"],col=rcol[Math.floor(tsec*6)%rcol.length];
-        g.save();g.translate(W/2,H*0.43);g.scale(pop,pop);   // 10点ごとのお祝い(H*0.30)・コンボ(H*0.205)と重ならない高さ
+        g.save();g.translate(W/2,H*0.43);g.scale(pop,pop);   // お祝い(H*0.30)中央・コンボは左(W*0.17,H*0.42)と重ならない高さ
         g.font="900 34px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
         g.globalAlpha=clamp(rbMsgT*1.4,0,1);g.lineJoin="round";
         g.lineWidth=7;g.strokeStyle="rgba(8,24,52,.85)";g.strokeText("にじいろだま!",0,0);

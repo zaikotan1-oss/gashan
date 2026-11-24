@@ -953,7 +953,12 @@ function buildAvalanche(api){
   function drawFeverBar(){
     const bw=Math.min(api.W*0.5,260),bh=14,bx=(api.W-bw)/2,by=api.H-32;
     g.save();g.textAlign="center";
-    g.fillStyle="rgba(20,40,70,.45)";roundRect(bx-4,by-3,bw+8,bh+6,(bh+6)/2);g.fill();
+    const label=fever>0?"フィーバー!! てんすう 2ばい!":"フィーバーゲージ";
+    g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
+    // ラベルの背板(背景の雪の白さに左右されない)
+    const lw=Math.min(api.W-16,(g.measureText?g.measureText(label).width:label.length*22)+28),ly=by-7-24;
+    g.fillStyle="rgba(20,40,70,.6)";roundRect((api.W-lw)/2,ly,lw,32,16);g.fill();
+    g.fillStyle="rgba(20,40,70,.6)";roundRect(bx-4,by-3,bw+8,bh+6,(bh+6)/2);g.fill();
     const fr=fever>0?fever/FEVER_LEN:feverGauge;
     if(fr>0.01){
       let gg=g.createLinearGradient(bx,0,bx+bw,0);
@@ -964,10 +969,12 @@ function buildAvalanche(api){
     }
     g.strokeStyle="rgba(255,255,255,.55)";g.lineWidth=2;
     roundRect(bx-4,by-3,bw+8,bh+6,(bh+6)/2);g.stroke();
-    g.font="800 18px 'Hiragino Maru Gothic ProN',system-ui";
-    g.fillStyle=fever>0?RAINBOW[Math.floor(tsec*8)%RAINBOW.length]:"#fff";
+    g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
+    g.lineJoin="round";g.lineWidth=6;g.strokeStyle="rgba(30,40,70,.9)";
+    g.strokeText(label,api.W/2,by-7);
+    g.fillStyle=fever>0?"#ffd23f":"#fff";
     g.shadowColor="rgba(30,50,80,.7)";g.shadowBlur=5;
-    g.fillText(fever>0?"フィーバー!! てんすう 2ばい!":"フィーバーゲージ",api.W/2,by-7);
+    g.fillText(label,api.W/2,by-7);
     g.restore();g.textAlign="left";
   }
   function drawHUD(){

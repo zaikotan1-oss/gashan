@@ -599,16 +599,18 @@ function buildDrill(api){
         if(bug.x<-40||bug.x>api.W+40)bug=null;}
       if(bug){const tw=0.55+0.45*Math.sin(bug.ph*2);
         g.save();g.globalCompositeOperation="lighter";
-        const hg=g.createRadialGradient(bug.x,bug.y,1,bug.x,bug.y,18);
+        const hg=g.createRadialGradient(bug.x,bug.y,1,bug.x,bug.y,34);
         hg.addColorStop(0,bug.hue);hg.addColorStop(1,"rgba(0,0,0,0)");
-        g.globalAlpha=0.6*tw;g.fillStyle=hg;g.beginPath();g.arc(bug.x,bug.y,18,0,TAU);g.fill();
+        g.globalAlpha=0.6*tw;g.fillStyle=hg;g.beginPath();g.arc(bug.x,bug.y,34,0,TAU);g.fill();
         g.globalAlpha=1;g.globalCompositeOperation="source-over";
-        g.fillStyle=bug.hue;g.beginPath();g.arc(bug.x,bug.y,4,0,TAU);g.fill();
-        g.fillStyle="rgba(255,255,255,.9)";g.beginPath();g.arc(bug.x-1,bug.y-1,1.6,0,TAU);g.fill();
+        // 本体は黒縁つきで 明るい帯の上でも消えない(見かけ約70px)
+        g.fillStyle=bug.hue;g.beginPath();g.arc(bug.x,bug.y,9,0,TAU);g.fill();
+        g.lineWidth=3;g.strokeStyle="rgba(0,0,0,.55)";g.stroke();
+        g.fillStyle="rgba(255,255,255,.9)";g.beginPath();g.arc(bug.x-2.5,bug.y-2.5,3.4,0,TAU);g.fill();
         const wf=Math.sin(bug.ph*6)*0.5;
-        g.strokeStyle="rgba(255,255,255,.5)";g.lineWidth=1.4;g.lineCap="round";
-        g.beginPath();g.arc(bug.x-3,bug.y-1,3,Math.PI*0.9+wf,Math.PI*1.7+wf);g.stroke();
-        g.beginPath();g.arc(bug.x+3,bug.y-1,3,Math.PI*1.3-wf,Math.PI*2.1-wf);g.stroke();
+        g.strokeStyle="rgba(255,255,255,.85)";g.lineWidth=2.5;g.lineCap="round";
+        g.beginPath();g.arc(bug.x-7,bug.y-2,7,Math.PI*0.9+wf,Math.PI*1.7+wf);g.stroke();
+        g.beginPath();g.arc(bug.x+7,bug.y-2,7,Math.PI*1.3-wf,Math.PI*2.1-wf);g.stroke();
         g.restore();}
       // ① にじいろジェム 接近予告: したから レアが近づいたら 画面下ちゅうおうに 虹のシェブロン(ドキドキ)
       if(chunks.some(c=>c.type==="rainbow"&&!c.done&&c.top>depth&&c.top<depth+api.H*1.3)){
@@ -627,7 +629,7 @@ function buildDrill(api){
         g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";if(rbMsgT<0)rbMsgT=0;}
       // ② きょうのラッキー色 はっけん！ 中央上に一度だけ教える
       if(luckyMsgT>0){luckyMsgT-=ds;
-        g.save();g.translate(api.W/2,api.H*0.31);g.textAlign="center";g.textBaseline="middle";
+        g.save();g.translate(api.W/2,api.H*0.17);g.textAlign="center";g.textBaseline="middle";
         g.globalAlpha=clamp(luckyMsgT*1.2,0,1);g.font="800 22px 'Hiragino Maru Gothic ProN',system-ui";
         const t2="きょうのラッキーいろは "+(GEMNAME[luckyColor]||"")+"！";
         g.lineWidth=5;g.strokeStyle="rgba(0,0,0,.45)";g.strokeText(t2,0,0);
@@ -973,7 +975,8 @@ function buildDrill(api){
     const cx=api.W/2+wob+leanX,cy=drillY;
     // squash & stretch on impact (heat as proxy for active drilling)
     const sx=1+heat*0.06,sy=1-heat*0.05;
-    g.save();g.translate(cx,cy);g.rotate(lean*Math.max(0,leanT)*0.12);g.translate(-cx,-cy);
+    g.save();g.translate(cx,cy);g.scale(1.25,1.25);g.translate(-cx,-cy); // 見た目だけ1.25倍(判定は drillY 基準のまま)
+    g.translate(cx,cy);g.rotate(lean*Math.max(0,leanT)*0.12);g.translate(-cx,-cy);
     g.translate(cx,cy);g.scale(sx,sy);g.translate(-cx,-cy);
     // 画像ドリル(上=そうじゅうせき / 下=ぎんいろの きり)。手描きの本体(cy-70..cy+28)と同じ大きさに合わせる
     const useImg=USE_DRILL_IMG && api.drawAsset("drill",cx,cy-21,118,118,{center:true});
@@ -991,12 +994,12 @@ function buildDrill(api){
     // cute mascot face inside the cockpit (little driller pal)
     g.fillStyle="#23323f";
     const eo=heat>0.05?1.6:0;
-    g.beginPath();g.arc(cx-3.2,cy-59,1.5,0,TAU);g.arc(cx+3.2,cy-59,1.5,0,TAU);g.fill();
+    g.beginPath();g.arc(cx-3.2,cy-59,2.6,0,TAU);g.arc(cx+3.2,cy-59,2.6,0,TAU);g.fill();
     g.fillStyle="#fff";g.beginPath();g.arc(cx-3.6+eo*0.2,cy-59.6,0.6,0,TAU);g.arc(cx+2.8+eo*0.2,cy-59.6,0.6,0,TAU);g.fill();
     // smile (opens a bit while drilling)
-    g.strokeStyle="#23323f";g.lineWidth=1.2;g.beginPath();g.arc(cx,cy-55,2.4,0.15*Math.PI,0.85*Math.PI);g.stroke();
+    g.strokeStyle="#23323f";g.lineWidth=2;g.beginPath();g.arc(cx,cy-55,2.4,0.15*Math.PI,0.85*Math.PI);g.stroke();
     // rosy cheeks
-    g.fillStyle="rgba(255,130,150,.5)";g.beginPath();g.arc(cx-6,cy-56,1.6,0,TAU);g.arc(cx+6,cy-56,1.6,0,TAU);g.fill();
+    g.fillStyle="rgba(255,130,150,.5)";g.beginPath();g.arc(cx-6,cy-56,2.6,0,TAU);g.arc(cx+6,cy-56,2.6,0,TAU);g.fill();
     }
     // hot glow at the drilling tip when active (画像/手描き共通のエフェクト)
     if(heat>0.05){g.globalCompositeOperation="lighter";

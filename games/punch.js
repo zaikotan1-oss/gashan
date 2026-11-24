@@ -320,7 +320,7 @@ function buildPunch(api){
   function proceedNext(){
     level++;
     if(wave<wavesPerStage){
-      wave++;floats(api.W/2,api.H*0.52,"つぎは "+(nextRecipe?nextRecipe.name:"？")+"！","#fff");
+      wave++; // 次の壁の名前は newWall の spawnTitle が1回だけ出す(二重表示しない)
       setTimeout(newWall,60);
     }else{clearStage();}
   }
@@ -343,7 +343,7 @@ function buildPunch(api){
       const n=Math.min(7,sorted.length);   // かたい壁が増えた分、1回の自動崩しで進む量を少し増やす(大きい壁でも早く抜ける)
       for(let i=0;i<n;i++){const b=sorted[i];if(bricks.indexOf(b)>=0)destroyBrick(b,1.2);}
       count+=n;api.setScore(count);api.shake(8);flash=Math.min(1,flash+0.2);
-      floats(api.W*0.5,api.H*0.3,"じどうで ドカン！","#ffd23f");
+      floats(api.W*0.5,api.H*0.45,"じどうで ドカン！","#ffd23f");
       noBreak=bricks.length?STUCK-40:0;             // 残ってればすぐ再発火
       if(bricks.length===0&&!clearing){
         clearing=true;wash=1;washCol=theme?theme.cols[0]:"#ffd23f";api.boom(0.6);api.shake(18);
@@ -801,10 +801,10 @@ function buildPunch(api){
         g.globalCompositeOperation="source-over";g.globalAlpha=1;
       }
       // stage / wave indicator (top-CENTER = engine HUDのもどる/スコアと衝突しない安全帯)
-      g.font="800 16px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
+      g.font="800 20px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
       const stg="ステージ "+stage+(stage>FINAL_STAGE?"":"/"+FINAL_STAGE)+"  かべ "+wave+"/"+wavesPerStage;
-      g.lineWidth=4;g.strokeStyle="rgba(0,0,0,.45)";g.strokeText(stg,api.W/2,26);
-      g.fillStyle="#fff7e6";g.fillText(stg,api.W/2,26);
+      g.lineWidth=4;g.strokeStyle="rgba(0,0,0,.45)";g.strokeText(stg,api.W/2,28);
+      g.fillStyle="#fff7e6";g.fillText(stg,api.W/2,28);
       g.textAlign="left";
       // 出現テーマの予告表示（数字/名前だけ・短時間チラ見せ）
       if(spawnTitle>0){

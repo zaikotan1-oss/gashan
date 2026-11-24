@@ -158,7 +158,7 @@ function buildMeteor(api){
     if(hitCount>=4){colorWash=1;washHue=hitCount>=6?28:48;api.shake(38);}
     // 軸6: 最後の1発(面クリアになる)は パーフェクト！＋3 と同じ帯を通らないよう低い所から浮かせ、中央からも少しずらす
     const finalShot=lastShot&&standCount()===0;
-    const fy=finalShot?groundY-60:groundY-100;
+    const fy=(finalShot||rbMsgT>0)?groundY-60:groundY-100;
     let fx=x;if(finalShot&&Math.abs(x-api.W/2)<api.W*0.2)fx=x<api.W/2?api.W/2-api.W*0.2:api.W/2+api.W*0.2;
     if(hitCount>=3){floats=floats.filter(f=>!/^x\d/.test(f.txt)&&!/^\d+はかい！/.test(f.txt));floats.push({x:fx,y:fy,txt:hitCount+"はかい！",life:1,vy:-1.1,col:hitCount>=6?"#ff3b3b":"#ff8c42",size:hitCount>=6?46:34});}
     else if(combo>1){floats=floats.filter(f=>!/^x\d/.test(f.txt));floats.push({x:fx,y:fy,txt:"x"+combo,life:1,vy:-1.1,col:combo>=5?"#ff8c42":"#ffd23f",size:32});}
@@ -179,7 +179,7 @@ function buildMeteor(api){
     for(let i=0;i<12;i++){const a=rnd(-Math.PI,0),s=rnd(3,10);
       fire.push({x,y:groundY,vx:Math.cos(a)*s,vy:Math.sin(a)*s,r:rnd(4,10),life:1,decay:rnd(0.015,0.03),
         col:pick(["#ff5da2","#5ad1ff","#ffd23f","#7be08a","#9b6bff"])});}
-    floats.push({x,y:groundY-120,txt:"にじいろ！",life:1,vy:-1.1,col:"#ff5da2",size:44});
+    floats.push({x,y:groundY-170,txt:"にじいろ！",life:1,vy:-1.1,col:"#ff5da2",size:44});
   }
   // ② ラッキー色命中: 頭上に小さな星のキラッ(白飛びしないよう控えめ)
   function luckyBurst(x,y){
@@ -430,7 +430,7 @@ function buildMeteor(api){
       g.textAlign="center";g.fillStyle="#ffd27a";g.lineWidth=4;g.strokeStyle="rgba(0,0,0,.4)";
       g.strokeText(ct,api.W/2,cy);g.fillText(ct,api.W/2,cy);g.textAlign="left";}
     // --- stage-start / final banner ---
-    if(banT>0&&banner&&rbMsgT<=0){const a=Math.min(1,banT*1.6);const bfs=clamp(api.W*0.06,26,46);
+    if(banT>0&&banner&&rbMsgT<=0){const a=Math.min(1,banT*3);const bfs=clamp(api.W*0.06,26,46);
       g.globalAlpha=a;g.font="900 "+bfs+"px 'Hiragino Maru Gothic ProN',system-ui";g.textAlign="center";
       // 軸6対策: engine.js の祝福バナー(_fx.bann, 固定で api.H*0.3 に描画)と帯が重なって
       // 文字が判読不能に混ざる不具合が実機で確認された。ステージ開始バナーは
@@ -459,7 +459,7 @@ function buildMeteor(api){
       g.fillStyle=col;g.fillText("にじいろビル！",0,0);
       g.restore();g.globalAlpha=1;g.textAlign="left";g.textBaseline="alphabetic";}
     // ② きょうのラッキー色 ヒント(初回だけ大きく・以降は小さく)
-    if(luckyMsgT>0&&clearT<=0&&rbMsgT<=0){g.save();g.translate(api.W/2,api.H*(clearT>0?0.34:0.28));g.textAlign="center";g.textBaseline="middle";
+    if(luckyMsgT>0&&clearT<=0&&rbMsgT<=0){g.save();g.translate(api.W/2,api.H*0.40);g.textAlign="center";g.textBaseline="middle";
       g.globalAlpha=luckyMsgT>0.5?1:clamp(luckyMsgT*2,0,1);g.font="800 "+clamp(api.W*0.045,22,32)+"px 'Hiragino Maru Gothic ProN',system-ui";
       const t1="きょうのラッキーいろは ",t3=(COLNAME[luckyColor]||"")+"！";
       g.textAlign="left";const w1=g.measureText(t1).width,w3=g.measureText(t3).width,x0=-(w1+w3)/2;

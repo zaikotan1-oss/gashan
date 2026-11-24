@@ -126,11 +126,12 @@ function build_gumball(api){
     if(fever<=0) feverGauge=Math.min(1,feverGauge+(s.rainbow?0.5:s.gold?0.34:0.075));   // フィーバー中は溜めない(終わった直後にまたフィーバーが連続して、特別感が消えるのを防ぐ)
     if(fever<=0&&feverGauge>=1&&clearT<=0&&endingT<=0&&stageEat<stageGoal) startFever();   // 軸6: 最後の1個でゲージ満タンなら、クリア帯が消えるまでフィーバーを保留(文字が重ならない)
     // ガムボールが大きくカラフルに育つ
-    ball.r=Math.min(ball.r+unit*0.12, unit*2.0);
+    ball.r=Math.min(ball.r+unit*0.12, unit*1.6);
     if(ball.eaten%2===0) ball.col=pick(CANDY);
     // 軸3: お菓子を巻き込むたびに少しだけ勢いが落ちる(狙わず取り続けると失速して止まる=打ち直しが要る)
     if(ball.rolling) ball.vx=Math.max(0.6,ball.vx-0.85);
     const hx=s.x,hy=s.y;
+    const baseY=Math.min(hy-unit*0.2,ball.y-ball.r-unit*0.6);   // 軸6(見やすさ): 浮き文字を縦に段積みする1か所の基準y
     // 軸7: 壊れ方を種類ごとに変える(砕ける/ぷにっと伸びる/弧状に飛ぶ/クリームが混ざる)
     if(s.kind==="choco"){
       spawnShards(hx,hy,s.col,rint(3,5),{sMin:unit*0.32,sMax:unit*0.55,decMin:0.012,decMax:0.02,shape:1}); // バキッ: 大きめ少数
@@ -157,19 +158,19 @@ function build_gumball(api){
     api.shake(4+Math.min(combo,8));
     // hitStopはゴールド/コンボ節目のみ+クールダウン30f以上
     if((s.gold||combo===5||combo===10)&&hsCd<=0){api.hitStop(s.gold?4:3);hsCd=34;}
-    if(s.gold) goldBurst(hx,hy);
+    if(s.gold) goldBurst(hx,hy,baseY-unit*1.3);
     if(s.rainbow) rainbowBurst(hx,hy);
     // ② ラッキー色命中: 小さめの祝福 + 頭上に小さな星のキラッ(気づけるヒント)
     if(isLucky){
       luckStars.push({x:hx,y:hy-s.r*0.9,vy:-1.2,life:1,r:unit*0.3,rot:0});
-      addFloat({x:hx,y:hy-unit*0.9,txt:"ラッキー！",life:1,vy:-0.9,col:luckyColor,size:22});
+      addFloat({x:hx,y:baseY-unit*1.1,txt:"ラッキー！",life:1,vy:-0.9,col:luckyColor,size:22});
       api.tone(1046,0.09,"triangle",0.11);api.tone(1568,0.11,"triangle",0.07);
       luckySeen=true;
     }
     // 軸6: 文字は節目だけ(フィーバー中の毎個+2や毎個のxコンボは出さない。コンボはHUDが見せる)
-    if(gain>=3||isLucky) addFloat({x:hx,y:Math.min(hy-unit*0.2,ball.y-ball.r-unit*0.6),txt:"+"+gain,life:1,vy:-1,
+    if(gain>=3||isLucky) addFloat({x:hx,y:baseY,txt:"+"+gain,life:1,vy:-1,
       col:s.rainbow?"#ff5b8a":s.gold?"#ffd23f":"#ff2bff",size:s.rainbow?36:s.gold?34:26});
-    if(combo>1&&(combo<=3||combo%5===0)) addFloat({x:hx,y:hy-unit*0.6,txt:"x"+combo,life:1,vy:-1,
+    if(combo>1&&!s.rainbow&&!s.gold&&(combo<=3||combo%5===0)) addFloat({x:clamp(hx+unit*1.8,unit,W-unit*1.5),y:baseY,txt:"x"+combo,life:1,vy:-1,
       col:combo>=8?"#ff2bff":combo>=5?"#ff5b8a":"#ffd23f",size:combo>=4?38:28});
     if(ball.eaten===4) addFloat({x:hx,y:bigY(hy),txt:"おおきく なった！",life:1,vy:-0.7,col:"#ffe14a",size:22});
     if(ball.eaten===8) addFloat({x:hx,y:bigY(hy),txt:"きょだいガムボール！",life:1.4,vy:-0.7,col:"#ffd0ff",size:24,stroke:"rgba(60,0,60,.85)"});
@@ -177,14 +178,14 @@ function build_gumball(api){
   }
 
   // ゴールドキャンディ撃破: 虹色大破裂+ファンファーレ
-  function goldBurst(x,y){
+  function goldBurst(x,y,labelY){
     for(let i=0;i<3;i++) ringAt(x,y,pick(CANDY));
     spawnSparks(x,y,"#fff6c8",10);
     const nn=Math.min(12,Math.max(0,110-shards.length));
     for(let i=0;i<nn;i++){const a=rnd(0,TAU),sp=rnd(3,9);
       shards.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-rnd(1,4),s:rnd(unit*0.2,unit*0.42),
         col:pick(CANDY),rot:rnd(0,TAU),vr:rnd(-0.4,0.4),life:1,decay:rnd(0.01,0.018)});}
-    floats.push({x,y:y-unit*1.4,txt:"ゴールド！",life:1.1,vy:-0.8,col:"#ffd23f",size:34});
+    floats.push({x,y:labelY!=null?labelY:y-unit*1.4,txt:"ゴールド！",life:1.1,vy:-0.8,col:"#ffd23f",size:34});
     flash=1;flashHue="#ffd23f";
     api.boom(0.55);api.shake(12);
     api.tone(784,0.12,"triangle",0.16);
@@ -203,7 +204,7 @@ function build_gumball(api){
       shards.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-rnd(1,4),s:rnd(unit*0.22,unit*0.46),
         col:pick(CANDY),rot:rnd(0,TAU),vr:rnd(-0.4,0.4),life:1,decay:rnd(0.01,0.018)});}
     spawnSparks(x,y,"#fff6c8",12);
-    floats.push({x,y:Math.min(y-unit*1.5,ball.y-ball.r-unit*0.6),txt:"にじいろ！",life:1.2,vy:-0.8,col:"#ff5b8a",size:36});
+    floats.push({x,y:Math.min(y-unit*1.5,ball.y-ball.r-unit*0.6)-unit*1.3,txt:"にじいろ！",life:1.2,vy:-0.8,col:"#ff5b8a",size:36});
     api.boom(0.6);api.shake(15);
     if(hsCd<=0){api.hitStop(4);hsCd=34;}   // 激レア=節目なのでヒットストップ(クールダウン付き)
     api.tone(784,0.12,"triangle",0.16);
@@ -708,7 +709,8 @@ function build_gumball(api){
     g.strokeStyle="rgba(255,255,255,.55)";g.lineWidth=2;roundRect(bx,by,bw,bh,bh/2);g.stroke();
     // フィーバーゲージ(進行バーの下)
     const fw2=bw*0.66,fx2=(W-fw2)/2,fy2=by+bh+7,fh2=11;
-    g.fillStyle="rgba(0,0,0,.28)";roundRect(fx2,fy2,fw2,fh2,fh2/2);g.fill();
+    const showFv=fever>0||feverGauge>0.02;   // 軸6: 常時HUDは2段(文字+進行バー)。フィーバーバーは使う時だけ
+    if(showFv){ g.fillStyle="rgba(0,0,0,.28)";roundRect(fx2,fy2,fw2,fh2,fh2/2);g.fill(); }
     if(fever>0){
       // 残り時間バー(虹色に点滅)
       const fr2=clamp(fever/9,0,1);
@@ -722,7 +724,7 @@ function build_gumball(api){
       g.fillStyle=gg2;roundRect(fx2,fy2,Math.max(fh2,fw2*clamp(feverGauge,0,1)),fh2,fh2/2);g.fill();
       g.restore();
     }
-    g.strokeStyle="rgba(255,255,255,.4)";g.lineWidth=1.5;roundRect(fx2,fy2,fw2,fh2,fh2/2);g.stroke();
+    if(showFv){ g.strokeStyle="rgba(255,255,255,.4)";g.lineWidth=1.5;roundRect(fx2,fy2,fw2,fh2,fh2/2);g.stroke(); }
     g.restore();g.textAlign="left";
     // コンボ表示(中央)
     if(combo>1&&rbMsgT<=0&&feverBann<=0&&clearT<=0&&endingT<=0){   // 軸6: 大きいバナーが出ている間はコンボを引っ込める
@@ -748,7 +750,8 @@ function build_gumball(api){
     // 外側のキラキラオーラ
     g.save();g.globalCompositeOperation="lighter";
     const aur=g.createRadialGradient(0,0,r*0.3,0,0,r*1.8);
-    aur.addColorStop(0,hexA(b.col,0.5));aur.addColorStop(1,hexA(b.col,0));
+    let aurA=0.5;for(const q of sweets){ if(!q.dead&&Math.hypot(q.x-b.x,q.y-b.y)<r*1.8+q.r){ aurA=0.3;break; } }   // 軸6: 標的と重なる所はオーラを弱めて標的を埋もれさせない
+    aur.addColorStop(0,hexA(b.col,aurA));aur.addColorStop(1,hexA(b.col,0));
     g.fillStyle=aur;g.beginPath();g.arc(0,0,r*1.8,0,TAU);g.fill();g.restore();
     // 本体(光沢グラデ)
     const grd=g.createRadialGradient(-r*0.35,-r*0.4,r*0.1,0,0,r);
